@@ -3,6 +3,12 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 
+// A local checkout may not have a .env file. Keep sign-up and sign-in usable
+// during development, while still requiring an explicit secret in production.
+if (!process.env.JWT_SECRET && process.env.NODE_ENV !== 'production') {
+  process.env.JWT_SECRET = 'foodbridge-local-development-secret-change-me';
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
