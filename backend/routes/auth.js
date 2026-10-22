@@ -22,7 +22,9 @@ router.post('/register', (req, res) => {
       documentName, documentData, documentUrl: existingDocUrl
     } = req.body;
 
-    if (!email || !password || !name || !role) {
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+
+    if (!normalizedEmail || !password || !name || !role) {
       return res.status(400).json({ error: 'Email, password, name and role are required' });
     }
 
@@ -30,19 +32,28 @@ router.post('/register', (req, res) => {
       return res.status(400).json({ error: 'Invalid role. Must be donor, demand_org, or recipient' });
     }
 
-    const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+    const existing = db.prepare('SELECT id FROM users WHERE lower(email) = ?').get(normalizedEmail);
     if (existing) return res.status(409).json({ error: 'Email already registered' });
+
+    // Do not write anything if token creation cannot succeed. In development a
+    // local fallback keeps the app usable without requiring a .env file; set a
+    // real JWT_SECRET in production.
+    const jwtSecret = process.env.JWT_SECRET ||
+      (process.env.NODE_ENV === 'production' ? null : 'foodbridge-local-development-secret-change-me');
+    if (!jwtSecret) {
+      return res.status(500).json({ error: 'Server authentication is not configured' });
+    }
 
     const passwordHash = bcrypt.hashSync(password, 10);
     const userId = uuidv4();
     let orgId = null;
 
-    // Handle document storage if provided
-    let finalDocUrl = existingDocUrl || '';
-    let finalDocName = documentName || '';
+    const result = db.transaction(() => {
+      // Handle document storage if provided
+      let finalDocUrl = existingDocUrl || '';
+      let finalDocName = documentName || '';
 
-    if (documentData && documentName) {
-      try {
+      if (documentData && documentName) {
         const cleanName = documentName.replace(/[^a-zA-Z0-9._-]/g, '_');
         const filename = `doc_${Date.now()}_${cleanName}`;
         const filePath = path.join(uploadsDir, filename);
@@ -53,53 +64,53 @@ router.post('/register', (req, res) => {
 
         finalDocUrl = `/uploads/${filename}`;
         finalDocName = documentName;
-      } catch (docErr) {
-        console.error('[Auth/DocUpload Error]', docErr.message);
       }
-    }
 
-    // Create organization for donor and demand_org
-    if (role !== 'recipient' && orgName) {
-      orgId = uuidv4();
-      db.prepare(`
+      // Create organization for donor and demand_org
+      if (role !== 'recipient' && orgName) {
+        orgId = uuidv4();
+        db.prepare(`
         INSERT INTO organizations (id, name, type, location_address, location_lat, location_lng, operating_hours, contact_phone, contact_email, description, status, document_url, document_name)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
-      `).run(
-        orgId, orgName, orgType || role, locationAddress || '',
-        locationLat || 0, locationLng || 0, operatingHours || '',
-        contactPhone || '', email, description || '',
-        finalDocUrl, finalDocName
-      );
+        `).run(
+          orgId, orgName, orgType || role, locationAddress || '',
+          locationLat || 0, locationLng || 0, operatingHours || '',
+          contactPhone || '', normalizedEmail, description || '',
+          finalDocUrl, finalDocName
+        );
 
-      if (finalDocUrl) {
-        db.prepare(`
+        if (finalDocUrl) {
+          db.prepare(`
           INSERT INTO organization_documents (id, org_id, file_name, file_path, doc_type)
           VALUES (?, ?, ?, ?, 'verification_certificate')
-        `).run(uuidv4(), orgId, finalDocName, finalDocUrl);
+          `).run(uuidv4(), orgId, finalDocName, finalDocUrl);
+        }
+
+        if (role === 'donor') {
+          db.prepare('INSERT INTO donor_profiles (org_id) VALUES (?)').run(orgId);
+        } else if (role === 'demand_org') {
+          db.prepare('INSERT INTO demand_org_profiles (org_id) VALUES (?)').run(orgId);
+        }
       }
 
-      if (role === 'donor') {
-        db.prepare('INSERT INTO donor_profiles (org_id) VALUES (?)').run(orgId);
-      } else if (role === 'demand_org') {
-        db.prepare('INSERT INTO demand_org_profiles (org_id) VALUES (?)').run(orgId);
-      }
-    }
-
-    db.prepare(`
+      db.prepare(`
       INSERT INTO users (id, email, password_hash, role, org_id, name) VALUES (?, ?, ?, ?, ?, ?)
-    `).run(userId, email, passwordHash, role, orgId, name);
+      `).run(userId, normalizedEmail, passwordHash, role, orgId, name);
 
-    const token = jwt.sign(
-      { id: userId, email, role, orgId, name },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
-    );
+      const token = jwt.sign(
+        { id: userId, email: normalizedEmail, role, orgId, name },
+        jwtSecret,
+        { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      );
 
-    res.status(201).json({
-      token,
-      user: { id: userId, email, name, role, orgId },
-      documentUploaded: !!finalDocUrl
-    });
+      return {
+        token,
+        user: { id: userId, email: normalizedEmail, name, role, orgId },
+        documentUploaded: !!finalDocUrl
+      };
+    })();
+
+    res.status(201).json(result);
   } catch (err) {
     console.error('[Auth/Register]', err);
     res.status(500).json({ error: 'Registration failed' });
