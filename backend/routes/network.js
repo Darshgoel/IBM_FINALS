@@ -38,7 +38,7 @@ router.get('/overview', (req, res) => {
     `).all();
 
     const wasteRiskCount = wasteRisksRaw.length;
-    const fulfillmentRate = totalDemand.c > 0 ? Math.round((fulfilledDemand.c / totalDemand.c) * 100) : 84;
+    const fulfillmentRate = totalDemand.c > 0 ? Math.round((fulfilledDemand.c / totalDemand.c) * 100) : (totalSurplus.c > 0 ? 100 : 0);
 
     // Recent surplus for overview list
     const recentSurplusRaw = db.prepare(`
@@ -211,42 +211,110 @@ router.get('/redistributions', (req, res) => {
 // ── GET /api/network/rebalancing ───────────────────────────────────────────
 router.get('/rebalancing', (req, res) => {
   try {
-    // Generate zone balance from real organizations and active posts
-    const zones = [
-      { name: 'Central Business District (CBD)', supply: 75, demand: 30, balance: 45 },
-      { name: 'Indiranagar & East Corridor',    supply: 45, demand: 15, balance: 30 },
-      { name: 'Shivajinagar & Cantt Zone',     supply: 10, demand: 60, balance: -50 },
-      { name: 'Shanthi Nagar & South Central',  supply: 20, demand: 45, balance: -25 },
-      { name: 'Koramangala & BTM Area',         supply: 35, demand: 35, balance: 0 },
-      { name: 'Whitefield Tech Belt',           supply: 50, demand: 20, balance: 30 }
-    ];
+    const allOrgs = db.prepare(`SELECT id, name, location_address FROM organizations`).all();
+    
+    // Group into logical areas
+    const areaMap = {};
+    allOrgs.forEach(o => {
+      let area = 'Central City';
+      const addr = (o.location_address || o.name || '').toLowerCase();
+      if (addr.includes('indiranagar')) area = 'Indiranagar & East';
+      else if (addr.includes('mg road') || addr.includes('central business') || addr.includes('cbd') || addr.includes('brigade')) area = 'Central Business District (CBD)';
+      else if (addr.includes('koramangala')) area = 'Koramangala';
+      else if (addr.includes('shanthi nagar') || addr.includes('richmond')) area = 'Shanthi Nagar & South';
+      else if (addr.includes('shivajinagar') || addr.includes('cantonment')) area = 'Shivajinagar';
+      else if (addr.includes('whitefield')) area = 'Whitefield Tech Belt';
+      else if (addr.includes('btm')) area = 'BTM & South-East';
+      else if (addr.includes('yeshwanthpur')) area = 'Yeshwanthpur Logistics';
+      else if (addr.includes('ambala')) area = 'Ambala Cantt Hub';
+      else area = o.location_address?.split(',')[0]?.trim() || o.name;
 
-    const recommendations = [
-      {
-        id: 'rec-1',
-        icon: '🔄',
-        title: 'Redirect CBD surplus to Shivajinagar',
-        detail: 'Central Business District has +45 net meals surplus while Shivajinagar shelter faces a −50 meal deficit (distance ~3.8 km).',
-        priority: 'high'
-      },
-      {
-        id: 'rec-2',
-        icon: '🚚',
-        title: 'Route Indiranagar surplus to Shanthi Nagar',
-        detail: 'Connect Indiranagar corporate catering lunch excess (+30 meals) to Helping Hands evening mission (-25 meals).',
-        priority: 'medium'
-      },
-      {
-        id: 'rec-3',
-        icon: '🏦',
-        title: 'Buffer Whitefield excess into Cold Storage Hub',
-        detail: 'Whitefield commercial donor activity is peaking. Divert unassigned produce to Yeshwanthpur Central Food Bank.',
-        priority: 'low'
+      if (!areaMap[area]) {
+        areaMap[area] = { name: area, orgIds: [], supply: 0, demand: 0 };
       }
-    ];
+      areaMap[area].orgIds.push(o.id);
+    });
+
+    const activeSurplus = db.prepare(`
+      SELECT donor_org_id, SUM(quantity) as qty
+      FROM surplus_posts
+      WHERE status NOT IN ('cancelled', 'expired')
+      GROUP BY donor_org_id
+    `).all();
+
+    const activeDemands = db.prepare(`
+      SELECT demand_org_id, SUM(quantity_needed) as qty
+      FROM demand_registrations
+      WHERE status NOT IN ('cancelled', 'fulfilled')
+      GROUP BY demand_org_id
+    `).all();
+
+    activeSurplus.forEach(s => {
+      for (const area of Object.values(areaMap)) {
+        if (area.orgIds.includes(s.donor_org_id)) {
+          area.supply += Math.round(s.qty);
+        }
+      }
+    });
+
+    activeDemands.forEach(d => {
+      for (const area of Object.values(areaMap)) {
+        if (area.orgIds.includes(d.demand_org_id)) {
+          area.demand += Math.round(d.qty);
+        }
+      }
+    });
+
+    const zones = Object.values(areaMap)
+      .map(z => ({
+        name: z.name,
+        supply: z.supply,
+        demand: z.demand,
+        balance: z.supply - z.demand
+      }))
+      .sort((a, b) => b.balance - a.balance);
+
+    const surplusZones = zones.filter(z => z.balance > 0);
+    const deficitZones = zones.filter(z => z.balance < 0);
+    const recommendations = [];
+
+    if (surplusZones.length > 0 && deficitZones.length > 0) {
+      surplusZones.slice(0, 2).forEach((sz, idx) => {
+        const dz = deficitZones[idx % deficitZones.length];
+        recommendations.push({
+          id: `rec-real-${idx + 1}`,
+          icon: '🔄',
+          title: `Rebalance: Transfer from ${sz.name} to ${dz.name}`,
+          detail: `${sz.name} has a net surplus of +${sz.balance} units while ${dz.name} has an unmet demand of ${Math.abs(dz.balance)} units. Cross-zone dispatch recommended.`,
+          priority: Math.abs(dz.balance) > 30 ? 'high' : 'medium'
+        });
+      });
+    }
+
+    if (surplusZones.length > 0) {
+      const topSurplus = surplusZones[0];
+      recommendations.push({
+        id: 'rec-buffer-1',
+        icon: '🏦',
+        title: `Buffer excess from ${topSurplus.name} to Central Reserve`,
+        detail: `${topSurplus.name} has +${topSurplus.balance} surplus units available. Direct to Central Reserve Hub for perishable stabilization.`,
+        priority: 'low'
+      });
+    }
+
+    if (recommendations.length === 0) {
+      recommendations.push({
+        id: 'rec-balanced',
+        icon: '✅',
+        title: 'Network Supply & Demand Balanced',
+        detail: 'Current active food registrations are balanced across all monitored zones. No emergency cross-zone redistribution needed.',
+        priority: 'low'
+      });
+    }
 
     res.json({ zones, recommendations });
   } catch (err) {
+    console.error('Rebalancing error:', err);
     res.status(500).json({ error: 'Failed to fetch rebalancing data' });
   }
 });
@@ -261,34 +329,30 @@ router.get('/reserve', (req, res) => {
       WHERE o.type = 'food_bank' OR o.name LIKE '%reserve%' OR o.name LIKE '%bank%'
     `).all();
 
-    const reservePoints = foodBanksRaw.map(fb => ({
-      id: fb.id,
-      name: fb.name,
-      locationAddress: fb.location_address,
-      capacity: fb.serving_capacity || 1500,
-      currentLoad: 420,
-      storageInfo: fb.storage_capacity || 'Cold + Dry storage',
-      status: 'operational'
-    }));
+    const reservePoints = foodBanksRaw.map(fb => {
+      const currentLoadRaw = db.prepare(`
+        SELECT COALESCE(SUM(sp.quantity), 0) as qty
+        FROM matches m
+        JOIN surplus_posts sp ON m.surplus_id = sp.id
+        WHERE m.demand_org_id = ? AND m.status IN ('matched', 'in_transit', 'confirmed')
+      `).get(fb.id);
 
-    // If none found in DB, provide default operational reserve point
-    if (!reservePoints.length) {
-      reservePoints.push({
-        id: 'res-default',
-        name: 'Central Food Bank & Reserve Hub',
-        locationAddress: 'Yeshwanthpur Logistics Park',
-        capacity: 1500,
-        currentLoad: 380,
-        storageInfo: '5000kg dry + 1000kg cold storage',
+      return {
+        id: fb.id,
+        name: fb.name,
+        locationAddress: fb.location_address,
+        capacity: fb.serving_capacity || 1500,
+        currentLoad: Math.round(currentLoadRaw.qty || 0),
+        storageInfo: fb.storage_capacity || 'Cold & Dry multi-zone storage facility',
         status: 'operational'
-      });
-    }
+      };
+    });
 
     const pendingReserve = db.prepare(`
       SELECT sp.*, o.name as donor_name
       FROM surplus_posts sp
       JOIN organizations o ON sp.donor_org_id = o.id
-      WHERE sp.status = 'available' AND sp.remaining_usable_time <= datetime('now', '+2 hours')
+      WHERE sp.status = 'available' AND sp.remaining_usable_time <= datetime('now', '+3 hours')
     `).all().map(p => ({
       id: p.id,
       title: p.food_name,
@@ -296,7 +360,7 @@ router.get('/reserve', (req, res) => {
       donorName: p.donor_name,
       quantity: p.quantity,
       unit: p.quantity_unit,
-      address: p.pickup_address,
+      address: p.pickup_address || p.location_address,
       status: 'pending_buffer'
     }));
 
@@ -309,40 +373,79 @@ router.get('/reserve', (req, res) => {
 // ── GET /api/network/community ─────────────────────────────────────────────
 router.get('/community', (req, res) => {
   try {
-    const surplusHotspots = [
-      { area: 'Central Business District (MG Rd / Residency Rd)', detail: '14 hotel and banquet kitchens with regular evening meal surplus', severity: 'high' },
-      { area: 'Indiranagar Tech Park Zone', detail: 'Corporate cafeterias generating weekday lunch surplus (12:30 - 2:30pm)', severity: 'medium' },
-      { area: 'Koramangala Commercial Hub', detail: 'Supermarkets & retail grocers with fresh produce & bakery stock', severity: 'medium' }
-    ];
+    const topSurplus = db.prepare(`
+      SELECT o.name, o.location_address as area, COUNT(*) as post_count, COALESCE(SUM(sp.quantity), 0) as total_qty
+      FROM organizations o
+      JOIN surplus_posts sp ON o.id = sp.donor_org_id
+      WHERE sp.status != 'cancelled'
+      GROUP BY o.id
+      ORDER BY total_qty DESC LIMIT 4
+    `).all();
 
-    const demandHotspots = [
-      { area: 'Shivajinagar & Cantonment Slums', detail: 'High concentration of unhoused and daily-wage families requiring daily hot meals', severity: 'high' },
-      { area: 'Shanthi Nagar Migrant Settlements', detail: 'Evening dinner requirements for children and low-income laborers', severity: 'high' },
-      { area: 'BTM Layout 2nd Stage', detail: 'After-school nutrition centers needing milk, fruit, and snacks', severity: 'medium' }
-    ];
+    const surplusHotspots = topSurplus.map(s => ({
+      area: s.area || s.name,
+      detail: `${s.name} — ${s.post_count} surplus donations (${Math.round(s.total_qty * 10) / 10} kg registered)`,
+      severity: s.total_qty > 50 ? 'high' : 'medium'
+    }));
 
-    const accessGaps = [
-      { area: 'North-East Transit Corridor', detail: 'No certified demand organizations within 5 km of large banquet halls', severity: 'high' },
-      { area: 'South Industrial Suburb', detail: 'Weekend surplus goes uncollected due to volunteer logistics deficit', severity: 'medium' }
-    ];
+    const topDemand = db.prepare(`
+      SELECT o.name, o.location_address as area, COUNT(*) as demand_count, COALESCE(SUM(dr.quantity_needed), 0) as total_qty
+      FROM organizations o
+      JOIN demand_registrations dr ON o.id = dr.demand_org_id
+      WHERE dr.status != 'cancelled'
+      GROUP BY o.id
+      ORDER BY total_qty DESC LIMIT 4
+    `).all();
 
-    const mismatches = [
-      {
-        id: 'mis-1',
-        title: 'Chilled dairy & milk packets vs ambient transport',
-        detail: 'Donors offer perishables requiring 4°C cold chain, but local volunteers lack thermal refrigeration boxes.',
-        frequency: 'Daily occurrence'
-      },
-      {
-        id: 'mis-2',
-        title: 'Bulk banquet curry & rice vs individual portion needs',
-        detail: 'Catering containers of 40kg require re-portioning and packaging before street distribution.',
-        frequency: 'Weekends'
+    const demandHotspots = topDemand.map(d => ({
+      area: d.area || d.name,
+      detail: `${d.name} — ${d.demand_count} community requests (${Math.round(d.total_qty)} servings needed)`,
+      severity: d.total_qty > 50 ? 'high' : 'medium'
+    }));
+
+    const unservedDemands = db.prepare(`
+      SELECT dr.*, o.name as org_name, o.location_address as area
+      FROM demand_registrations dr
+      JOIN organizations o ON dr.demand_org_id = o.id
+      WHERE dr.status = 'open'
+      ORDER BY dr.created_at ASC LIMIT 3
+    `).all();
+
+    const accessGaps = unservedDemands.map(u => ({
+      area: u.area || u.org_name,
+      detail: `${u.org_name} has an unfulfilled request for ${u.quantity_needed} ${u.quantity_unit} of ${u.food_requirement.replace(/_/g, ' ')}. Requires donor connection.`,
+      severity: u.urgency === 'emergency' || u.urgency === 'immediate' ? 'high' : 'medium'
+    }));
+
+    const mismatches = [];
+    const openRequirements = db.prepare(`
+      SELECT DISTINCT food_requirement, quantity_unit, SUM(quantity_needed) as needed
+      FROM demand_registrations
+      WHERE status IN ('open', 'partially_fulfilled')
+      GROUP BY food_requirement
+    `).all();
+
+    const availableTypes = db.prepare(`
+      SELECT DISTINCT food_type
+      FROM surplus_posts
+      WHERE status = 'available'
+    `).all().map(r => r.food_type);
+
+    openRequirements.forEach(reqItem => {
+      const isAvailable = availableTypes.some(t => t.toLowerCase() === reqItem.food_requirement.toLowerCase());
+      if (!isAvailable) {
+        mismatches.push({
+          id: `mis-${mismatches.length + 1}`,
+          title: `Unmet Need: ${reqItem.food_requirement.replace(/_/g, ' ')}`,
+          detail: `Community demands ${Math.round(reqItem.needed)} ${reqItem.quantity_unit || 'servings'} of ${reqItem.food_requirement.replace(/_/g, ' ')}, but 0 matching available surplus exists in the donor network.`,
+          frequency: 'Active deficit'
+        });
       }
-    ];
+    });
 
     res.json({ surplusHotspots, demandHotspots, accessGaps, mismatches });
   } catch (err) {
+    console.error('Community intel error:', err);
     res.status(500).json({ error: 'Failed to fetch community intelligence' });
   }
 });
@@ -380,39 +483,86 @@ router.get('/waste-risk', (req, res) => {
 // ── GET /api/network/interventions ─────────────────────────────────────────
 router.get('/interventions', (req, res) => {
   try {
-    const interventions = [
-      {
-        id: 'int-1',
+    const interventions = [];
+
+    const urgentSurplus = db.prepare(`
+      SELECT sp.*, o.name as donor_name, o.location_address
+      FROM surplus_posts sp
+      JOIN organizations o ON sp.donor_org_id = o.id
+      WHERE sp.status = 'available'
+      ORDER BY sp.remaining_usable_time ASC LIMIT 3
+    `).all();
+
+    urgentSurplus.forEach((s) => {
+      interventions.push({
+        id: `int-surplus-${s.id}`,
         icon: '🚨',
-        title: 'Emergency Match: 30 Sandwiches expiring in 90 mins',
-        detail: 'FreshBites Indiranagar post is approaching expiry. Recommended match: City Hope Shelter (2.8 km away).',
+        title: `Dispatch Expiring Surplus: ${s.food_name} (${s.quantity} ${s.quantity_unit})`,
+        detail: `${s.donor_name} has ${s.quantity} ${s.quantity_unit} of ${s.food_name} available. Immediate match dispatch recommended to avoid landfill loss.`,
         priority: 'high'
-      },
-      {
-        id: 'int-2',
+      });
+    });
+
+    const urgentDemands = db.prepare(`
+      SELECT dr.*, o.name as org_name
+      FROM demand_registrations dr
+      JOIN organizations o ON dr.demand_org_id = o.id
+      WHERE dr.status IN ('open', 'partially_fulfilled')
+      ORDER BY CASE dr.urgency WHEN 'emergency' THEN 1 WHEN 'immediate' THEN 2 ELSE 3 END, dr.created_at ASC
+      LIMIT 3
+    `).all();
+
+    urgentDemands.forEach(d => {
+      interventions.push({
+        id: `int-demand-${d.id}`,
         icon: '⚖️',
-        title: 'Network Rebalance: Shift 45 meals from CBD to Shivajinagar',
-        detail: 'Grand Hotel surplus is available. Route via transport coordinator to relieve dinner demand backlog.',
-        priority: 'high'
-      },
-      {
-        id: 'int-3',
-        icon: '🏦',
-        title: 'Buffer unallocated milk crates into Central Cold Reserve',
-        detail: 'GreenLeaf dairy surplus requires cold chain. Automated transfer ticket prepared for Yeshwanthpur Hub.',
+        title: `Prioritize Demand: ${d.food_requirement} (${d.quantity_needed} ${d.quantity_unit})`,
+        detail: `${d.org_name} has an active ${d.urgency} request for ${d.quantity_needed} ${d.quantity_unit}. Route nearest available supply or buffer reserve.`,
+        priority: d.urgency === 'emergency' || d.urgency === 'immediate' ? 'high' : 'medium'
+      });
+    });
+
+    const pendingMatches = db.prepare(`
+      SELECT m.*, sp.food_name, do1.name as donor_name, do2.name as recipient_name
+      FROM matches m
+      JOIN surplus_posts sp ON m.surplus_id = sp.id
+      JOIN organizations do1 ON sp.donor_org_id = do1.id
+      LEFT JOIN organizations do2 ON m.demand_org_id = do2.id
+      WHERE m.status = 'pending'
+      LIMIT 2
+    `).all();
+
+    pendingMatches.forEach(m => {
+      interventions.push({
+        id: `int-match-${m.id}`,
+        icon: '🚚',
+        title: `Confirm Match: ${m.food_name} → ${m.recipient_name || 'Recipient'}`,
+        detail: `Automated match generated between ${m.donor_name} and ${m.recipient_name || 'Recipient'}. Verify transport coordinator and dispatch.`,
         priority: 'medium'
-      },
-      {
-        id: 'int-4',
+      });
+    });
+
+    const largeSurplus = db.prepare(`
+      SELECT sp.*, o.name as donor_name
+      FROM surplus_posts sp
+      JOIN organizations o ON sp.donor_org_id = o.id
+      WHERE sp.quantity >= 30 AND sp.status IN ('available', 'matched')
+      LIMIT 1
+    `).get();
+
+    if (largeSurplus) {
+      interventions.push({
+        id: `int-bulk-${largeSurplus.id}`,
         icon: '📦',
-        title: 'Packaging intervention for bulk banquet rice',
-        detail: 'Provide 50 foil takeaway containers to donor loading dock for hygienic individual parceling.',
+        title: `Packaging Support: ${largeSurplus.donor_name} (${largeSurplus.quantity} ${largeSurplus.quantity_unit})`,
+        detail: `Bulk donation of ${largeSurplus.food_name} requires portioning containers and thermal packing before last-mile delivery.`,
         priority: 'low'
-      }
-    ];
+      });
+    }
 
     res.json({ interventions });
   } catch (err) {
+    console.error('Interventions error:', err);
     res.status(500).json({ error: 'Failed to fetch interventions' });
   }
 });
@@ -422,43 +572,74 @@ router.get('/metrics', (req, res) => {
   try {
     const totalSurplus = db.prepare("SELECT COALESCE(SUM(quantity), 0) as q FROM surplus_posts WHERE status != 'cancelled'").get();
     const totalDemand = db.prepare("SELECT COALESCE(SUM(quantity_needed), 0) as q FROM demand_registrations WHERE status != 'cancelled'").get();
-    const recovered = db.prepare("SELECT COALESCE(SUM(quantity), 0) as q FROM surplus_posts WHERE status = 'completed'").get();
-    const expired = db.prepare("SELECT COALESCE(SUM(quantity), 0) as q FROM surplus_posts WHERE status = 'expired'").get();
+    const recovered = db.prepare("SELECT COALESCE(SUM(quantity), 0) as q FROM surplus_posts WHERE status IN ('completed', 'in_transit', 'matched')").get();
     const openDemand = db.prepare("SELECT COALESCE(SUM(quantity_needed), 0) as q FROM demand_registrations WHERE status IN ('open','partially_fulfilled')").get();
 
-    const fulfillmentRate = totalDemand.q > 0 ? Math.round(((totalDemand.q - openDemand.q) / totalDemand.q) * 100) : 88;
+    const totalSurplusQty = Math.round(totalSurplus.q * 10) / 10;
+    const totalDemandQty = Math.round(totalDemand.q);
+    const recoveredQty = Math.round(recovered.q * 10) / 10;
+    const openDemandQty = Math.round(openDemand.q);
 
-    const weeklyData = [
-      { day: 'Mon', surplus: 120, demand: 110, fulfilled: 105 },
-      { day: 'Tue', surplus: 140, demand: 130, fulfilled: 125 },
-      { day: 'Wed', surplus: 115, demand: 120, fulfilled: 110 },
-      { day: 'Thu', surplus: 160, demand: 145, fulfilled: 140 },
-      { day: 'Fri', surplus: 195, demand: 180, fulfilled: 175 },
-      { day: 'Sat', surplus: 230, demand: 210, fulfilled: 200 },
-      { day: 'Sun', surplus: 210, demand: 195, fulfilled: 190 }
-    ];
+    const fulfillmentRate = totalDemandQty > 0 ? Math.round(((totalDemandQty - openDemandQty) / totalDemandQty) * 100) : (totalSurplusQty > 0 ? 100 : 0);
 
-    const wasteData = [
-      { day: 'Mon', intercepted: 105, unintercepted: 8 },
-      { day: 'Tue', intercepted: 125, unintercepted: 10 },
-      { day: 'Wed', intercepted: 110, unintercepted: 5 },
-      { day: 'Thu', intercepted: 140, unintercepted: 9 },
-      { day: 'Fri', intercepted: 175, unintercepted: 12 },
-      { day: 'Sat', intercepted: 200, unintercepted: 15 },
-      { day: 'Sun', intercepted: 190, unintercepted: 11 }
-    ];
+    const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const weeklyData = [];
+    const wasteData = [];
+
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayName = daysOfWeek[d.getDay()];
+
+      const daySurplus = db.prepare(`
+        SELECT COALESCE(SUM(quantity), 0) as qty FROM surplus_posts WHERE created_at LIKE ? AND status != 'cancelled'
+      `).get(`${dateStr}%`);
+
+      const dayDemand = db.prepare(`
+        SELECT COALESCE(SUM(quantity_needed), 0) as qty FROM demand_registrations WHERE created_at LIKE ? AND status != 'cancelled'
+      `).get(`${dateStr}%`);
+
+      const dayFulfilled = db.prepare(`
+        SELECT COALESCE(SUM(sp.quantity), 0) as qty
+        FROM matches m
+        JOIN surplus_posts sp ON m.surplus_id = sp.id
+        WHERE m.status IN ('completed', 'in_transit', 'confirmed', 'matched')
+          AND (m.matched_at LIKE ? OR m.completed_at LIKE ?)
+      `).get(`${dateStr}%`, `${dateStr}%`);
+
+      const dayExpired = db.prepare(`
+        SELECT COALESCE(SUM(quantity), 0) as qty FROM surplus_posts WHERE status = 'expired' AND updated_at LIKE ?
+      `).get(`${dateStr}%`);
+
+      weeklyData.push({
+        day: dayName,
+        date: dateStr,
+        surplus: Math.round(daySurplus.qty || 0),
+        demand: Math.round(dayDemand.qty || 0),
+        fulfilled: Math.round(dayFulfilled.qty || 0)
+      });
+
+      wasteData.push({
+        day: dayName,
+        date: dateStr,
+        intercepted: Math.round(dayFulfilled.qty || 0),
+        unintercepted: Math.round(dayExpired.qty || 0)
+      });
+    }
 
     res.json({
-      totalSurplus: `${Math.round(totalSurplus.q || 1170)} kg`,
-      totalDemand: `${Math.round(totalDemand.q || 1090)} kg`,
-      foodRecovered: `${Math.round(recovered.q || 1045)} kg`,
-      wastePrevented: `${Math.round((recovered.q || 1045) * 2.5)} kg CO₂e`,
+      totalSurplus: `${totalSurplusQty} kg`,
+      totalDemand: `${totalDemandQty} servings`,
+      foodRecovered: `${recoveredQty} kg`,
+      wastePrevented: `${Math.round(recoveredQty * 2.5 * 10) / 10} kg CO₂e`,
       fulfillmentRate,
-      unmetDemand: `${Math.round(openDemand.q || 115)} kg`,
+      unmetDemand: `${openDemandQty} servings`,
       weeklyData,
       wasteData
     });
   } catch (err) {
+    console.error('Metrics error:', err);
     res.status(500).json({ error: 'Failed to fetch network metrics' });
   }
 });

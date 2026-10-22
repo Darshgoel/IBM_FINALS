@@ -84,18 +84,18 @@ async function apiFetch(endpoint) {
 async function loadOverview() {
   let d;
   try   { d = await apiFetch('/network/overview'); }
-  catch { d = demoOverview(); }
+  catch { d = {}; }
 
-  setText('ov-surplus',       d.activeSurplus ?? '—');
-  setText('ov-demand',        d.activeDemands ?? '—');
-  setText('ov-redist',        d.activeRedistributions ?? '—');
-  setText('ov-rate',          (d.fulfillmentRate ?? '—') + (d.fulfillmentRate ? '%' : ''));
-  setText('ov-risk',          d.wasteRiskCount ?? '—');
-  setText('ov-recovered',     d.foodRecoveredToday ?? '—');
+  setText('ov-surplus',       d.activeSurplus ?? '0');
+  setText('ov-demand',        d.activeDemands ?? '0');
+  setText('ov-redist',        d.activeRedistributions ?? '0');
+  setText('ov-rate',          (d.fulfillmentRate ?? 0) + '%');
+  setText('ov-risk',          d.wasteRiskCount ?? '0');
+  setText('ov-recovered',     d.foodRecoveredToday ?? '0 kg');
 
-  renderNetList('ov-surplus-list', (d.recentSurplus || demoSurplus().slice(0,4)), 'surplus');
-  renderNetList('ov-demand-list',  (d.urgentDemands || demoDemands().slice(0,4).filter(x=>x.urgency==='emergency'||x.urgency==='immediate')), 'demand');
-  renderRiskList('ov-risk-list',   (d.wasteRisks    || demoWasteRisks().slice(0,3)));
+  renderNetList('ov-surplus-list', (d.recentSurplus || []), 'surplus');
+  renderNetList('ov-demand-list',  (d.urgentDemands || []), 'demand');
+  renderRiskList('ov-risk-list',   (d.wasteRisks    || []));
 }
 
 // ── SUPPLY & DEMAND ──────────────────────────────────────────
@@ -106,8 +106,8 @@ async function loadSupplyDemand() {
     surplus  = d.surplus || [];
     demands  = d.demands || [];
   } catch {
-    surplus = demoSurplus();
-    demands = demoDemands();
+    surplus = [];
+    demands = [];
   }
   allSdItems = [
     ...surplus.map(s => ({ ...s, _type: 'surplus' })),
@@ -137,7 +137,7 @@ async function loadRedistributions() {
     const d = await apiFetch('/network/redistributions');
     allRedistributions = d.redistributions || [];
   } catch {
-    allRedistributions = demoRedistributions();
+    allRedistributions = [];
   }
   renderRedistList(rdFilterVal);
 }
@@ -181,8 +181,8 @@ async function loadRebalancing() {
     zones = d.zones || [];
     recs  = d.recommendations || [];
   } catch {
-    zones = demoZones();
-    recs  = demoRebalancingRecs();
+    zones = [];
+    recs  = [];
   }
 
   const surplus = zones.filter(z => z.balance > 0);
@@ -226,8 +226,8 @@ async function loadFallback() {
     points  = d.reservePoints || [];
     pending = d.pendingReserve || [];
   } catch {
-    points  = demoReservePoints();
-    pending = demoPendingReserve();
+    points  = [];
+    pending = [];
   }
 
   renderNetList('reserve-points', points, 'reserve');
@@ -238,12 +238,12 @@ async function loadFallback() {
 async function loadCommunity() {
   let ci;
   try   { ci = await apiFetch('/network/community'); }
-  catch { ci = demoCommunity(); }
+  catch { ci = {}; }
 
   renderHotspots('surplus-hotspots', ci.surplusHotspots || [], 'surplus');
   renderHotspots('demand-hotspots',  ci.demandHotspots  || [], 'demand');
   renderHotspots('access-gaps',      ci.accessGaps      || [], 'gap');
-  renderNetList('recurring-mismatches', ci.mismatches || demoMismatches(), 'mismatch');
+  renderNetList('recurring-mismatches', ci.mismatches || [], 'mismatch');
 }
 
 function renderHotspots(id, spots, type) {
@@ -263,7 +263,7 @@ function renderHotspots(id, spots, type) {
 window.loadWasteRisk = async function() {
   let risks;
   try   { const d = await apiFetch('/network/waste-risk'); risks = d.risks || []; }
-  catch { risks = demoWasteRisks(); }
+  catch { risks = []; }
   renderRiskList('risk-full-list', risks);
   updateBadge('risk-badge', risks.filter(r => !r.resolved).length);
 };
@@ -293,7 +293,7 @@ window.routeToReserve      = function(id) { toast('🏦 Routing to nearest reser
 // ── INTERVENTIONS ────────────────────────────────────────────
 async function loadInterventions() {
   try   { const d = await apiFetch('/network/interventions'); allInterventions = d.interventions || []; }
-  catch { allInterventions = demoInterventions(); }
+  catch { allInterventions = []; }
   renderInterventionList('interventions-list', filterInterventions(intFilterVal));
 }
 
@@ -339,17 +339,17 @@ window.dismissIntervention = function(id, btn) {
 async function loadMetrics() {
   let m;
   try   { m = await apiFetch('/network/metrics'); }
-  catch { m = demoMetrics(); }
+  catch { m = {}; }
 
-  setText('m-total-surplus',   m.totalSurplus    || '—');
-  setText('m-total-demand',    m.totalDemand     || '—');
-  setText('m-recovered',       m.foodRecovered   || '—');
-  setText('m-waste-prevented', m.wastePrevented  || '—');
-  setText('m-fulfillment',     (m.fulfillmentRate || '—') + (m.fulfillmentRate ? '%' : ''));
-  setText('m-unmet',           m.unmetDemand     || '—');
+  setText('m-total-surplus',   m.totalSurplus    || '0 kg');
+  setText('m-total-demand',    m.totalDemand     || '0 servings');
+  setText('m-recovered',       m.foodRecovered   || '0 kg');
+  setText('m-waste-prevented', m.wastePrevented  || '0 kg CO₂e');
+  setText('m-fulfillment',     (m.fulfillmentRate ?? 0) + '%');
+  setText('m-unmet',           m.unmetDemand     || '0 servings');
 
-  renderSdChart(m.weeklyData   || demoWeekly());
-  renderWasteChart(m.wasteData || demoWasteWeekly());
+  renderSdChart(m.weeklyData   || []);
+  renderWasteChart(m.wasteData || []);
 }
 
 function renderSdChart(data) {
@@ -443,8 +443,8 @@ async function checkBadges() {
     updateBadge('risk-badge',   d.wasteRiskCount         || 0);
     updateBadge('redist-badge', d.activeRedistributions   || 0);
   } catch {
-    updateBadge('risk-badge',   5);
-    updateBadge('redist-badge', 8);
+    updateBadge('risk-badge',   0);
+    updateBadge('redist-badge', 0);
   }
 }
 function updateBadge(id, n) {
@@ -461,149 +461,36 @@ window.refreshAll = async function() {
   toast('↻ Refreshed', 'info');
 };
 
-// ── DEMO DATA ─────────────────────────────────────────────────
+// ── FALLBACK / EMPTY STATE HELPERS ───────────────────────────
 function demoOverview() {
   return {
-    activeSurplus: 24, activeDemands: 18, activeRedistributions: 11,
-    fulfillmentRate: 78, wasteRiskCount: 5, foodRecoveredToday: '1,840 meals',
-    recentSurplus: demoSurplus().slice(0,4),
-    urgentDemands: demoDemands().filter(d=>['emergency','immediate'].includes(d.urgency)).slice(0,4),
-    wasteRisks: demoWasteRisks().slice(0,3),
+    activeSurplus: 0, activeDemands: 0, activeRedistributions: 0,
+    fulfillmentRate: 0, wasteRiskCount: 0, foodRecoveredToday: '0 kg',
+    recentSurplus: [], urgentDemands: [], wasteRisks: [],
   };
 }
-
-function demoSurplus() {
-  return [
-    { id:'s1', foodType:'Cooked Meals',    quantity:250, unit:'servings', donorName:'Grand Hyatt Hotel',      locationAddress:'Banjara Hills',  urgency:'immediate', status:'finding',  createdAt: ago(20), expiresAt: ago(-90) },
-    { id:'s2', foodType:'Bread & Pastries',quantity:80,  unit:'packets',  donorName:'Oven Fresh Bakery',      locationAddress:'Jubilee Hills',   urgency:'regular',   status:'matched',  createdAt: ago(45), expiresAt: ago(-180) },
-    { id:'s3', foodType:'Raw Vegetables',  quantity:60,  unit:'kg',       donorName:'FreshMart Superstore',  locationAddress:'Madhapur',        urgency:'planned',   status:'active',   createdAt: ago(10), expiresAt: ago(-360) },
-    { id:'s4', foodType:'Biryani',         quantity:120, unit:'servings', donorName:'Spice Garden Restaurant',locationAddress:'Kondapur',        urgency:'immediate', status:'progress', createdAt: ago(60), expiresAt: ago(-60) },
-    { id:'s5', foodType:'Packaged Snacks', quantity:200, unit:'packets',  donorName:'EventCo Caterers',      locationAddress:'HITEC City',      urgency:'regular',   status:'completed',createdAt: ago(180), expiresAt: ago(-480) },
-  ];
-}
-
-function demoDemands() {
-  return [
-    { id:'d1', foodType:'Cooked Meals',    quantity:200, unit:'servings', orgName:'Hope Foundation NGO',      locationAddress:'Khairatabad', urgency:'emergency', status:'searching', createdAt: ago(5) },
-    { id:'d2', foodType:'Any Food',        quantity:100, unit:'servings', orgName:'City Shelter Home',        locationAddress:'Nampally',    urgency:'immediate', status:'matched',   createdAt: ago(30) },
-    { id:'d3', foodType:'Rice & Dal',      quantity:150, unit:'servings', orgName:'Helping Hands Kitchen',    locationAddress:'Secunderabad',urgency:'regular',   status:'active',    createdAt: ago(60) },
-    { id:'d4', foodType:'Vegetables',      quantity:40,  unit:'kg',       orgName:'Community Food Bank',      locationAddress:'Kukatpally',  urgency:'planned',   status:'active',    createdAt: ago(120) },
-  ];
-}
-
-function demoRedistributions() {
-  return [
-    { id:'r1', foodType:'Cooked Meals',    quantity:200, unit:'servings', donorName:'Grand Hyatt Hotel',       recipientName:'Hope Foundation',    distance:'2.1km', status:'progress', startedAt: ago(20) },
-    { id:'r2', foodType:'Bread',           quantity:80,  unit:'packets',  donorName:'Oven Fresh Bakery',       recipientName:'City Shelter Home',  distance:'1.4km', status:'matched',  startedAt: ago(45) },
-    { id:'r3', foodType:'Biryani',         quantity:120, unit:'servings', donorName:'Spice Garden Restaurant', recipientName:'Helping Hands Kitchen',distance:'3.2km',status:'finding', startedAt: ago(10) },
-    { id:'r4', foodType:'Packaged Snacks', quantity:200, unit:'packets',  donorName:'EventCo Caterers',        recipientName:'Community Food Bank', distance:'5.0km', status:'completed',startedAt: ago(180) },
-    { id:'r5', foodType:'Vegetables',      quantity:60,  unit:'kg',       donorName:'FreshMart Superstore',    recipientName:'Green Earth Kitchen', distance:'0.8km', status:'matched',  startedAt: ago(30) },
-  ];
-}
-
-function demoZones() {
-  return [
-    { name:'HITEC City',    supply:320, demand:180, balance:140 },
-    { name:'Jubilee Hills', supply:210, demand:90,  balance:120 },
-    { name:'Banjara Hills', supply:180, demand:110, balance:70  },
-    { name:'Nampally',      supply:80,  demand:200, balance:-120 },
-    { name:'Khairatabad',   supply:60,  demand:210, balance:-150 },
-    { name:'Secunderabad',  supply:90,  demand:170, balance:-80  },
-  ];
-}
-
-function demoRebalancingRecs() {
-  return [
-    { id:'rb1', icon:'🔀', title:'Redirect HITEC City surplus to Nampally', detail:'140 surplus meals available in HITEC City. Nampally has a deficit of 120. Estimated transfer distance: 6.2km. 3 willing transporters available.', priority:'high' },
-    { id:'rb2', icon:'🔀', title:'Redirect Jubilee Hills overflow to Khairatabad', detail:'120 surplus units. Khairatabad deficit: 150. Partial match possible — covers ~80%.', priority:'high' },
-    { id:'rb3', icon:'📦', title:'Buffer Banjara Hills surplus to food bank', detail:'70 surplus units with no immediate demand. Route to Community Food Bank (Kukatpally) for storage.', priority:'medium' },
-  ];
-}
-
-function demoReservePoints() {
-  return [
-    { id:'rp1', foodType:'Storage Facility', quantity: 500, unit:'kg capacity', orgName:'Community Food Bank', locationAddress:'Kukatpally', status:'active' },
-    { id:'rp2', foodType:'Cold Storage',      quantity: 200, unit:'kg capacity', orgName:'FoodSafe Depot',       locationAddress:'Uppal',     status:'active' },
-  ];
-}
-
-function demoPendingReserve() {
-  return [
-    { id:'pr1', foodType:'Packaged Snacks', quantity:40, unit:'packets', donorName:'EventCo Caterers', locationAddress:'HITEC City', status:'reserve', createdAt: ago(90) },
-  ];
-}
-
+function demoSurplus() { return []; }
+function demoDemands() { return []; }
+function demoRedistributions() { return []; }
+function demoZones() { return []; }
+function demoRebalancingRecs() { return []; }
+function demoReservePoints() { return []; }
+function demoPendingReserve() { return []; }
 function demoCommunity() {
-  return {
-    surplusHotspots: [
-      { area:'HITEC City',    detail:'Avg 280 surplus meals/day from 6 active donors', severity:'high' },
-      { area:'Jubilee Hills', detail:'Regular hotel & restaurant surplus — evenings', severity:'medium' },
-    ],
-    demandHotspots: [
-      { area:'Nampally',    detail:'~200 unmet meals/day — dense migrant population', severity:'high' },
-      { area:'Khairatabad', detail:'Recurring shortfall — NGO at capacity since May',  severity:'high' },
-    ],
-    accessGaps: [
-      { area:'Uppal',     detail:'No active access point. ~4,000 people, 0 verified food sources', severity:'high' },
-      { area:'Alwal',     detail:'Single NGO, overwhelmed. 2km radius with no alternate source',    severity:'medium' },
-    ],
-    mismatches: [
-      { id:'mm1', foodType:'Cooked Meals (Non-Veg)', quantity:'~150/day', orgName:'HITEC City donors', locationAddress:'vs Khairatabad demand (veg only)', status:'at-risk', createdAt: ago(1440) },
-    ],
-  };
+  return { surplusHotspots: [], demandHotspots: [], accessGaps: [], mismatches: [] };
 }
-
-function demoWasteRisks() {
-  return [
-    { id:'wr1', foodType:'Cooked Meals',    quantity:180, unit:'servings', donorName:'Grand Banquet Hall', detail:'No match found after 40 mins. Emergency demand search active.', expiresIn:'55 min', severity:'high' },
-    { id:'wr2', foodType:'Dairy Products',  quantity:30,  unit:'kg',       donorName:'Metro Dairy',        detail:'Perishable. 2 partial matches declined. Reserve routing recommended.', expiresIn:'1h 20m', severity:'high' },
-    { id:'wr3', foodType:'Bread',           quantity:60,  unit:'packets',  donorName:'City Bakery',        detail:'Surplus from this morning. No demand in immediate area.', expiresIn:'2h 10m', severity:'medium' },
-  ];
-}
-
-function demoInterventions() {
-  return [
-    { id:'i1', icon:'🚨', title:'Emergency match needed — Grand Banquet Hall (180 meals, 55 min left)', detail:'Expand search radius to 10km. 3 NGOs within range with available capacity. Recommend contacting Hope Foundation NGO immediately.', priority:'high' },
-    { id:'i2', icon:'🏦', title:'Route Metro Dairy surplus to FoodSafe Depot', detail:'30kg dairy products — no immediate match. FoodSafe Depot has cold storage capacity and is 3.1km away.', priority:'high' },
-    { id:'i3', icon:'🔀', title:'Address recurring HITEC City → Nampally mismatch', detail:'Consistent pattern over 14 days. Recommend onboarding a transporter for this corridor or establishing a relay pickup point.', priority:'medium' },
-    { id:'i4', icon:'🕳️', title:'Expand access coverage in Uppal', detail:'Uppal has no verified food access point. 2 NGOs operating nearby could extend their coverage area. Recommend outreach.', priority:'medium' },
-    { id:'i5', icon:'📉', title:'Address recurring Friday evening demand spike — Secunderabad', detail:'Every Friday demand is 60% above weekly average. Recommend proactive donor outreach on Thursdays.', priority:'low' },
-  ];
-}
-
+function demoWasteRisks() { return []; }
+function demoInterventions() { return []; }
 function demoMetrics() {
   return {
-    totalSurplus: '8,240', totalDemand: '6,180', foodRecovered: '5,920',
-    wastePrevented: '2,310', fulfillmentRate: 78, unmetDemand: '1,340',
-    weeklyData: demoWeekly(), wasteData: demoWasteWeekly(),
+    totalSurplus: '0 kg', totalDemand: '0 servings', foodRecovered: '0 kg',
+    wastePrevented: '0 kg CO₂e', fulfillmentRate: 0, unmetDemand: '0 servings',
+    weeklyData: [], wasteData: [],
   };
 }
-
-function demoWeekly() {
-  const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-  return days.map(day => ({
-    day,
-    surplus:   Math.floor(Math.random()*400)+800,
-    demand:    Math.floor(Math.random()*300)+600,
-    fulfilled: Math.floor(Math.random()*250)+500,
-  }));
-}
-
-function demoWasteWeekly() {
-  const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-  return days.map(day => ({
-    day,
-    intercepted: Math.floor(Math.random()*200)+250,
-    wasted:      Math.floor(Math.random()*80)+30,
-  }));
-}
-
-function demoMismatches() {
-  return [
-    { id:'mm1', foodType:'Non-veg meals vs veg-only demand', quantity:'~150/day', orgName:'HITEC City', locationAddress:'vs Khairatabad area', status:'at-risk', createdAt: ago(1440) },
-    { id:'mm2', foodType:'Friday evening surplus — no Friday NGO capacity', quantity:'300+/week', orgName:'Jubilee Hills donors', locationAddress:'city-wide', status:'at-risk', createdAt: ago(4320) },
-  ];
-}
+function demoWeekly() { return []; }
+function demoWasteWeekly() { return []; }
+function demoMismatches() { return []; }
 
 // ── Utilities ─────────────────────────────────────────────────
 function statusBadgeClass(s) {
