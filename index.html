@@ -592,6 +592,13 @@
         <input type="password" id="si-password" placeholder="••••••••" autocomplete="current-password" />
 
         <button class="btn btn-primary" id="signin-btn" onclick="handleSignIn()">Sign In</button>
+
+        <div style="text-align:center; margin-top:18px; font-size:0.83rem; color:var(--muted); border-top:1px solid var(--border); padding-top:14px;">
+          Looking for food for yourself or family?<br>
+          <a href="/recipient/index.html" style="color:var(--primary); text-decoration:none; font-weight:600; display:inline-block; margin-top:4px;">
+            🍽️ Find Food Near You (No Login Needed) →
+          </a>
+        </div>
       </div>
 
       <!-- ── SIGN UP ── -->
@@ -609,25 +616,8 @@
         <div class="msg error" id="signup-error"></div>
         <div class="msg success" id="signup-success"></div>
 
-        <!-- Step 1: Credentials -->
+        <!-- Step 1: Role -->
         <div class="step-pane active" id="step-1">
-          <div class="form-title">Create your account</div>
-          <div class="form-sub">Start with your name and login credentials.</div>
-
-          <label for="su-name">Your Full Name</label>
-          <input type="text" id="su-name" placeholder="e.g. Priya Sharma" autocomplete="name" />
-
-          <label for="su-email">Email Address</label>
-          <input type="email" id="su-email" placeholder="you@example.com" autocomplete="email" />
-
-          <label for="su-password">Password</label>
-          <input type="password" id="su-password" placeholder="Min. 8 characters" autocomplete="new-password" />
-
-          <button class="btn btn-primary" onclick="goStep2()">Continue →</button>
-        </div>
-
-        <!-- Step 2: Role -->
-        <div class="step-pane" id="step-2">
           <div class="form-title">Who are you?</div>
           <div class="form-sub">Choose your role in the FoodBridge network.</div>
 
@@ -650,13 +640,30 @@
             Select your role to continue.
           </div>
 
-          <button class="btn btn-ghost" onclick="goStep1()">← Back</button>
-          <button class="btn btn-primary" id="role-next-btn" onclick="goStep3()" disabled>Continue →</button>
+          <button class="btn btn-primary" id="role-next-btn" onclick="goStep2()" disabled>Continue →</button>
+        </div>
+
+        <!-- Step 2: Credentials -->
+        <div class="step-pane" id="step-2">
+          <div class="form-title">Create your account</div>
+          <div class="form-sub">Enter your name and login credentials.</div>
+
+          <label for="su-name">Your Full Name</label>
+          <input type="text" id="su-name" placeholder="e.g. Priya Sharma" autocomplete="name" />
+
+          <label for="su-email">Email Address</label>
+          <input type="email" id="su-email" placeholder="you@example.com" autocomplete="email" />
+
+          <label for="su-password">Password</label>
+          <input type="password" id="su-password" placeholder="Min. 8 characters" autocomplete="new-password" />
+
+          <button class="btn btn-ghost" onclick="goStep1()">← Change Role</button>
+          <button class="btn btn-primary" onclick="goStep3()">Continue to Details →</button>
         </div>
 
         <!-- Step 3: Role-specific details -->
         <div class="step-pane" id="step-3">
-          <div class="form-title" id="step3-title">Your Details</div>
+          <div class="form-title" id="step3-title">Organization Details</div>
           <div class="form-sub" id="step3-sub">Fill in your organization information.</div>
 
           <!-- Donor fields -->
@@ -736,16 +743,6 @@
               <span id="n-doc-label">📎 Click or drag & drop NGO Certificate or Trust Deed (PDF/Image)</span>
               <input type="file" id="n-doc" accept=".pdf,image/*" style="display:none" onchange="previewDocName('n-doc', 'n-doc-label')" />
             </div>
-          </div>
-
-          <!-- Individual Recipient fields -->
-          <div id="fields-recipient" style="display:none">
-            <div class="msg info show" style="display:block; margin-bottom:16px;">
-              As an individual recipient, no organization details are needed. You can search for food near you
-              instantly.
-            </div>
-            <label for="r-city">Your City / Area</label>
-            <input type="text" id="r-city" placeholder="e.g. Chennai, Bengaluru" />
           </div>
 
           <button class="btn btn-ghost" onclick="goStep2()">← Back</button>
@@ -828,21 +825,33 @@
       currentStep = step;
     }
 
-    function goStep1() { updateStepper(1); }
+    function goStep1() {
+      clearErrors();
+      updateStepper(1);
+    }
 
     function goStep2() {
-      const name = document.getElementById('su-name').value.trim();
-      const email = document.getElementById('su-email').value.trim();
-      const pass = document.getElementById('su-password').value;
-      if (!name || !email || !pass) return showMsg('signup-error', 'Please fill in all fields.', 'error');
-      if (pass.length < 8) return showMsg('signup-error', 'Password must be at least 8 characters.', 'error');
       clearErrors();
-      signupData = { name, email, password: pass };
+      if (!selectedRole) {
+        return showMsg('signup-error', 'Please select your role first.', 'error');
+      }
+      // Individual recipients do not require signup!
+      if (selectedRole === 'recipient') {
+        window.location.href = ROLE_ROUTES['recipient'];
+        return;
+      }
       updateStepper(2);
     }
 
     function goStep3() {
-      if (!selectedRole) return;
+      clearErrors();
+      const name = document.getElementById('su-name').value.trim();
+      const email = document.getElementById('su-email').value.trim();
+      const pass = document.getElementById('su-password').value;
+      if (!name || !email || !pass) return showMsg('signup-error', 'Please fill in all account fields.', 'error');
+      if (pass.length < 8) return showMsg('signup-error', 'Password must be at least 8 characters.', 'error');
+      
+      signupData = { name, email, password: pass };
       updateStepper(3);
       showRoleFields(selectedRole);
     }
@@ -851,27 +860,34 @@
       selectedRole = role;
       document.querySelectorAll('.role-card').forEach(c => c.classList.remove('selected'));
       document.getElementById(`role-${role}`).classList.add('selected');
-      document.getElementById('role-next-btn').disabled = false;
+      const nextBtn = document.getElementById('role-next-btn');
+      nextBtn.disabled = false;
 
-      const hints = {
-        donor: '🏪 You\'ll be posting surplus food. Your org requires admin verification before going live.',
-        demand_org: '🤝 You\'ll register food needs. Your org requires admin verification before going live.',
-        recipient: '👤 You can search for food near you without verification.'
-      };
-      document.getElementById('role-hint').textContent = hints[role];
+      if (role === 'recipient') {
+        document.getElementById('role-hint').innerHTML = '👤 <strong>No sign-up or registration needed!</strong> Individual recipients and families can search and find nearby food access points immediately without creating an account.';
+        nextBtn.innerHTML = '🍽️ Find Food Now (No Sign-Up Needed) →';
+      } else if (role === 'donor') {
+        document.getElementById('role-hint').textContent = '🏪 You\'ll be posting surplus food. Set up your donor account and verify your business credentials.';
+        nextBtn.innerHTML = 'Continue to Account Details →';
+      } else if (role === 'demand_org') {
+        document.getElementById('role-hint').textContent = '🤝 You\'ll register food requirements and receive supply matches. Set up your NGO or shelter account.';
+        nextBtn.innerHTML = 'Continue to Account Details →';
+      }
     }
 
     function showRoleFields(role) {
-      ['donor', 'demand_org', 'recipient'].forEach(r => {
-        document.getElementById(`fields-${r}`).style.display = r === role ? 'block' : 'none';
+      ['donor', 'demand_org'].forEach(r => {
+        const el = document.getElementById(`fields-${r}`);
+        if (el) el.style.display = r === role ? 'block' : 'none';
       });
       const titles = {
-        donor: ['Donor Details', 'Tell us about your organization so we can set you up.'],
-        demand_org: ['Organization Details', 'Help the network understand your capacity and needs.'],
-        recipient: ['Almost done!', 'Just one optional detail.']
+        donor: ['Donor Details', 'Tell us about your organization and food safety certification.'],
+        demand_org: ['Organization Details', 'Help the network understand your serving capacity and verification status.']
       };
-      document.getElementById('step3-title').textContent = titles[role][0];
-      document.getElementById('step3-sub').textContent = titles[role][1];
+      if (titles[role]) {
+        document.getElementById('step3-title').textContent = titles[role][0];
+        document.getElementById('step3-sub').textContent = titles[role][1];
+      }
     }
 
     // ── Sign In ──
@@ -985,11 +1001,18 @@
       }
     }
 
-    // ── Auto-redirect if already logged in ──
-    const existingToken = localStorage.getItem('fb_token');
-    const existingUser = JSON.parse(localStorage.getItem('fb_user') || 'null');
-    if (existingToken && existingUser && ROLE_ROUTES[existingUser.role]) {
-      window.location.href = ROLE_ROUTES[existingUser.role];
+    // ── Auto-redirect if already logged in (exclude recipients so they don't get trapped) ──
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('logout') || urlParams.has('clear')) {
+      localStorage.removeItem('fb_token');
+      localStorage.removeItem('fb_user');
+    } else {
+      const existingToken = localStorage.getItem('fb_token');
+      const existingUser = JSON.parse(localStorage.getItem('fb_user') || 'null');
+      // Do NOT auto-redirect recipients: individual recipients have open access and should not be locked out of the home page
+      if (existingToken && existingUser && existingUser.role && existingUser.role !== 'recipient' && ROLE_ROUTES[existingUser.role] && !urlParams.has('noredirect')) {
+        window.location.href = ROLE_ROUTES[existingUser.role];
+      }
     }
 
     // ── Enter key support ──
