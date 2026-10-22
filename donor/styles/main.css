@@ -192,6 +192,21 @@ html, body { font-family: var(--font); background: var(--bg); color: var(--text)
 .card-link { background: none; border: none; color: var(--primary); font-size: 0.8rem; cursor: pointer; font-family: var(--font); }
 .card-link:hover { text-decoration: underline; }
 
+/* ── Chart Container (Prevents infinite resizing loops) ── */
+.chart-container {
+  position: relative;
+  width: 100%;
+  height: 220px;
+  max-height: 220px;
+  overflow: hidden;
+}
+.chart-container canvas {
+  width: 100% !important;
+  height: 100% !important;
+  max-height: 220px !important;
+  display: block;
+}
+
 /* ── Item list ── */
 .item-list { display: flex; flex-direction: column; gap: 10px; }
 .item-row {
@@ -249,16 +264,83 @@ html, body { font-family: var(--font); background: var(--bg); color: var(--text)
 .filter-btn:hover { border-color: rgba(245,158,11,0.4); color: var(--text); }
 .filter-btn.active { background: var(--primary); border-color: var(--primary); color: #000; font-weight: 700; }
 
-/* ── Impact Hero ── */
+/* ── Impact Hero / Stat Grid ── */
 .impact-hero {
-  display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-bottom: 24px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
 }
-.impact-hero-stat {
-  background: var(--card); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 28px 20px; text-align: center;
+.impact-stat-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 18px;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  min-height: 140px;
+  position: relative;
+  overflow: hidden;
 }
-.impact-big-num { font-size: 2.5rem; font-weight: 900; color: var(--primary); line-height: 1; }
-.impact-big-label { font-size: 0.8rem; color: var(--muted); margin-top: 8px; }
+.impact-stat-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+}
+.impact-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.impact-icon-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+}
+.impact-icon-badge.purple  { background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); }
+.impact-icon-badge.green   { background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); }
+.impact-icon-badge.emerald { background: rgba(5, 150, 105, 0.15); border: 1px solid rgba(5, 150, 105, 0.3); }
+.impact-icon-badge.amber   { background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); }
+
+.impact-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--muted);
+}
+.impact-big-num {
+  font-size: 1.75rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.impact-stat-card.purple .impact-big-num { color: #C084FC; }
+.impact-stat-card.green .impact-big-num { color: #34D399; }
+.impact-stat-card.emerald .impact-big-num { color: #10B981; }
+.impact-stat-card.amber .impact-big-num { color: var(--primary); }
+
+.impact-big-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.impact-sub {
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
 .chart-legend { display: flex; gap: 16px; margin-top: 12px; justify-content: center; font-size: 0.78rem; color: var(--muted); }
 
 /* ── Prediction Cards ── */
@@ -359,7 +441,7 @@ html, body { font-family: var(--font); background: var(--bg); color: var(--text)
 @media (max-width: 1100px) {
   .stats-grid { grid-template-columns: repeat(2,1fr); }
   .two-col { grid-template-columns: 1fr; }
-  .impact-hero { grid-template-columns: repeat(3,1fr); }
+  .impact-hero { grid-template-columns: repeat(2,1fr); }
 }
 @media (max-width: 768px) {
   .sidebar { transform: translateX(-100%); }
@@ -367,9 +449,13 @@ html, body { font-family: var(--font); background: var(--bg); color: var(--text)
   .main-wrapper { margin-left: 0; }
   .menu-toggle { display: block; }
   .stats-grid { grid-template-columns: 1fr 1fr; }
-  .impact-hero { grid-template-columns: 1fr; }
+  .impact-hero { grid-template-columns: 1fr 1fr; }
   .form-row-2 { grid-template-columns: 1fr; }
   .surplus-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 540px) {
+  .stats-grid { grid-template-columns: 1fr; }
+  .impact-hero { grid-template-columns: 1fr; }
 }
 @media (max-width: 480px) {
   .stats-grid { grid-template-columns: 1fr; }

@@ -356,26 +356,87 @@ input[type="checkbox"] { width: auto; margin: 0; }
 
 /* ── Charts ── */
 .chart-wrap {
-  position: relative; height: 200px;
-  display: flex; align-items: flex-end; gap: 8px; padding-bottom: 24px;
+  position: relative;
+  height: 220px;
+  max-height: 220px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+  padding: 0;
+  margin-top: 10px;
 }
-.chart-bar-g { flex: 1; display: flex; align-items: flex-end; gap: 3px; height: 100%; }
-.chart-bar {
-  flex: 1; border-radius: 4px 4px 0 0; min-width: 16px;
-  background: rgba(16,185,129,0.25); transition: background 0.2s, height 0.6s ease; position: relative;
+.demand-chart-bars {
+  height: 180px;
+  max-height: 180px;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
 }
-.chart-bar.fulfilled { background: var(--primary-g); }
-.chart-bar.unfilled  { background: rgba(239,68,68,0.35); }
-.chart-bar:hover { filter: brightness(1.2); cursor: pointer; }
-.chart-bar-tooltip {
-  display: none; position: absolute; bottom: calc(100% + 6px); left: 50%;
+.demand-chart-col {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 4px;
+  position: relative;
+}
+.demand-bar {
+  flex: 1;
+  max-width: 16px;
+  min-width: 6px;
+  border-radius: 4px 4px 0 0;
+  transition: height 0.4s ease, filter 0.2s;
+  position: relative;
+}
+.demand-bar.fulfilled {
+  background: var(--primary-g, #10B981);
+}
+.demand-bar.unmet {
+  background: rgba(239, 68, 68, 0.75);
+}
+.demand-bar:hover {
+  filter: brightness(1.25);
+  cursor: pointer;
+}
+.demand-bar-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
   transform: translateX(-50%);
-  background: #1a2235; border: 1px solid var(--border);
-  padding: 5px 10px; border-radius: 6px; font-size: 0.72rem; white-space: nowrap; z-index: 99;
+  background: #1a2235;
+  border: 1px solid var(--border);
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  color: var(--text, #fff);
+  white-space: nowrap;
+  z-index: 99;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
 }
-.chart-bar:hover .chart-bar-tooltip { display: block; }
-.chart-x-labels { display: flex; gap: 8px; position: absolute; bottom: 0; left: 0; right: 0; }
-.chart-x-label { flex: 1; text-align: center; font-size: 0.65rem; color: var(--sub); }
+.demand-bar:hover .demand-bar-tooltip {
+  display: block;
+}
+.demand-chart-labels {
+  height: 28px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.demand-chart-label {
+  flex: 1;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  user-select: none;
+}
 
 /* ── Profile ── */
 .profile-section-title {

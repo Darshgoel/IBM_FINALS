@@ -145,29 +145,72 @@ router.get('/impact', (req, res) => {
   try {
     const orgId = req.user.orgId;
 
-    const totalSurplus = db.prepare('SELECT COUNT(*) as count, SUM(quantity) as total FROM surplus_posts WHERE donor_org_id = ?').get(orgId);
-    const recovered = db.prepare("SELECT COUNT(*) as count, SUM(sp.quantity) as total FROM surplus_posts sp WHERE sp.donor_org_id = ? AND sp.status = 'completed'").get(orgId);
-    const matched = db.prepare("SELECT COUNT(*) as count FROM surplus_posts WHERE donor_org_id = ? AND status IN ('matched','in_transit','completed')").get(orgId);
-    const wasted = db.prepare("SELECT COUNT(*) as count, SUM(quantity) as total FROM surplus_posts WHERE donor_org_id = ? AND status = 'expired'").get(orgId);
+    const totalSurplus = db.prepare('SELECT COUNT(*) as count, COALESCE(SUM(quantity),0) as total FROM surplus_posts WHERE donor_org_id = ?').get(orgId);
+    
+    // Rescued / recovered includes matched, in_transit, and completed donations
+    const recovered = db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(quantity),0) as total FROM surplus_posts WHERE donor_org_id = ? AND status IN ('matched','in_transit','completed')").get(orgId);
+    const completed = db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(quantity),0) as total FROM surplus_posts WHERE donor_org_id = ? AND status = 'completed'").get(orgId);
+    const matched = db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(quantity),0) as total FROM surplus_posts WHERE donor_org_id = ? AND status IN ('matched','in_transit')").get(orgId);
+    const available = db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(quantity),0) as total FROM surplus_posts WHERE donor_org_id = ? AND status = 'available'").get(orgId);
+    const wasted = db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(quantity),0) as total FROM surplus_posts WHERE donor_org_id = ? AND status = 'expired'").get(orgId);
 
-    const monthlyTrend = db.prepare(`
+    // Build timeline for last 6 calendar months
+    const monthlyMap = {};
+    const months = [];
+    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(1);
+      d.setMonth(d.getMonth() - i);
+      const mStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+      monthlyMap[mStr] = { month: label, key: mStr, quantity: 0, posts: 0 };
+      months.push(mStr);
+    }
+
+    const dbMonthly = db.prepare(`
       SELECT strftime('%Y-%m', created_at) as month, COUNT(*) as posts, SUM(quantity) as quantity
       FROM surplus_posts WHERE donor_org_id = ?
-      GROUP BY month ORDER BY month DESC LIMIT 6
+      GROUP BY month
     `).all(orgId);
 
-    const mealsEquivalent = Math.round((recovered.total || 0) * 3.5); // Rough: 1 kg ≈ 3.5 meals
+    dbMonthly.forEach(row => {
+      if (monthlyMap[row.month]) {
+        monthlyMap[row.month].quantity = Math.round((row.quantity || 0) * 10) / 10;
+        monthlyMap[row.month].posts = row.posts;
+      }
+    });
+
+    const monthlyTrend = months.map(m => monthlyMap[m]);
+
+    const recoveredQty = Math.round((recovered.total || 0) * 10) / 10;
+    const mealsEquivalent = Math.round(recoveredQty * 3.5); // ~1 kg ≈ 3.5 meals
+    const co2Saved = Math.round(recoveredQty * 2.5 * 10) / 10; // ~2.5 kg CO2e per kg food diverted
+    const wasteAvoided = recoveredQty;
+
+    // Category breakdown
+    const categoryBreakdown = db.prepare(`
+      SELECT food_type, COUNT(*) as count, SUM(quantity) as quantity
+      FROM surplus_posts WHERE donor_org_id = ?
+      GROUP BY food_type
+    `).all(orgId);
 
     res.json({
       totalPosts: totalSurplus.count || 0,
       totalQuantityPosted: Math.round((totalSurplus.total || 0) * 10) / 10,
-      recovered: { count: recovered.count || 0, quantity: Math.round((recovered.total || 0) * 10) / 10 },
+      recovered: { count: recovered.count || 0, quantity: recoveredQty },
+      completed: { count: completed.count || 0, quantity: Math.round((completed.total || 0) * 10) / 10 },
       matched: matched.count || 0,
+      available: available.count || 0,
       wasted: { count: wasted.count || 0, quantity: Math.round((wasted.total || 0) * 10) / 10 },
       mealsEquivalent,
-      monthlyTrend
+      co2Saved,
+      wasteAvoided,
+      monthlyTrend,
+      categoryBreakdown
     });
   } catch (err) {
+    console.error('Impact route error:', err);
     res.status(500).json({ error: 'Failed to fetch impact data' });
   }
 });
@@ -175,7 +218,14 @@ router.get('/impact', (req, res) => {
 // GET /api/donor/predictions - Get surplus predictions
 router.get('/predictions', (req, res) => {
   try {
-    const prediction = generateSurplusPredictions(req.user.orgId);
+    const rawPrediction = generateSurplusPredictions(req.user.orgId);
+    const prediction = rawPrediction ? {
+      expectedQty: rawPrediction.predictedQuantity,
+      predictedQuantity: rawPrediction.predictedQuantity,
+      foodType: rawPrediction.predictedFoodType,
+      predictedFoodType: rawPrediction.predictedFoodType,
+      confidence: rawPrediction.confidence
+    } : null;
 
     // Also get recent patterns
     const patterns = db.prepare(`

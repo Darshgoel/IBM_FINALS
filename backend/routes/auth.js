@@ -157,9 +157,10 @@ router.post('/login', (req, res) => {
 
     db.prepare("UPDATE users SET last_login = datetime('now') WHERE id = ?").run(user.id);
 
+    const jwtSecret = process.env.JWT_SECRET || 'foodbridge-local-development-secret-change-me';
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role, orgId: user.org_id, name: user.name },
-      process.env.JWT_SECRET,
+      jwtSecret,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
 

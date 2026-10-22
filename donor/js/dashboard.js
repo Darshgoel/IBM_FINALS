@@ -184,7 +184,7 @@ async function loadOverview() {
     }
 
     // Monthly trend chart
-    const trend = impactData.monthlyTrend.reverse();
+    const trend = impactData.monthlyTrend || [];
     renderTrendChart(trend);
   } catch (err) {
     console.error(err);
@@ -199,13 +199,14 @@ function renderTrendChart(trend) {
     data: {
       labels: trend.map(t => t.month),
       datasets: [{
-        label: 'Posts', data: trend.map(t => t.posts),
+        label: 'kg Rescued', data: trend.map(t => t.quantity || 0),
         borderColor: '#F59E0B', backgroundColor: 'rgba(245,158,11,0.1)',
         tension: 0.4, fill: true, pointBackgroundColor: '#F59E0B'
       }]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
+      resizeDelay: 50,
       plugins: { legend: { display: false } },
       scales: {
         x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6B7280', font: { size: 11 } } },
@@ -363,40 +364,58 @@ async function loadImpact() {
   try {
     const data = await api.donor.getImpact(token);
 
-    document.getElementById('impact-meals').textContent = data.mealsEquivalent.toLocaleString();
-    document.getElementById('impact-kg').textContent    = data.recovered.quantity + ' kg';
-    document.getElementById('impact-waste').textContent = (data.wasted.quantity || 0) + ' kg';
+    const meals = data.mealsEquivalent || 0;
+    const kg = data.recovered ? (data.recovered.quantity || 0) : 0;
+    const waste = data.wasteAvoided !== undefined ? data.wasteAvoided : (data.wasted ? (data.wasted.quantity || 0) : 0);
+    const co2 = data.co2Saved !== undefined ? data.co2Saved : Math.round(kg * 2.5);
+
+    document.getElementById('impact-meals').textContent = meals.toLocaleString();
+    document.getElementById('impact-kg').textContent = kg + ' kg';
+    const co2El = document.getElementById('impact-co2');
+    if (co2El) co2El.textContent = co2 + ' kg';
+    document.getElementById('impact-waste').textContent = waste + ' kg';
 
     // Doughnut chart
     if (impactDoughnut) impactDoughnut.destroy();
     const dCtx = document.getElementById('impact-doughnut').getContext('2d');
-    const recovered = data.recovered.count || 0;
-    const expired   = data.wasted.count || 0;
-    const pending   = (data.totalPosts || 0) - recovered - expired;
+    const recovered = data.recovered ? (data.recovered.count || 0) : 0;
+    const available = data.available || 0;
+    const expired   = data.wasted ? (data.wasted.count || 0) : 0;
+    const hasData   = (recovered + available + expired) > 0;
+
     impactDoughnut = new Chart(dCtx, {
       type: 'doughnut',
       data: {
-        labels: ['Recovered', 'Wasted', 'Pending'],
-        datasets: [{ data: [recovered, expired, Math.max(0,pending)], backgroundColor: ['#10B981','#EF4444','#3B82F6'], borderWidth: 0 }]
+        labels: hasData ? ['Recovered & Matched', 'Available', 'Expired'] : ['No Data Recorded'],
+        datasets: [{
+          data: hasData ? [recovered, available, expired] : [1],
+          backgroundColor: hasData ? ['#10B981','#3B82F6','#EF4444'] : ['rgba(255,255,255,0.08)'],
+          borderWidth: 0
+        }]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
+        resizeDelay: 50,
         plugins: { legend: { display: false } },
         cutout: '70%'
       }
     });
 
     const legend = document.getElementById('impact-legend');
-    legend.innerHTML = [
-      ['#10B981','Recovered','color:#10B981'],
-      ['#EF4444','Wasted','color:#EF4444'],
-      ['#3B82F6','Pending','color:#3B82F6']
-    ].map(([c,l]) => `<span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:50%;background:${c};display:inline-block"></span>${l}</span>`).join('');
+    if (hasData) {
+      legend.innerHTML = [
+        ['#10B981', `Recovered / Matched (${recovered})`],
+        ['#3B82F6', `Available (${available})`],
+        ['#EF4444', `Expired (${expired})`]
+      ].map(([c,l]) => `<span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:50%;background:${c};display:inline-block"></span>${l}</span>`).join('');
+    } else {
+      legend.innerHTML = '<span style="color:var(--muted);font-size:0.85rem">No surplus posts recorded yet</span>';
+    }
 
     // Bar chart
     if (impactBar) impactBar.destroy();
     const bCtx = document.getElementById('impact-bar').getContext('2d');
-    const trend = [...data.monthlyTrend].reverse();
+    const trend = data.monthlyTrend || [];
     impactBar = new Chart(bCtx, {
       type: 'bar',
       data: {
@@ -410,6 +429,7 @@ async function loadImpact() {
       },
       options: {
         responsive: true, maintainAspectRatio: false,
+        resizeDelay: 50,
         plugins: { legend: { display: false } },
         scales: {
           x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6B7280', font: { size: 11 } } },
@@ -418,7 +438,7 @@ async function loadImpact() {
       }
     });
   } catch (err) {
-    console.error(err);
+    console.error('loadImpact error:', err);
   }
 }
 

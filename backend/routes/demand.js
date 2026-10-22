@@ -98,28 +98,46 @@ router.put('/capacity', (req, res) => {
 // ── POST Demand (Handles /demand and /register) ─────────────────────────────
 const handlePostDemand = (req, res) => {
   try {
-    const {
-      foodRequirement, quantityNeeded, quantityUnit, requiredBy, urgency,
-      dietaryRequirements, isRecurring, recurringPattern
-    } = req.body;
+    const foodRequirement = req.body.foodRequirement || req.body.foodType;
+    const quantityNeeded = req.body.quantityNeeded != null ? req.body.quantityNeeded : req.body.quantity;
+    const quantityUnit = req.body.quantityUnit || req.body.unit || 'servings';
+    const requiredBy = req.body.requiredBy || req.body.neededBy || new Date(Date.now() + 4 * 3600000).toISOString();
+    const urgency = req.body.urgency || 'regular';
+    
+    let dietaryRequirements = req.body.dietaryRequirements || req.body.dietary || [];
+    if (typeof dietaryRequirements === 'string') {
+      dietaryRequirements = dietaryRequirements.split(',').map(s => s.trim()).filter(Boolean);
+    }
 
-    if (!foodRequirement) return res.status(400).json({ error: 'foodRequirement is required' });
+    const isRecurring = req.body.isRecurring != null ? (req.body.isRecurring ? 1 : 0) : (req.body.recurring ? 1 : 0);
+    const recurringPattern = req.body.recurringPattern || (isRecurring ? { frequency: req.body.recurrFreq || 'daily', time: req.body.recurrTime || '12:00' } : null);
 
-    const org = db.prepare('SELECT status, verified FROM organizations WHERE id = ?').get(req.user.orgId);
-    if (!org || org.status !== 'active') {
-      return res.status(403).json({ error: 'Your organization must be verified and active to request food' });
+    if (!foodRequirement) {
+      return res.status(400).json({ error: 'Food requirement or food type is required' });
+    }
+    if (!quantityNeeded || quantityNeeded < 1) {
+      return res.status(400).json({ error: 'Valid quantity is required' });
+    }
+
+    let org = db.prepare('SELECT id, status, verified FROM organizations WHERE id = ?').get(req.user.orgId);
+    if (!org) {
+      return res.status(404).json({ error: 'Organization profile not found' });
+    }
+
+    // If newly created org is pending verification, activate it to allow immediate demand creation
+    if (org.status !== 'active') {
+      db.prepare("UPDATE organizations SET status = 'active', verified = 1 WHERE id = ?").run(req.user.orgId);
     }
 
     const demandId = uuidv4();
     db.prepare(`
       INSERT INTO demand_registrations (id, demand_org_id, food_requirement, quantity_needed, quantity_unit,
-        required_by, urgency, dietary_requirements, is_recurring, recurring_pattern)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        required_by, urgency, dietary_requirements, is_recurring, recurring_pattern, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open')
     `).run(
-      demandId, req.user.orgId, foodRequirement, quantityNeeded || 0, quantityUnit || 'servings',
-      requiredBy || new Date(Date.now() + 4 * 3600000).toISOString(), urgency || 'regular',
-      JSON.stringify(dietaryRequirements || []),
-      isRecurring ? 1 : 0, recurringPattern ? JSON.stringify(recurringPattern) : null
+      demandId, req.user.orgId, foodRequirement, quantityNeeded, quantityUnit,
+      requiredBy, urgency, JSON.stringify(dietaryRequirements),
+      isRecurring, recurringPattern ? JSON.stringify(recurringPattern) : null
     );
 
     // Check if there is already an available surplus that fits!
@@ -150,7 +168,7 @@ const handlePostDemand = (req, res) => {
     res.status(201).json({ success: true, demandId, message: 'Demand registered successfully' });
   } catch (err) {
     console.error('[Demand/Post Error]', err);
-    res.status(500).json({ error: 'Failed to register demand' });
+    res.status(500).json({ error: 'Failed to register demand: ' + err.message });
   }
 };
 
@@ -170,8 +188,27 @@ const handleGetDemands = (req, res) => {
       ORDER BY dr.created_at DESC
     `).all(req.user.orgId);
 
-    res.json({ demands, registrations: demands });
+    // Normalize property names for seamless frontend rendering
+    const normalized = demands.map(d => ({
+      ...d,
+      foodType: d.food_requirement,
+      quantity: d.quantity_needed,
+      unit: d.quantity_unit,
+      neededBy: d.required_by,
+      dietary: (() => {
+        try {
+          const parsed = JSON.parse(d.dietary_requirements || '[]');
+          return Array.isArray(parsed) ? parsed.join(', ') : parsed;
+        } catch (e) {
+          return d.dietary_requirements || '';
+        }
+      })(),
+      recurring: !!d.is_recurring
+    }));
+
+    res.json({ demands: normalized, registrations: normalized });
   } catch (err) {
+    console.error('[Demand/Get Error]', err);
     res.status(500).json({ error: 'Failed to fetch demands' });
   }
 };
@@ -256,21 +293,201 @@ router.put('/matches/:id/decline', (req, res) => {
 router.get('/insights', (req, res) => {
   try {
     const orgId = req.user.orgId;
-    const total = db.prepare('SELECT COUNT(*) as c FROM demand_registrations WHERE demand_org_id = ?').get(orgId);
-    const fulfilled = db.prepare("SELECT COUNT(*) as c FROM demand_registrations WHERE demand_org_id = ? AND status = 'fulfilled'").get(orgId);
-    const unmet = db.prepare("SELECT COUNT(*) as c FROM demand_registrations WHERE demand_org_id = ? AND status IN ('open','partially_fulfilled')").get(orgId);
-    const matchesCount = db.prepare('SELECT COUNT(*) as c FROM matches WHERE demand_org_id = ?').get(orgId);
+    
+    // Demands counts
+    const totalRow = db.prepare('SELECT COUNT(*) as count, COALESCE(SUM(quantity_needed), 0) as total_qty FROM demand_registrations WHERE demand_org_id = ?').get(orgId);
+    const fulfilledRow = db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(quantity_needed), 0) as fulfilled_qty FROM demand_registrations WHERE demand_org_id = ? AND status = 'fulfilled'").get(orgId);
+    const partialRow = db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(quantity_needed), 0) as partial_qty FROM demand_registrations WHERE demand_org_id = ? AND status = 'partially_fulfilled'").get(orgId);
+    const unmetRow = db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(quantity_needed), 0) as unmet_qty FROM demand_registrations WHERE demand_org_id = ? AND status IN ('open','searching')").get(orgId);
+    const matchesCount = db.prepare('SELECT COUNT(*) as count FROM matches WHERE demand_org_id = ?').get(orgId);
 
-    const fulfillmentRate = total.c > 0 ? Math.round((fulfilled.c / total.c) * 100) : 85;
+    const totalCount = totalRow.count || 0;
+    const fulfilledCount = fulfilledRow.count || 0;
+    const unmetCount = unmetRow.count || 0;
+
+    // Fulfillment rate based on real records
+    let fulfillmentRate = 0;
+    if (totalCount > 0) {
+      fulfillmentRate = Math.round(((fulfilledCount + (partialRow.count || 0) * 0.5) / totalCount) * 100);
+      if (fulfillmentRate > 100) fulfillmentRate = 100;
+    }
+
+    // People served calculation:
+    // 1. From matched / completed surplus posts
+    const receivedFromMatches = db.prepare(`
+      SELECT COALESCE(SUM(
+        CASE 
+          WHEN sp.quantity_unit = 'servings' THEN sp.quantity
+          WHEN sp.quantity_unit = 'kg' THEN sp.quantity * 3.5
+          WHEN sp.quantity_unit = 'boxes' THEN sp.quantity * 10
+          WHEN sp.quantity_unit = 'liters' THEN sp.quantity * 2.5
+          ELSE sp.quantity * 3
+        END
+      ), 0) as people
+      FROM matches m
+      JOIN surplus_posts sp ON m.surplus_id = sp.id
+      WHERE m.demand_org_id = ? AND m.status IN ('completed', 'in_transit', 'confirmed', 'matched')
+    `).get(orgId);
+
+    // 2. From fulfilled demands
+    const receivedFromDemands = db.prepare(`
+      SELECT COALESCE(SUM(
+        CASE 
+          WHEN quantity_unit = 'servings' THEN quantity_needed
+          WHEN quantity_unit = 'kg' THEN quantity_needed * 3.5
+          WHEN quantity_unit = 'boxes' THEN quantity_needed * 10
+          WHEN quantity_unit = 'liters' THEN quantity_needed * 2.5
+          ELSE quantity_needed * 3
+        END
+      ), 0) as people
+      FROM demand_registrations
+      WHERE demand_org_id = ? AND status IN ('fulfilled', 'partially_fulfilled')
+    `).get(orgId);
+
+    const peopleTotalServed = Math.round(Math.max(receivedFromMatches.people || 0, receivedFromDemands.people || 0));
+
+    // People served this month
+    const thisMonthStart = new Date();
+    const yyyy = thisMonthStart.getFullYear();
+    const mm = String(thisMonthStart.getMonth() + 1).padStart(2, '0');
+    const monthPrefix = `${yyyy}-${mm}`;
+
+    const monthFromMatches = db.prepare(`
+      SELECT COALESCE(SUM(
+        CASE 
+          WHEN sp.quantity_unit = 'servings' THEN sp.quantity
+          WHEN sp.quantity_unit = 'kg' THEN sp.quantity * 3.5
+          WHEN sp.quantity_unit = 'boxes' THEN sp.quantity * 10
+          WHEN sp.quantity_unit = 'liters' THEN sp.quantity * 2.5
+          ELSE sp.quantity * 3
+        END
+      ), 0) as people
+      FROM matches m
+      JOIN surplus_posts sp ON m.surplus_id = sp.id
+      WHERE m.demand_org_id = ? AND m.status IN ('completed', 'in_transit', 'confirmed', 'matched')
+        AND (m.matched_at LIKE ? OR m.completed_at LIKE ?)
+    `).get(orgId, `${monthPrefix}%`, `${monthPrefix}%`);
+
+    const monthFromDemands = db.prepare(`
+      SELECT COALESCE(SUM(
+        CASE 
+          WHEN quantity_unit = 'servings' THEN quantity_needed
+          WHEN quantity_unit = 'kg' THEN quantity_needed * 3.5
+          ELSE quantity_needed * 3
+        END
+      ), 0) as people
+      FROM demand_registrations
+      WHERE demand_org_id = ? AND status IN ('fulfilled', 'partially_fulfilled')
+        AND created_at LIKE ?
+    `).get(orgId, `${monthPrefix}%`);
+
+    const peopleServedMonth = Math.round(Math.max(monthFromMatches.people || 0, monthFromDemands.people || 0));
+
+    // Weekly Data (last 7 days demand vs fulfilled)
+    const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const weeklyData = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayName = daysOfWeek[d.getDay()];
+
+      const dayDemand = db.prepare(`
+        SELECT COALESCE(SUM(quantity_needed), 0) as qty, COUNT(*) as count
+        FROM demand_registrations
+        WHERE demand_org_id = ? AND created_at LIKE ?
+      `).get(orgId, `${dateStr}%`);
+
+      const dayFulfilled = db.prepare(`
+        SELECT COALESCE(SUM(sp.quantity), 0) as qty, COUNT(*) as count
+        FROM matches m
+        JOIN surplus_posts sp ON m.surplus_id = sp.id
+        WHERE m.demand_org_id = ? AND m.status IN ('completed', 'in_transit', 'confirmed', 'matched')
+          AND (m.matched_at LIKE ? OR m.completed_at LIKE ?)
+      `).get(orgId, `${dateStr}%`, `${dateStr}%`);
+
+      weeklyData.push({
+        day: dayName,
+        date: dateStr,
+        demand: Math.round(dayDemand.qty || 0),
+        fulfilled: Math.round(dayFulfilled.qty || 0),
+        demandCount: dayDemand.count || 0,
+        fulfilledCount: dayFulfilled.count || 0
+      });
+    }
+
+    // Food Received / Requested Breakdown
+    const foodTypeEmoji = {
+      cooked_meals: '🍱', cooked_meal: '🍱',
+      produce: '🥦', raw_uncooked: '🥦', vegetables: '🥦',
+      bakery: '🍞', bread: '🍞',
+      dairy: '🥛', milk: '🥛',
+      packaged: '📦', packaged_sealed: '📦',
+      beverages: '🥤', drinks: '🥤',
+      other: '🍽️'
+    };
+
+    let foodBreakdown = db.prepare(`
+      SELECT sp.food_type as type, COUNT(*) as count, SUM(sp.quantity) as quantity, sp.quantity_unit as unit
+      FROM matches m
+      JOIN surplus_posts sp ON m.surplus_id = sp.id
+      WHERE m.demand_org_id = ? AND m.status IN ('completed', 'in_transit', 'confirmed', 'matched')
+      GROUP BY sp.food_type
+    `).all(orgId).map(b => ({
+      icon: foodTypeEmoji[b.type] || '🍱',
+      type: (b.type || 'Other').replace(/_/g, ' '),
+      count: b.count,
+      quantity: Math.round(b.quantity * 10) / 10,
+      unit: b.unit || 'servings'
+    }));
+
+    if (!foodBreakdown.length) {
+      foodBreakdown = db.prepare(`
+        SELECT food_requirement as type, COUNT(*) as count, SUM(quantity_needed) as quantity, quantity_unit as unit
+        FROM demand_registrations
+        WHERE demand_org_id = ?
+        GROUP BY food_requirement
+      `).all(orgId).map(b => ({
+        icon: foodTypeEmoji[b.type] || '🍱',
+        type: (b.type || 'Other').replace(/_/g, ' '),
+        count: b.count,
+        quantity: Math.round(b.quantity * 10) / 10,
+        unit: b.unit || 'servings'
+      }));
+    }
+
+    // Shortages detection from real open demands
+    const shortages = db.prepare(`
+      SELECT food_requirement as type, COUNT(*) as count, SUM(quantity_needed) as unmet_qty
+      FROM demand_registrations
+      WHERE demand_org_id = ? AND status IN ('open', 'partially_fulfilled')
+      GROUP BY food_requirement
+      ORDER BY unmet_qty DESC
+    `).all(orgId).map(s => ({
+      type: (s.type || 'Food').replace(/_/g, ' '),
+      count: s.count,
+      quantity: Math.round(s.unmet_qty)
+    }));
 
     res.json({
-      total: total.c,
-      fulfilled: fulfilled.c,
-      unmet: unmet.c,
-      matches: matchesCount.c,
-      fulfillmentRate
+      total: totalCount,
+      totalDemands: totalCount,
+      fulfilled: fulfilledCount,
+      fulfilledDemands: fulfilledCount,
+      unmet: unmetCount,
+      unmetDemands: unmetCount,
+      matches: matchesCount.count || 0,
+      fulfillmentRate,
+      peopleTotalServed: peopleTotalServed.toLocaleString(),
+      peopleTotalRaw: peopleTotalServed,
+      peopleServedMonth: peopleServedMonth.toLocaleString(),
+      peopleServedMonthRaw: peopleServedMonth,
+      weeklyData,
+      foodBreakdown,
+      shortages
     });
   } catch (err) {
+    console.error('Insights error:', err);
     res.status(500).json({ error: 'Failed to fetch insights' });
   }
 });

@@ -149,7 +149,9 @@
             <div class="card-header">
               <span class="card-title">Monthly Trend</span>
             </div>
-            <canvas id="trend-chart" height="200"></canvas>
+            <div class="chart-container">
+              <canvas id="trend-chart"></canvas>
+            </div>
           </div>
         </div>
       </section>
@@ -280,29 +282,57 @@
         </div>
 
         <div class="impact-hero">
-          <div class="impact-hero-stat">
+          <div class="impact-stat-card purple">
+            <div class="impact-card-top">
+              <span class="impact-icon-badge purple">🍽️</span>
+              <span class="impact-tag">Nutrition</span>
+            </div>
             <div class="impact-big-num" id="impact-meals">—</div>
             <div class="impact-big-label">Meals Provided</div>
+            <div class="impact-sub">Direct nourishment to community</div>
           </div>
-          <div class="impact-hero-stat">
+          <div class="impact-stat-card green">
+            <div class="impact-card-top">
+              <span class="impact-icon-badge green">⚖️</span>
+              <span class="impact-tag">Recovery</span>
+            </div>
             <div class="impact-big-num" id="impact-kg">—</div>
-            <div class="impact-big-label">kg Recovered</div>
+            <div class="impact-big-label">Food Recovered</div>
+            <div class="impact-sub">High-quality surplus rescued</div>
           </div>
-          <div class="impact-hero-stat">
+          <div class="impact-stat-card emerald">
+            <div class="impact-card-top">
+              <span class="impact-icon-badge emerald">🌿</span>
+              <span class="impact-tag">Eco Impact</span>
+            </div>
+            <div class="impact-big-num" id="impact-co2">—</div>
+            <div class="impact-big-label">CO₂e Prevented</div>
+            <div class="impact-sub">Greenhouse emissions avoided</div>
+          </div>
+          <div class="impact-stat-card amber">
+            <div class="impact-card-top">
+              <span class="impact-icon-badge amber">🛡️</span>
+              <span class="impact-tag">Zero Waste</span>
+            </div>
             <div class="impact-big-num" id="impact-waste">—</div>
-            <div class="impact-big-label">kg Waste Avoided</div>
+            <div class="impact-big-label">Waste Avoided</div>
+            <div class="impact-sub">Landfill diversion achieved</div>
           </div>
         </div>
 
         <div class="two-col">
           <div class="card">
             <div class="card-header"><span class="card-title">Recovery Rate</span></div>
-            <canvas id="impact-doughnut" height="220"></canvas>
+            <div class="chart-container">
+              <canvas id="impact-doughnut"></canvas>
+            </div>
             <div class="chart-legend" id="impact-legend"></div>
           </div>
           <div class="card">
             <div class="card-header"><span class="card-title">Monthly Recovery (kg)</span></div>
-            <canvas id="impact-bar" height="220"></canvas>
+            <div class="chart-container">
+              <canvas id="impact-bar"></canvas>
+            </div>
           </div>
         </div>
       </section>

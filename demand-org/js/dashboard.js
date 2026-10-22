@@ -142,20 +142,20 @@ async function loadOverview() {
       api.demandOrg.getAlerts(token),
     ]);
 
-    const demands = demandsData.status === 'fulfilled' ? (demandsData.value.demands || []) : demoDemandsData();
-    const matches = matchesData.status === 'fulfilled' ? (matchesData.value.matches || []) : demoMatchesData();
-    const insights = insightsData.status === 'fulfilled' ? (insightsData.value || {}) : demoInsightsData();
-    const alerts = alertsData.status === 'fulfilled' ? (alertsData.value.alerts || []) : demoAlertsData();
+    const demands = demandsData.status === 'fulfilled' ? (demandsData.value.demands || []) : [];
+    const matches = matchesData.status === 'fulfilled' ? (matchesData.value.matches || []) : [];
+    const insights = insightsData.status === 'fulfilled' ? (insightsData.value || {}) : {};
+    const alerts = alertsData.status === 'fulfilled' ? (alertsData.value.alerts || []) : [];
 
-    // Stats
-    const active = demands.filter(d => ['active', 'searching'].includes(d.status)).length;
+    // Stats based on real database records
+    const active = demands.filter(d => ['open', 'active', 'searching', 'partially_fulfilled'].includes(d.status)).length;
     const fulfilled = demands.filter(d => d.status === 'fulfilled').length;
     const pending = matches.filter(m => m.status === 'pending').length;
 
     setText('stat-active', active);
     setText('stat-fulfilled', fulfilled);
     setText('stat-pending', pending);
-    setText('stat-people', insights.peopleServedMonth ?? '—');
+    setText('stat-people', insights.peopleServedMonth ?? '0');
 
     // Recent demands (last 3)
     allDemands = demands;
@@ -169,18 +169,18 @@ async function loadOverview() {
 
   } catch (err) {
     console.error('loadOverview', err);
-    loadDemoOverview();
+    setText('stat-active', 0);
+    setText('stat-fulfilled', 0);
+    setText('stat-pending', 0);
+    setText('stat-people', '0');
   }
 }
 
 function loadDemoOverview() {
-  setText('stat-active', 3);
-  setText('stat-fulfilled', 18);
-  setText('stat-pending', 2);
-  setText('stat-people', '1,240');
-  renderDemandList('overview-demands', demoDemandsData().slice(0, 3));
-  renderMatchList('overview-matches', demoMatchesData().slice(0, 2));
-  renderAlertList('overview-alerts', demoAlertsData().slice(0, 3));
+  setText('stat-active', 0);
+  setText('stat-fulfilled', 0);
+  setText('stat-pending', 0);
+  setText('stat-people', '0');
 }
 
 // ── DEMANDS ──────────────────────────────────────────────────
@@ -203,6 +203,18 @@ window.filterDemands = function (status) {
 
 function filterDemandsArr(arr, status) {
   if (status === 'all') return arr;
+  if (status === 'active') {
+    return arr.filter(d => ['active', 'open', 'searching', 'pending'].includes(d.status));
+  }
+  if (status === 'searching') {
+    return arr.filter(d => ['searching', 'open', 'pending'].includes(d.status));
+  }
+  if (status === 'matched') {
+    return arr.filter(d => ['matched', 'partially_fulfilled'].includes(d.status));
+  }
+  if (status === 'fulfilled') {
+    return arr.filter(d => ['fulfilled', 'completed'].includes(d.status));
+  }
   return arr.filter(d => d.status === status);
 }
 
@@ -216,26 +228,38 @@ function renderDemandList(containerId, demands) {
     </div>`;
     return;
   }
-  el.innerHTML = demands.map(d => `
-    <div class="demand-item">
-      <div class="demand-urgency urgency-${d.urgency || 'regular'}"></div>
-      <div class="demand-info">
-        <div class="demand-food">${d.foodType || d.food_type || 'Food'}</div>
-        <div class="demand-meta">
-          <span>📅 ${d.neededBy ? new Date(d.neededBy).toLocaleString() : 'ASAP'}</span>
-          <span>⚡ ${d.urgency || 'regular'}</span>
-          ${d.dietary ? `<span>🥗 ${d.dietary}</span>` : ''}
-          ${d.recurring ? '<span>🔄 Recurring</span>' : ''}
+  el.innerHTML = demands.map(d => {
+    const foodName = d.food_requirement || d.foodRequirement || d.foodType || d.food_type || 'Food Request';
+    const qty = d.quantity_needed != null ? d.quantity_needed : (d.quantity != null ? d.quantity : '—');
+    const unit = d.quantity_unit || d.unit || 'servings';
+    const needed = d.required_by || d.neededBy;
+    const dateStr = needed ? new Date(needed).toLocaleString() : 'ASAP';
+    const urgency = d.urgency || 'regular';
+    const status = d.status || 'open';
+    const dietary = d.dietary || (Array.isArray(d.dietary_requirements) ? d.dietary_requirements.join(', ') : d.dietary_requirements);
+    const recurring = d.is_recurring || d.recurring;
+
+    return `
+      <div class="demand-item">
+        <div class="demand-urgency urgency-${urgency}"></div>
+        <div class="demand-info">
+          <div class="demand-food">${foodName}</div>
+          <div class="demand-meta">
+            <span>📅 ${dateStr}</span>
+            <span>⚡ ${urgency}</span>
+            ${dietary ? `<span>🥗 ${dietary}</span>` : ''}
+            ${recurring ? '<span>🔄 Recurring</span>' : ''}
+          </div>
+        </div>
+        <div class="demand-right">
+          <div class="demand-qty">${qty}</div>
+          <div class="demand-qty-label">${unit}</div>
+          <div class="demand-status-badge status-${status}">${status}</div>
+          ${status === 'open' || status === 'active' || status === 'searching' ? `<br><button style="margin-top:6px; font-size:0.72rem; padding:4px 10px; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); color:var(--red); border-radius:6px; cursor:pointer;" onclick="cancelDemand('${d.id}')">Cancel</button>` : ''}
         </div>
       </div>
-      <div class="demand-right">
-        <div class="demand-qty">${d.quantity || '—'}</div>
-        <div class="demand-qty-label">${d.unit || 'servings'}</div>
-        <div class="demand-status-badge status-${d.status || 'active'}">${d.status || 'active'}</div>
-        ${d.status === 'active' || d.status === 'searching' ? `<br><button style="margin-top:6px; font-size:0.72rem; padding:4px 10px; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); color:var(--red); border-radius:6px; cursor:pointer;" onclick="cancelDemand('${d.id}')">Cancel</button>` : ''}
-      </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 window.cancelDemand = async function (id) {
@@ -280,19 +304,36 @@ window.submitDemand = async function () {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Registering…';
 
-  const body = { foodType, quantity, unit, neededBy, dietary, notes, urgency: selectedUrgency, recurring };
-  if (recurring) { body.recurrFreq = recurrFreq; body.recurrTime = recurrTime; }
+  const body = {
+    foodRequirement: foodType,
+    foodType,
+    quantityNeeded: quantity,
+    quantity,
+    quantityUnit: unit,
+    unit,
+    requiredBy: neededBy || new Date(Date.now() + 4 * 3600000).toISOString(),
+    neededBy,
+    dietaryRequirements: dietary ? [dietary] : [],
+    dietary,
+    notes,
+    urgency: selectedUrgency || 'regular',
+    isRecurring: !!recurring,
+    recurring,
+    recurrFreq,
+    recurrTime
+  };
 
   try {
     await api.demandOrg.postDemand(token, body);
     toast('✅ Demand registered! The network is searching for matching supply.', 'success');
     clearDemandForm();
+    await loadDemands();
     showPage('my-demands');
   } catch (err) {
-    // Demo mode — show success anyway
-    toast('✅ Demand registered (demo mode)!', 'success');
-    clearDemandForm();
-    showPage('my-demands');
+    console.error('[Demand Submit Error]', err);
+    errEl.textContent = err.message || 'Failed to register demand';
+    errEl.style.display = 'block';
+    toast('❌ ' + (err.message || 'Failed to register demand'), 'error');
   } finally {
     btn.disabled = false;
     btn.innerHTML = '📋 Register Demand';
@@ -443,49 +484,108 @@ window.updateCapacity = async function () {
 async function loadInsights() {
   let ins;
   try {
-    const data = await api.demandOrg.getInsights(token);
-    ins = data || demoInsightsData();
-  } catch {
-    ins = demoInsightsData();
+    ins = await api.demandOrg.getInsights(token);
+  } catch (err) {
+    console.error('loadInsights', err);
+    ins = {};
   }
 
-  setText('ins-fulfillment-rate', (ins.fulfillmentRate || 78) + '%');
-  setText('ins-total-demands', ins.totalDemands || 42);
-  setText('ins-unmet', ins.unmetDemands || 9);
-  setText('ins-people-total', ins.peopleTotalServed || '8,400');
+  setText('ins-fulfillment-rate', (ins.fulfillmentRate ?? 0) + '%');
+  setText('ins-total-demands', ins.totalDemands ?? 0);
+  setText('ins-unmet', ins.unmetDemands ?? 0);
+  setText('ins-people-total', ins.peopleTotalServed ?? '0');
 
-  renderDemandChart(ins.weeklyData || demoDailyData());
-  renderFoodBreakdown(ins.foodBreakdown || demoFoodBreakdown());
+  renderDemandChart(ins.weeklyData || []);
+  renderFoodBreakdown(ins.foodBreakdown || []);
+  renderShortages(ins.shortages || []);
 }
 
 function renderDemandChart(data) {
   const wrap = document.getElementById('demand-chart');
   if (!wrap) return;
-  const max = Math.max(...data.map(d => d.demand || 0), 1);
-  wrap.innerHTML = `
-    <div style="display:flex; gap:8px; align-items:flex-end; width:100%; height:100%;">
-      ${data.map(d => `
-        <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; height:100%; justify-content:flex-end;">
-          <div style="width:100%; display:flex; align-items:flex-end; gap:2px; height:${Math.round((d.demand / max) * 100)}%;">
-            <div class="chart-bar fulfilled" style="height:${Math.round((d.fulfilled / d.demand) * 100 || 0)}%;">
-              <div class="chart-bar-tooltip">${d.fulfilled} fulfilled</div>
-            </div>
-            <div class="chart-bar unfilled" style="height:${Math.round(((d.demand - d.fulfilled) / d.demand) * 100 || 0)}%;">
-              <div class="chart-bar-tooltip">${d.demand - d.fulfilled} unmet</div>
-            </div>
+  const hasActivity = data && data.some(d => (d.demand > 0 || d.fulfilled > 0));
+  if (!hasActivity) {
+    wrap.innerHTML = `
+      <div class="empty-state" style="padding: 30px 16px; text-align: center; margin: auto;">
+        <div style="font-size: 2rem; margin-bottom: 8px;">📊</div>
+        <p style="color:var(--text);font-weight:600;margin-bottom:4px;">No demand activity this week</p>
+        <p style="color:var(--muted);font-size:0.85rem;">Register a food requirement to see daily demand vs fulfillment.</p>
+      </div>`;
+    return;
+  }
+  const max = Math.max(...data.map(d => Math.max(d.demand || 0, d.fulfilled || 0)), 1);
+
+  const barsHtml = data.map(d => {
+    const fulfilledHeight = d.fulfilled > 0 ? Math.max(8, Math.round((d.fulfilled / max) * 100)) : 0;
+    const unmet = Math.max(0, d.demand - d.fulfilled);
+    const unmetHeight = unmet > 0 ? Math.max(8, Math.round((unmet / max) * 100)) : 0;
+
+    return `
+      <div class="demand-chart-col">
+        ${fulfilledHeight > 0 ? `
+          <div class="demand-bar fulfilled" style="height: ${fulfilledHeight}%;">
+            <div class="demand-bar-tooltip">${d.fulfilled} fulfilled</div>
           </div>
-          <div class="chart-x-label" style="position:static;">${d.day}</div>
-        </div>
-      `).join('')}
-    </div>`;
+        ` : ''}
+        ${unmetHeight > 0 ? `
+          <div class="demand-bar unmet" style="height: ${unmetHeight}%;">
+            <div class="demand-bar-tooltip">${unmet} unmet</div>
+          </div>
+        ` : ''}
+        ${fulfilledHeight === 0 && unmetHeight === 0 ? `
+          <div style="height: 3px; width: 14px; background: rgba(255,255,255,0.08); border-radius: 2px;"></div>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
+
+  const labelsHtml = data.map(d => `
+    <div class="demand-chart-label">${d.day}</div>
+  `).join('');
+
+  wrap.innerHTML = `
+    <div class="demand-chart-bars">
+      ${barsHtml}
+    </div>
+    <div class="demand-chart-labels">
+      ${labelsHtml}
+    </div>
+  `;
 }
 
 function renderFoodBreakdown(breakdown) {
   const el = document.getElementById('food-breakdown');
-  if (!el || !breakdown.length) return;
+  if (!el) return;
+  if (!breakdown || !breakdown.length) {
+    el.innerHTML = '<div class="empty-state" style="padding:15px;color:var(--muted);">No food categories logged yet. Register a demand to see food categories.</div>';
+    return;
+  }
   el.innerHTML = breakdown.map(b =>
-    `<span class="tag">${b.icon || '🍱'} ${b.type}: <strong>${b.count}</strong></span>`
+    `<span class="tag">${b.icon || '🍱'} ${b.type}: <strong>${b.quantity ? b.quantity + ' ' + (b.unit || '') : b.count + ' demands'}</strong></span>`
   ).join('');
+}
+
+function renderShortages(shortages) {
+  const el = document.getElementById('shortage-list');
+  if (!el) return;
+  if (!shortages || !shortages.length) {
+    el.innerHTML = `
+      <div class="empty-state" style="padding: 20px;">
+        <div class="empty-icon" style="font-size: 2rem;">✅</div>
+        <p>No unmet shortage patterns detected.</p>
+      </div>
+    `;
+    return;
+  }
+  el.innerHTML = shortages.map(s => `
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:rgba(239,68,68,0.06); border-radius:8px; margin-bottom:8px; border:1px solid rgba(239,68,68,0.2);">
+      <div>
+        <div style="font-weight:600; color:var(--text); font-size:0.9rem;">${s.type}</div>
+        <div style="color:var(--muted); font-size:0.8rem;">${s.count} open requirement${s.count > 1 ? 's' : ''}</div>
+      </div>
+      <div style="color:var(--danger,#EF4444); font-weight:700; font-size:0.95rem;">${s.quantity} unmet</div>
+    </div>
+  `).join('');
 }
 
 // ── ALERTS ───────────────────────────────────────────────────
@@ -590,17 +690,19 @@ async function checkUnreadBadges() {
       api.demandOrg.getMatches(token),
     ]);
     const unreadAlerts = alertData.status === 'fulfilled'
-      ? (alertData.value.alerts || []).filter(a => !a.read).length : 3;
+      ? (alertData.value.alerts || []).filter(a => !a.is_read && !a.read).length : 0;
     const pendingMatches = matchData.status === 'fulfilled'
-      ? (matchData.value.matches || []).filter(m => m.status === 'pending').length : 2;
+      ? (matchData.value.matches || []).filter(m => m.status === 'pending').length : 0;
 
     updateBadge('alert-badge', unreadAlerts);
     updateBadge('match-badge', pendingMatches);
-    if (unreadAlerts > 0) document.getElementById('topbar-alert-dot').style.display = 'block';
+    const dot = document.getElementById('topbar-alert-dot');
+    if (dot) dot.style.display = unreadAlerts > 0 ? 'block' : 'none';
   } catch {
-    updateBadge('alert-badge', 3);
-    updateBadge('match-badge', 2);
-    document.getElementById('topbar-alert-dot').style.display = 'block';
+    updateBadge('alert-badge', 0);
+    updateBadge('match-badge', 0);
+    const dot = document.getElementById('topbar-alert-dot');
+    if (dot) dot.style.display = 'none';
   }
 }
 
@@ -611,63 +713,22 @@ function updateBadge(id, count) {
   else { el.style.display = 'none'; }
 }
 
-// ── DEMO DATA ─────────────────────────────────────────────────
-function demoDemandsData() {
-  return [
-    { id: '1', foodType: 'Cooked Meals', quantity: 200, unit: 'servings', urgency: 'regular', status: 'searching', neededBy: new Date(Date.now() + 3600000).toISOString(), recurring: true },
-    { id: '2', foodType: 'Raw Ingredients', quantity: 50, unit: 'kg', urgency: 'immediate', status: 'matched', neededBy: new Date(Date.now() + 7200000).toISOString() },
-    { id: '3', foodType: 'Bread / Bakery', quantity: 100, unit: 'packets', urgency: 'planned', status: 'fulfilled', neededBy: new Date(Date.now() - 86400000).toISOString() },
-    { id: '4', foodType: 'Cooked Meals', quantity: 150, unit: 'servings', urgency: 'emergency', status: 'active', neededBy: new Date(Date.now() + 1800000).toISOString() },
-  ];
-}
-
-function demoMatchesData() {
-  return [
-    { id: 'm1', donorName: 'The Spice Garden Restaurant', foodType: 'Cooked Meals', quantity: 180, unit: 'servings', distance: '1.2km', matchScore: 96, demandUrgency: 'regular', status: 'pending', availableUntil: new Date(Date.now() + 5400000).toISOString() },
-    { id: 'm2', donorName: 'Grand Hyatt Hotel', foodType: 'Cooked Meals', quantity: 60, unit: 'servings', distance: '3.8km', matchScore: 88, demandUrgency: 'immediate', status: 'accepted', availableUntil: new Date(Date.now() + 3600000).toISOString() },
-  ];
-}
-
+// ── EMPTY DEFAULTS ────────────────────────────────────────────
+function demoDemandsData() { return []; }
+function demoMatchesData() { return []; }
 function demoInsightsData() {
   return {
-    fulfillmentRate: 82, totalDemands: 47, unmetDemands: 8,
-    peopleTotalServed: '9,200', peopleServedMonth: 1240,
-    weeklyData: demoDailyData(),
-    foodBreakdown: demoFoodBreakdown(),
+    fulfillmentRate: 0, totalDemands: 0, unmetDemands: 0,
+    peopleTotalServed: '0', peopleServedMonth: 0,
+    weeklyData: [],
+    foodBreakdown: [],
   };
 }
-
-function demoDailyData() {
-  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  return days.map(day => ({
-    day,
-    demand: Math.floor(Math.random() * 100) + 150,
-    fulfilled: Math.floor(Math.random() * 80) + 120,
-  }));
-}
-
-function demoFoodBreakdown() {
-  return [
-    { icon: '🍱', type: 'Cooked Meals', count: 28 },
-    { icon: '🥦', type: 'Raw Ingredients', count: 9 },
-    { icon: '🍞', type: 'Bread', count: 6 },
-    { icon: '📦', type: 'Packaged', count: 4 },
-  ];
-}
-
-function demoAlertsData() {
-  return [
-    { id: 'a1', type: 'match', read: false, message: '🎯 New match found: 180 meals from The Spice Garden — 1.2km away.', createdAt: new Date(Date.now() - 900000).toISOString() },
-    { id: 'a2', type: 'supply', read: false, message: '🍽️ Surplus food available nearby matching your regular demand profile.', createdAt: new Date(Date.now() - 3600000).toISOString() },
-    { id: 'a3', type: 'warning', read: true, message: '⚠️ Your daily demand for tomorrow is predicted to exceed your current profile.', createdAt: new Date(Date.now() - 86400000).toISOString() },
-    { id: 'a4', type: 'fulfilled', read: true, message: '✅ Demand #D-2024-003 has been fulfilled. 100 meals received.', createdAt: new Date(Date.now() - 172800000).toISOString() },
-  ];
-}
+function demoDailyData() { return []; }
+function demoFoodBreakdown() { return []; }
+function demoAlertsData() { return []; }
 
 function loadDemoData() {
-  document.getElementById('sidebar-org-name').textContent = 'Helping Hands NGO';
-  document.getElementById('sidebar-org-type').textContent = 'NGO / Charity';
-  document.getElementById('sidebar-avatar').textContent = 'HH';
   loadDemoOverview();
 }
 
