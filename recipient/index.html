@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FoodBridge — Find Food Near You</title>
+  <meta name="description" content="FoodBridge — Find nearby food access points: community kitchens, shelters, food banks, and NGOs serving food in your area." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles/main.css" />
+</head>
+<body>
+
+<!-- ── Topbar ── -->
+<header class="topbar">
+  <div class="topbar-brand">
+    <div class="mark">🍽️</div>
+    <h1>FoodBridge</h1>
+    <span>/ Find Food</span>
+  </div>
+  <a class="topbar-link" href="/">← Home</a>
+</header>
+
+<!-- ── Hero & Search ── -->
+<div class="hero">
+  <h2>Find <em>food near you</em><br>right now</h2>
+  <p>Community kitchens, shelters, food banks, and NGOs serving meals in your area. No sign-up needed.</p>
+
+  <div class="search-card">
+    <!-- Location -->
+    <label class="field-label" for="location-input">📍 Your Location</label>
+    <div class="location-row">
+      <input
+        type="text"
+        class="location-input"
+        id="location-input"
+        placeholder="Enter area, landmark or address…"
+        autocomplete="off"
+      />
+      <button class="locate-btn" id="locate-btn" onclick="useMyLocation()" title="Use my current location">📡</button>
+    </div>
+
+    <!-- Options -->
+    <div class="options-row">
+      <div class="option-group">
+        <label class="field-label" for="sel-people">👥 People</label>
+        <select class="opt-select" id="sel-people">
+          <option value="1">1 person</option>
+          <option value="2">2 people</option>
+          <option value="3" selected>3–5 people</option>
+          <option value="6">6–10 people</option>
+          <option value="11">11+ people</option>
+        </select>
+      </div>
+      <div class="option-group">
+        <label class="field-label" for="sel-dietary">🥗 Dietary</label>
+        <select class="opt-select" id="sel-dietary">
+          <option value="any">No restriction</option>
+          <option value="vegetarian">Vegetarian</option>
+          <option value="vegan">Vegan</option>
+          <option value="halal">Halal</option>
+          <option value="no_nuts">No nuts</option>
+        </select>
+      </div>
+      <div class="option-group">
+        <label class="field-label" for="sel-urgency">⏱️ Urgency</label>
+        <select class="opt-select" id="sel-urgency">
+          <option value="now">Need it now</option>
+          <option value="today" selected>Today</option>
+          <option value="tomorrow">Tomorrow</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Error -->
+    <div id="search-error" style="display:none; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); color:#FCA5A5; padding:9px 14px; border-radius:8px; font-size:0.82rem; margin-bottom:14px;"></div>
+
+    <button class="search-btn" id="search-btn" onclick="searchFood()">
+      🔍 Find Food Access Points
+    </button>
+  </div>
+</div>
+
+<!-- ── Alert opt-in ── -->
+<div class="alert-opt" id="alert-opt">
+  <div class="alert-opt-card">
+    <span style="font-size:1.4rem;">🔔</span>
+    <div class="alert-opt-text">
+      <p>Get notified when food becomes available nearby</p>
+      <span>We'll send a one-time browser notification — no account needed</span>
+    </div>
+    <button class="alert-opt-btn" onclick="enableAlerts()">Enable</button>
+  </div>
+</div>
+
+<!-- ── Results ── -->
+<section class="results-section" id="results-section">
+
+  <!-- AI Recommendation -->
+  <div class="rec-banner" id="rec-banner">
+    <div class="rec-icon">⭐</div>
+    <div class="rec-content">
+      <div class="rec-label">Best Match for You</div>
+      <div class="rec-name" id="rec-name">—</div>
+      <div class="rec-why" id="rec-why">—</div>
+      <button class="rec-go-btn" id="rec-go-btn">Get Directions →</button>
+    </div>
+  </div>
+
+  <!-- List header -->
+  <div class="results-header">
+    <div>
+      <h3>Nearby Food Access Points</h3>
+      <div class="results-count" id="results-count">Searching…</div>
+    </div>
+    <select class="sort-select" id="sort-select" onchange="sortResults()">
+      <option value="distance">Sort: Nearest</option>
+      <option value="availability">Sort: Available Now</option>
+      <option value="capacity">Sort: Most Capacity</option>
+    </select>
+  </div>
+
+  <!-- Loading -->
+  <div id="loading-state" class="loading-dots" style="display:none;">
+    <span></span><span></span><span></span>
+  </div>
+
+  <!-- Access points list -->
+  <div class="access-list" id="access-list">
+    <!-- Rendered by JS -->
+  </div>
+</section>
+
+<!-- ── Detail panel ── -->
+<div class="detail-overlay" id="detail-overlay" onclick="closeDetail(event)">
+  <div class="detail-panel" id="detail-panel">
+    <div class="detail-handle"></div>
+    <div class="detail-header">
+      <div class="detail-icon" id="d-icon">🏠</div>
+      <div>
+        <div class="detail-name" id="d-name">—</div>
+        <div class="detail-subtype" id="d-subtype">—</div>
+      </div>
+    </div>
+
+    <!-- Availability -->
+    <div class="detail-section">
+      <div class="detail-section-title">Availability</div>
+      <div id="d-avail-chip"></div>
+      <div class="detail-row" style="margin-top:10px;">
+        <div class="detail-row-icon">⏰</div>
+        <div class="detail-row-text"><strong>Hours:</strong> <span id="d-hours">—</span></div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-row-icon">🍽️</div>
+        <div class="detail-row-text"><strong>Food available:</strong> <span id="d-food">—</span></div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-row-icon">📦</div>
+        <div class="detail-row-text"><strong>Capacity right now:</strong> <span id="d-capacity">—</span></div>
+      </div>
+    </div>
+
+    <!-- Location -->
+    <div class="detail-section">
+      <div class="detail-section-title">Location & Access</div>
+      <div class="detail-row">
+        <div class="detail-row-icon">📍</div>
+        <div class="detail-row-text" id="d-address">—</div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-row-icon">📏</div>
+        <div class="detail-row-text"><span id="d-distance">—</span></div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-row-icon">ℹ️</div>
+        <div class="detail-row-text" id="d-access-info">—</div>
+      </div>
+    </div>
+
+    <!-- Contact -->
+    <div class="detail-section" id="d-contact-section">
+      <div class="detail-section-title">Contact</div>
+      <div class="detail-row">
+        <div class="detail-row-icon">📞</div>
+        <div class="detail-row-text" id="d-phone">—</div>
+      </div>
+    </div>
+
+    <button class="detail-directions-btn" id="d-directions-btn">🗺️ Get Directions</button>
+    <button class="detail-close-btn" onclick="closeDetailPanel()">Close</button>
+  </div>
+</div>
+
+<!-- ── Toast ── -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- ── Footer ── -->
+<footer class="footer">
+  FoodBridge — connecting surplus food with those who need it. &nbsp;|&nbsp;
+  <a href="/">Home</a> &nbsp;|&nbsp;
+  <a href="/donor/">Donate Food</a>
+</footer>
+
+<script src="./js/app.js"></script>
+</body>
+</html>

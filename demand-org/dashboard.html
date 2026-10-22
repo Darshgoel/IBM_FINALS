@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FoodBridge — NGO Dashboard</title>
+  <meta name="description" content="FoodBridge Demand Organization Dashboard — manage food needs, view matches, track fulfillment." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles/main.css" />
+</head>
+<body>
+
+<!-- ══════════════════ SIDEBAR ══════════════════ -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <div class="mark">🤝</div>
+    <h2>FoodBridge</h2>
+    <p>Demand Organization Portal</p>
+  </div>
+
+  <nav class="sidebar-nav">
+    <span class="nav-section-label">Dashboard</span>
+    <button class="nav-item active" id="nav-overview"  onclick="showPage('overview')">
+      <span class="icon">📊</span> Overview
+    </button>
+    <button class="nav-item" id="nav-register-demand" onclick="showPage('register-demand')">
+      <span class="icon">📋</span> Register Demand
+    </button>
+    <button class="nav-item" id="nav-my-demands"     onclick="showPage('my-demands')">
+      <span class="icon">📦</span> My Demands
+    </button>
+
+    <span class="nav-section-label">Supply</span>
+    <button class="nav-item" id="nav-matches"    onclick="showPage('matches')">
+      <span class="icon">🎯</span> Matched Supply
+      <span class="nav-badge" id="match-badge" style="display:none">0</span>
+    </button>
+
+    <span class="nav-section-label">Organization</span>
+    <button class="nav-item" id="nav-capacity"  onclick="showPage('capacity')">
+      <span class="icon">📦</span> Capacity
+    </button>
+    <button class="nav-item" id="nav-insights"  onclick="showPage('insights')">
+      <span class="icon">📈</span> Insights
+    </button>
+    <button class="nav-item" id="nav-alerts"    onclick="showPage('alerts')">
+      <span class="icon">🔔</span> Alerts
+      <span class="nav-badge" id="alert-badge" style="display:none">0</span>
+    </button>
+    <button class="nav-item" id="nav-profile"   onclick="showPage('profile')">
+      <span class="icon">🏢</span> Profile
+    </button>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="org-card">
+      <div class="org-avatar" id="sidebar-avatar">NG</div>
+      <div class="org-info">
+        <div class="org-name" id="sidebar-org-name">Loading…</div>
+        <div class="org-type" id="sidebar-org-type">Demand Org</div>
+      </div>
+      <button class="logout-btn" title="Sign out" onclick="logout()">⏻</button>
+    </div>
+  </div>
+</aside>
+
+<!-- ══════════════════ MAIN ══════════════════ -->
+<div class="main">
+
+  <!-- Topbar -->
+  <header class="topbar">
+    <div>
+      <div class="topbar-title" id="topbar-title">Overview</div>
+      <div class="topbar-sub" id="topbar-sub">Welcome back</div>
+    </div>
+    <div class="topbar-actions">
+      <button class="topbar-btn primary" onclick="showPage('register-demand')">+ Register Demand</button>
+      <div class="alert-indicator" id="topbar-alert-btn" onclick="showPage('alerts')" title="Alerts">
+        🔔
+        <div class="alert-dot" id="topbar-alert-dot" style="display:none"></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ─── OVERVIEW ─── -->
+  <section class="page-content active" id="page-overview">
+    <div class="section-header">
+      <div>
+        <h2>Overview</h2>
+        <p>Your organization's demand activity at a glance.</p>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Active Demands</div>
+        <div class="stat-value blue" id="stat-active">—</div>
+        <div class="stat-change" id="stat-active-sub">currently open</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Fulfilled This Month</div>
+        <div class="stat-value green" id="stat-fulfilled">—</div>
+        <div class="stat-change up" id="stat-fulfilled-sub">demands completed</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Pending Matches</div>
+        <div class="stat-value amber" id="stat-pending">—</div>
+        <div class="stat-change" id="stat-pending-sub">awaiting confirmation</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">People Served</div>
+        <div class="stat-value green" id="stat-people">—</div>
+        <div class="stat-change up" id="stat-people-sub">this month</div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <!-- Recent Demands -->
+      <div class="card">
+        <div class="card-title">Recent Demands</div>
+        <div class="card-sub">Your latest food needs registered</div>
+        <div class="demand-list" id="overview-demands">
+          <div class="empty-state">
+            <div class="empty-icon">📋</div>
+            <p>No demands yet.<br>Register your first food need.</p>
+            <button class="cta" onclick="showPage('register-demand')">Register Demand</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Matches -->
+      <div class="card">
+        <div class="card-title">Recent Matches</div>
+        <div class="card-sub">Supply matched to your demands</div>
+        <div class="match-list" id="overview-matches">
+          <div class="empty-state">
+            <div class="empty-icon">🎯</div>
+            <p>No matches yet.<br>The system will surface suitable supply automatically.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Alerts -->
+    <div class="card">
+      <div class="card-title">🔔 Recent Alerts</div>
+      <div class="card-sub">Notifications from the network</div>
+      <div class="alerts-list" id="overview-alerts">
+        <div class="empty-state">
+          <div class="empty-icon">🔕</div>
+          <p>No alerts right now.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── REGISTER DEMAND ─── -->
+  <section class="page-content" id="page-register-demand">
+    <div class="section-header">
+      <div>
+        <h2>Register Food Demand</h2>
+        <p>Tell the network what you need. We'll find matching supply automatically.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Food Requirement</div>
+      <div class="card-sub">Provide details about what your organization needs</div>
+
+      <!-- Urgency -->
+      <div style="margin-bottom: 20px;">
+        <label style="margin-bottom: 10px; display:block;">Priority / Urgency</label>
+        <div class="urgency-selector" id="urgency-selector">
+          <button class="urgency-btn" data-urgency="emergency" onclick="selectUrgency('emergency')">🚨 Emergency</button>
+          <button class="urgency-btn" data-urgency="immediate" onclick="selectUrgency('immediate')">⏰ Immediate</button>
+          <button class="urgency-btn selected" data-urgency="regular" onclick="selectUrgency('regular')">✅ Regular</button>
+          <button class="urgency-btn" data-urgency="planned" onclick="selectUrgency('planned')">📅 Planned</button>
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="d-food-type">Food Type Required</label>
+          <select id="d-food-type">
+            <option value="cooked_meals">Cooked Meals</option>
+            <option value="raw_ingredients">Raw Ingredients</option>
+            <option value="packaged_food">Packaged Food</option>
+            <option value="bread_bakery">Bread / Bakery</option>
+            <option value="dairy">Dairy Products</option>
+            <option value="fruits_vegetables">Fruits & Vegetables</option>
+            <option value="any">Any / No Preference</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="d-quantity">Quantity (servings / kg)</label>
+          <input type="number" id="d-quantity" placeholder="e.g. 150" min="1" />
+        </div>
+        <div class="form-group">
+          <label for="d-unit">Unit</label>
+          <select id="d-unit">
+            <option value="servings">Servings / Meals</option>
+            <option value="kg">Kilograms (kg)</option>
+            <option value="litres">Litres</option>
+            <option value="packets">Packets</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="d-needed-by">Needed By</label>
+          <input type="datetime-local" id="d-needed-by" />
+        </div>
+        <div class="form-group full">
+          <label for="d-dietary">Dietary Requirements / Restrictions</label>
+          <input type="text" id="d-dietary" placeholder="e.g. No pork, vegetarian preferred, no nuts" />
+        </div>
+        <div class="form-group full">
+          <label for="d-notes">Additional Notes</label>
+          <textarea id="d-notes" placeholder="Any other relevant information about your need…"></textarea>
+        </div>
+      </div>
+
+      <!-- Recurring toggle -->
+      <div class="toggle-row" style="margin-bottom: 16px;">
+        <input type="checkbox" id="d-recurring" />
+        <label for="d-recurring">This is a recurring demand</label>
+        <span class="toggle-desc">Sets a demand profile for regular network planning</span>
+      </div>
+
+      <div id="recurring-fields" style="display:none;">
+        <div class="form-grid" style="margin-top: 14px;">
+          <div class="form-group">
+            <label for="d-recur-freq">Frequency</label>
+            <select id="d-recur-freq">
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="weekdays">Weekdays</option>
+              <option value="weekends">Weekends</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="d-recur-time">Preferred Time</label>
+            <input type="time" id="d-recur-time" value="17:00" />
+          </div>
+        </div>
+      </div>
+
+      <div id="demand-error" style="display:none; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); color:#FCA5A5; padding:10px 14px; border-radius:8px; font-size:0.85rem; margin-top:14px;"></div>
+
+      <div class="form-actions">
+        <button class="btn btn-primary" id="demand-submit-btn" onclick="submitDemand()">📋 Register Demand</button>
+        <button class="btn btn-ghost" onclick="clearDemandForm()">Clear</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── MY DEMANDS ─── -->
+  <section class="page-content" id="page-my-demands">
+    <div class="section-header">
+      <div>
+        <h2>My Demands</h2>
+        <p>All food needs your organization has registered.</p>
+      </div>
+      <button class="topbar-btn primary" onclick="showPage('register-demand')">+ New Demand</button>
+    </div>
+
+    <!-- Filter bar -->
+    <div style="display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap;">
+      <button class="topbar-btn" id="filter-all"       onclick="filterDemands('all')"       style="color:var(--text);">All</button>
+      <button class="topbar-btn" id="filter-active"    onclick="filterDemands('active')">Active</button>
+      <button class="topbar-btn" id="filter-searching" onclick="filterDemands('searching')">Searching</button>
+      <button class="topbar-btn" id="filter-matched"   onclick="filterDemands('matched')">Matched</button>
+      <button class="topbar-btn" id="filter-fulfilled" onclick="filterDemands('fulfilled')">Fulfilled</button>
+    </div>
+
+    <div class="demand-list" id="demands-list">
+      <div class="empty-state">
+        <div class="empty-icon">📋</div>
+        <p>No demands found.</p>
+        <button class="cta" onclick="showPage('register-demand')">Register your first demand</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── MATCHES ─── -->
+  <section class="page-content" id="page-matches">
+    <div class="section-header">
+      <div>
+        <h2>Matched Supply</h2>
+        <p>Food that the network has matched to your demands.</p>
+      </div>
+    </div>
+    <div class="match-list" id="matches-list">
+      <div class="empty-state">
+        <div class="empty-icon">🎯</div>
+        <p>No matches yet. The network is scanning for suitable supply.<br>Register demands to receive automatic matches.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── CAPACITY ─── -->
+  <section class="page-content" id="page-capacity">
+    <div class="section-header">
+      <div>
+        <h2>Capacity & Availability</h2>
+        <p>Tell the network what you can currently receive and handle.</p>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <!-- Current Capacity Form -->
+      <div class="card">
+        <div class="card-title">Update Capacity</div>
+        <div class="card-sub">Update whenever your situation changes</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="cap-receive">Receiving Capacity (today)</label>
+            <input type="number" id="cap-receive" placeholder="Meals / kg you can receive" min="0" />
+          </div>
+          <div class="form-group">
+            <label for="cap-serve">Serving Capacity (meals/day)</label>
+            <input type="number" id="cap-serve" placeholder="Max meals you can serve" min="0" />
+          </div>
+          <div class="form-group">
+            <label for="cap-storage">Storage Capacity (kg)</label>
+            <input type="number" id="cap-storage" placeholder="Storage space in kg" min="0" />
+          </div>
+          <div class="form-group">
+            <label for="cap-avail-until">Available Until</label>
+            <input type="time" id="cap-avail-until" />
+          </div>
+          <div class="form-group full">
+            <label for="cap-notes">Capacity Notes</label>
+            <textarea id="cap-notes" placeholder="Any constraints, e.g. no refrigeration, limited transport…"></textarea>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-primary" onclick="updateCapacity()">💾 Update Capacity</button>
+        </div>
+      </div>
+
+      <!-- Capacity visualization -->
+      <div class="card">
+        <div class="card-title">Current Utilization</div>
+        <div class="card-sub">How much of your capacity is currently committed</div>
+        <div id="capacity-bars">
+          <div class="capacity-bar-row">
+            <div class="capacity-bar-label">Receiving</div>
+            <div class="capacity-bar-track"><div class="capacity-bar-fill" id="bar-receive" style="width:0%"></div></div>
+            <div class="capacity-bar-val" id="val-receive">—</div>
+          </div>
+          <div class="capacity-bar-row">
+            <div class="capacity-bar-label">Serving</div>
+            <div class="capacity-bar-track"><div class="capacity-bar-fill" id="bar-serve" style="width:0%"></div></div>
+            <div class="capacity-bar-val" id="val-serve">—</div>
+          </div>
+          <div class="capacity-bar-row">
+            <div class="capacity-bar-label">Storage</div>
+            <div class="capacity-bar-track"><div class="capacity-bar-fill amber" id="bar-storage" style="width:0%"></div></div>
+            <div class="capacity-bar-val" id="val-storage">—</div>
+          </div>
+        </div>
+
+        <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border);">
+          <div class="card-title" style="margin-bottom: 14px;">Demand Profile</div>
+          <div class="card-sub">Your recurring needs that feed network intelligence</div>
+          <div class="tag-list" id="demand-profile-tags">
+            <span class="tag time">🕔 Daily 5pm</span>
+            <span class="tag">🍱 ~200 meals/day</span>
+            <span class="tag dietary">🥗 Vegetarian preferred</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── INSIGHTS ─── -->
+  <section class="page-content" id="page-insights">
+    <div class="section-header">
+      <div>
+        <h2>Organization Insights</h2>
+        <p>Demand trends, fulfillment analysis, and network intelligence for your org.</p>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Fulfillment Rate</div>
+        <div class="stat-value green" id="ins-fulfillment-rate">—</div>
+        <div class="stat-change up">of demands fulfilled</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Demands Registered</div>
+        <div class="stat-value blue" id="ins-total-demands">—</div>
+        <div class="stat-change">all time</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Unmet Demands</div>
+        <div class="stat-value red" id="ins-unmet">—</div>
+        <div class="stat-change down">needs with no supply</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">People Served Total</div>
+        <div class="stat-value green" id="ins-people-total">—</div>
+        <div class="stat-change up">all time</div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <!-- Demand vs Fulfilled chart -->
+      <div class="card">
+        <div class="card-title">Demand vs Fulfilled (Last 7 Days)</div>
+        <div class="card-sub">Green = fulfilled · Red = unmet</div>
+        <div class="chart-wrap" id="demand-chart">
+          <!-- Rendered by JS -->
+        </div>
+      </div>
+
+      <!-- Recurring Shortages -->
+      <div class="card">
+        <div class="card-title">Recurring Shortages</div>
+        <div class="card-sub">Days / times when supply consistently falls short</div>
+        <div id="shortage-list">
+          <div class="empty-state" style="padding: 20px;">
+            <div class="empty-icon" style="font-size: 2rem;">📉</div>
+            <p>No recurring shortage patterns detected yet.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Food Received Breakdown -->
+    <div class="card">
+      <div class="card-title">Food Received Breakdown</div>
+      <div class="card-sub">Types of food your organization has received</div>
+      <div id="food-breakdown" class="tag-list">
+        <!-- Rendered by JS -->
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── ALERTS ─── -->
+  <section class="page-content" id="page-alerts">
+    <div class="section-header">
+      <div>
+        <h2>Alerts</h2>
+        <p>Network notifications relevant to your organization.</p>
+      </div>
+      <button class="topbar-btn" onclick="markAllAlertsRead()">✓ Mark all read</button>
+    </div>
+    <div class="alerts-list" id="alerts-full-list">
+      <div class="empty-state">
+        <div class="empty-icon">🔕</div>
+        <p>No alerts. You're all caught up!</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── PROFILE ─── -->
+  <section class="page-content" id="page-profile">
+    <div class="section-header">
+      <div>
+        <h2>Organization Profile</h2>
+        <p>Update your organization's information and food requirements.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="profile-section-title">Organization Details</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="p-org-name">Organization Name</label>
+          <input type="text" id="p-org-name" />
+        </div>
+        <div class="form-group">
+          <label for="p-org-type">Organization Type</label>
+          <select id="p-org-type">
+            <option value="ngo">NGO / Charity</option>
+            <option value="food_bank">Food Bank</option>
+            <option value="community_kitchen">Community Kitchen</option>
+            <option value="shelter">Shelter / Refuge</option>
+            <option value="other_demand">Other</option>
+          </select>
+        </div>
+        <div class="form-group full">
+          <label for="p-address">Location Address</label>
+          <input type="text" id="p-address" />
+        </div>
+        <div class="form-group">
+          <label for="p-phone">Contact Phone</label>
+          <input type="tel" id="p-phone" />
+        </div>
+        <div class="form-group">
+          <label for="p-hours">Operating Hours</label>
+          <input type="text" id="p-hours" placeholder="e.g. Daily 4pm–9pm" />
+        </div>
+      </div>
+
+      <div class="profile-section-title">Serving & Capacity</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="p-serve-cap">Serving Capacity (meals/day)</label>
+          <input type="number" id="p-serve-cap" min="0" />
+        </div>
+        <div class="form-group">
+          <label for="p-population">Population Served</label>
+          <input type="text" id="p-population" placeholder="e.g. Homeless adults, migrant workers" />
+        </div>
+        <div class="form-group full">
+          <label for="p-food-req">Food Requirements / Preferences</label>
+          <textarea id="p-food-req" placeholder="Vegetarian, halal, no allergens, hot meals preferred…"></textarea>
+        </div>
+      </div>
+
+      <div id="profile-error"   style="display:none; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); color:#FCA5A5; padding:10px 14px; border-radius:8px; font-size:0.85rem; margin-top:14px;"></div>
+      <div id="profile-success" style="display:none; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); color:#6EE7B7; padding:10px 14px; border-radius:8px; font-size:0.85rem; margin-top:14px;"></div>
+
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="saveProfile()">💾 Save Profile</button>
+      </div>
+    </div>
+  </section>
+
+</div><!-- /main -->
+
+<!-- Toast container -->
+<div class="toast-container" id="toast-container"></div>
+
+<script type="module" src="./js/dashboard.js"></script>
+</body>
+</html>

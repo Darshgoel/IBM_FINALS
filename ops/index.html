@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FoodBridge — Ops Portal</title>
+  <meta name="description" content="FoodBridge Operations Portal — Network Intelligence & Admin access." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #05080F;
+      --surface: #0A0F1C;
+      --card:    rgba(255,255,255,0.04);
+      --border:  rgba(255,255,255,0.08);
+      --text:    #F1F5F9;
+      --muted:   #94A3B8;
+      --sub:     #64748B;
+      --font:    'Inter', sans-serif;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    /* Ambient background */
+    body::before {
+      content: ''; position: fixed; inset: 0; pointer-events: none;
+      background:
+        radial-gradient(ellipse 60% 45% at 20% 20%, rgba(139,92,246,0.08) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 40% at 80% 75%, rgba(6,182,212,0.06) 0%, transparent 60%);
+    }
+
+    .page {
+      position: relative; z-index: 1;
+      width: 100%; max-width: 440px;
+    }
+
+    /* ── Logo ── */
+    .logo { text-align: center; margin-bottom: 36px; }
+    .logo-mark { font-size: 2.8rem; margin-bottom: 8px; }
+    .logo h1 {
+      font-size: 1.7rem; font-weight: 800; letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #8B5CF6, #06B6D4);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .logo p { color: var(--muted); font-size: 0.85rem; margin-top: 6px; line-height: 1.5; }
+
+    /* Role chips shown under logo */
+    .role-chips {
+      display: flex; gap: 8px; justify-content: center; margin-top: 14px;
+      flex-wrap: wrap;
+    }
+    .role-chip {
+      display: flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: 20px; font-size: 0.72rem; font-weight: 600;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .role-chip.admin { background: rgba(139,92,246,0.12); color: #A78BFA; border-color: rgba(139,92,246,0.25); }
+    .role-chip.network { background: rgba(6,182,212,0.1); color: #22D3EE; border-color: rgba(6,182,212,0.2); }
+
+    /* ── Card ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      backdrop-filter: blur(24px);
+      padding: 32px;
+    }
+
+    .restricted-banner {
+      display: flex; align-items: start; gap: 10px;
+      background: rgba(245,158,11,0.07);
+      border: 1px solid rgba(245,158,11,0.18);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 22px;
+      font-size: 0.78rem;
+      color: #FCD34D;
+      line-height: 1.6;
+    }
+    .restricted-banner span { flex-shrink: 0; font-size: 1rem; }
+
+    .card-title { font-size: 1rem; font-weight: 700; margin-bottom: 4px; }
+    .card-sub   { font-size: 0.8rem; color: var(--muted); margin-bottom: 22px; }
+
+    label {
+      display: block; font-size: 0.73rem; font-weight: 600;
+      color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    input {
+      width: 100%; background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border); border-radius: 10px;
+      padding: 12px 14px; color: var(--text);
+      font-family: var(--font); font-size: 0.9rem; outline: none;
+      margin-bottom: 16px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    input:focus { border-color: #8B5CF6; box-shadow: 0 0 0 3px rgba(139,92,246,0.12); }
+
+    /* Role detected pill — shows after API responds */
+    .role-detected {
+      display: none; align-items: center; gap: 8px;
+      padding: 8px 14px; border-radius: 8px;
+      font-size: 0.8rem; font-weight: 600;
+      margin-bottom: 16px;
+    }
+    .role-detected.admin   { background: rgba(139,92,246,0.12); color: #A78BFA; border: 1px solid rgba(139,92,246,0.25); }
+    .role-detected.network { background: rgba(6,182,212,0.1);   color: #22D3EE; border: 1px solid rgba(6,182,212,0.2); }
+    .role-detected.show    { display: flex; }
+
+    /* ── Buttons ── */
+    .btn {
+      width: 100%; padding: 13px; border: none; border-radius: 10px;
+      font-family: var(--font); font-size: 0.95rem; font-weight: 700;
+      cursor: pointer; transition: all 0.2s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn-ops {
+      background: linear-gradient(135deg, #8B5CF6, #06B6D4);
+      color: #fff;
+    }
+    .btn-ops:hover { transform: translateY(-1px); box-shadow: 0 8px 28px rgba(139,92,246,0.3); }
+    .btn-ops:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    /* ── Error / Info ── */
+    .error-msg {
+      background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3);
+      color: #FCA5A5; padding: 10px 14px; border-radius: 8px;
+      font-size: 0.82rem; margin-bottom: 14px; display: none;
+    }
+    .error-msg.show { display: block; }
+
+    /* ── Spinner ── */
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.2); border-top-color: #fff;
+      border-radius: 50%; animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Divider ── */
+    .divider {
+      display: flex; align-items: center; gap: 12px;
+      margin: 22px 0; color: var(--sub); font-size: 0.72rem;
+    }
+    .divider::before, .divider::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+
+    /* ── Role panels (shown after login) ── */
+    .role-panels {
+      display: none; gap: 10px; margin-top: 20px;
+    }
+    .role-panels.show { display: flex; flex-direction: column; }
+
+    .role-panel {
+      display: flex; align-items: center; gap: 14px;
+      background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px;
+      cursor: pointer; transition: border-color 0.2s, transform 0.2s;
+      text-decoration: none; color: var(--text);
+    }
+    .role-panel:hover { border-color: rgba(255,255,255,0.15); transform: translateX(3px); }
+    .role-panel.admin:hover   { border-color: rgba(139,92,246,0.4); }
+    .role-panel.network:hover { border-color: rgba(6,182,212,0.35); }
+
+    .rp-icon {
+      width: 44px; height: 44px; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex-shrink: 0;
+    }
+    .rp-icon.admin   { background: rgba(139,92,246,0.15); }
+    .rp-icon.network { background: rgba(6,182,212,0.12); }
+
+    .rp-text { flex: 1; }
+    .rp-title { font-size: 0.9rem; font-weight: 700; margin-bottom: 3px; }
+    .rp-sub   { font-size: 0.73rem; color: var(--muted); }
+    .rp-arrow { font-size: 1rem; color: var(--sub); }
+
+    /* ── Back link ── */
+    .back { text-align: center; margin-top: 22px; }
+    .back a { color: var(--sub); font-size: 0.78rem; text-decoration: none; }
+    .back a:hover { color: var(--muted); }
+  </style>
+</head>
+<body>
+
+<div class="page">
+
+  <!-- Logo -->
+  <div class="logo">
+    <div class="logo-mark">🌐</div>
+    <h1>FoodBridge Ops</h1>
+    <p>Operations & Administration Portal<br>Restricted to authorized personnel only.</p>
+    <div class="role-chips">
+      <span class="role-chip admin">⚙️ Admin</span>
+      <span class="role-chip network">🌐 Network Intelligence</span>
+    </div>
+  </div>
+
+  <!-- Login card -->
+  <div class="card">
+    <div class="restricted-banner">
+      <span>⚠️</span>
+      <span>Access to this portal is restricted. Unauthorized login attempts are logged and reported.</span>
+    </div>
+
+    <div class="card-title">Sign in to Ops Portal</div>
+    <div class="card-sub">Enter your authorized credentials below.</div>
+
+    <div class="error-msg" id="login-error"></div>
+
+    <!-- Role detected pill (after auth, before redirect) -->
+    <div class="role-detected" id="role-detected-pill">
+      <span id="role-icon">🌐</span>
+      <span id="role-label">Logging in…</span>
+    </div>
+
+    <label for="ops-email">Email Address</label>
+    <input type="email" id="ops-email" placeholder="ops@foodbridge.org" autocomplete="email" />
+
+    <label for="ops-password">Password</label>
+    <input type="password" id="ops-password" placeholder="••••••••" autocomplete="current-password" />
+
+    <button class="btn btn-ops" id="login-btn" onclick="handleLogin()">
+      Sign In →
+    </button>
+  </div>
+
+  <div class="back"><a href="/">← Back to FoodBridge</a></div>
+</div>
+
+<script>
+  const API = 'http://localhost:3000/api';
+
+  // Role → dashboard URL mapping
+  const ROLE_ROUTES = {
+    admin:                 '/admin/dashboard.html',
+    network_intelligence:  '/network-intelligence/dashboard.html',
+    network_admin:         '/network-intelligence/dashboard.html',
+  };
+
+  const ROLE_META = {
+    admin: {
+      icon: '⚙️', label: 'Platform Administrator — redirecting…',
+      pillClass: 'admin',
+    },
+    network_intelligence: {
+      icon: '🌐', label: 'Network Coordinator — redirecting…',
+      pillClass: 'network',
+    },
+    network_admin: {
+      icon: '🌐', label: 'Network Coordinator — redirecting…',
+      pillClass: 'network',
+    },
+  };
+
+  // Auto-redirect if already logged in with an ops role
+  const existingToken = localStorage.getItem('fb_token');
+  const existingUser  = JSON.parse(localStorage.getItem('fb_user') || 'null');
+  if (existingToken && existingUser && ROLE_ROUTES[existingUser.role]) {
+    window.location.href = ROLE_ROUTES[existingUser.role];
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('login-error');
+    el.textContent = msg;
+    el.classList.add('show');
+  }
+  function hideError() {
+    document.getElementById('login-error').classList.remove('show');
+  }
+
+  function setLoading(loading) {
+    const btn = document.getElementById('login-btn');
+    btn.disabled = loading;
+    btn.innerHTML = loading
+      ? `<div class="spinner"></div> Authenticating…`
+      : 'Sign In →';
+  }
+
+  function showRolePill(role) {
+    const meta = ROLE_META[role];
+    if (!meta) return;
+    const pill = document.getElementById('role-detected-pill');
+    pill.className = `role-detected show ${meta.pillClass}`;
+    document.getElementById('role-icon').textContent  = meta.icon;
+    document.getElementById('role-label').textContent = meta.label;
+  }
+
+  async function handleLogin() {
+    hideError();
+    const email    = document.getElementById('ops-email').value.trim();
+    const password = document.getElementById('ops-password').value;
+
+    if (!email || !password) {
+      showError('Please enter your email and password.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res  = await fetch(`${API}/auth/login`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Login failed.');
+
+      const role  = data.user?.role;
+      const route = ROLE_ROUTES[role];
+
+      if (!route) {
+        throw new Error(
+          'Your account does not have ops access. ' +
+          (role === 'donor' || role === 'demand_org'
+            ? 'Please sign in at the main FoodBridge portal.'
+            : 'Contact your administrator.')
+        );
+      }
+
+      // Store credentials
+      localStorage.setItem('fb_token', data.token);
+      localStorage.setItem('fb_user',  JSON.stringify(data.user));
+
+      // Show role pill briefly before redirecting
+      showRolePill(role);
+      setTimeout(() => { window.location.href = route; }, 800);
+
+    } catch (err) {
+      showError(err.message);
+      setLoading(false);
+    }
+  }
+
+  // Enter key support
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter') handleLogin();
+  });
+</script>
+</body>
+</html>

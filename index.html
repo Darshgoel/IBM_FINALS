@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FoodBridge — Food Access & Recovery Network</title>
+  <meta name="description"
+    content="FoodBridge connects food surplus with community need. Join as a donor, NGO, or find food near you." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+    rel="stylesheet" />
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #070B14;
+      --surface: #0D1321;
+      --card: rgba(255, 255, 255, 0.04);
+      --border: rgba(255, 255, 255, 0.08);
+      --primary: #F59E0B;
+      --primary-d: #D97706;
+      --green: #10B981;
+      --blue: #3B82F6;
+      --purple: #8B5CF6;
+      --text: #F9FAFB;
+      --muted: #9CA3AF;
+      --sub: #6B7280;
+      --radius: 16px;
+      --font: 'Inter', sans-serif;
+    }
+
+    html,
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Animated background ── */
+    .bg-glow {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 70% 50% at 15% 15%, rgba(245, 158, 11, 0.09) 0%, transparent 65%),
+        radial-gradient(ellipse 55% 45% at 85% 80%, rgba(16, 185, 129, 0.07) 0%, transparent 65%),
+        radial-gradient(ellipse 40% 40% at 50% 50%, rgba(59, 130, 246, 0.04) 0%, transparent 70%);
+      animation: bgShift 12s ease-in-out infinite alternate;
+    }
+
+    @keyframes bgShift {
+      from {
+        opacity: 1;
+      }
+
+      to {
+        opacity: 0.7;
+        transform: scale(1.05);
+      }
+    }
+
+    /* ── Layout ── */
+    .page {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* Left panel — hero */
+    .hero {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 60px 64px;
+      max-width: 520px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 56px;
+    }
+
+    .brand-icon {
+      font-size: 2rem;
+    }
+
+    .brand-name {
+      font-size: 1.5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--primary), #FCD34D);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-tagline {
+      font-size: 2.8rem;
+      font-weight: 900;
+      line-height: 1.15;
+      letter-spacing: -1px;
+      margin-bottom: 20px;
+    }
+
+    .hero-tagline .accent {
+      color: var(--primary);
+    }
+
+    .hero-sub {
+      font-size: 1rem;
+      color: var(--muted);
+      line-height: 1.7;
+      max-width: 400px;
+      margin-bottom: 48px;
+    }
+
+    .hero-stats {
+      display: flex;
+      gap: 32px;
+    }
+
+    .hero-stat-value {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--primary);
+    }
+
+    .hero-stat-label {
+      font-size: 0.75rem;
+      color: var(--sub);
+      margin-top: 2px;
+    }
+
+    .divider {
+      width: 1px;
+      background: var(--border);
+    }
+
+    /* Right panel — auth */
+    .auth-panel {
+      width: 480px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 40px 48px;
+      border-left: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.018);
+      backdrop-filter: blur(20px);
+    }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 32px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 11px;
+      border: none;
+      border-radius: 9px;
+      background: transparent;
+      color: var(--muted);
+      font-family: var(--font);
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      background: var(--primary);
+      color: #000;
+      font-weight: 700;
+    }
+
+    .tab-pane {
+      display: none;
+    }
+
+    .tab-pane.active {
+      display: block;
+    }
+
+    /* ── Form elements ── */
+    .form-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .form-sub {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 24px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--sub);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 6px;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 16px;
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      margin-bottom: 14px;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.13);
+    }
+
+    select option {
+      background: #1a1a2e;
+    }
+
+    textarea {
+      resize: vertical;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    /* ── Signup stepper ── */
+    .stepper {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      margin-bottom: 28px;
+    }
+
+    .step-dot {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--sub);
+      border: 1px solid var(--border);
+      transition: all 0.3s;
+      flex-shrink: 0;
+    }
+
+    .step-dot.active {
+      background: var(--primary);
+      color: #000;
+      border-color: var(--primary);
+    }
+
+    .step-dot.done {
+      background: var(--green);
+      color: #000;
+      border-color: var(--green);
+    }
+
+    .step-line {
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+      transition: background 0.3s;
+    }
+
+    .step-line.done {
+      background: var(--green);
+    }
+
+    .step-pane {
+      display: none;
+      animation: fadeSlide 0.3s ease;
+    }
+
+    .step-pane.active {
+      display: block;
+    }
+
+    @keyframes fadeSlide {
+      from {
+        opacity: 0;
+        transform: translateX(16px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    /* ── Role cards ── */
+    .role-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+
+    .role-card {
+      background: var(--card);
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 10px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .role-card:hover {
+      border-color: rgba(245, 158, 11, 0.4);
+      transform: translateY(-2px);
+    }
+
+    .role-card.selected {
+      border-color: var(--primary);
+      background: rgba(245, 158, 11, 0.08);
+      box-shadow: 0 0 0 1px var(--primary);
+    }
+
+    .role-card .role-icon {
+      font-size: 1.8rem;
+      margin-bottom: 8px;
+    }
+
+    .role-card .role-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--muted);
+      line-height: 1.3;
+    }
+
+    .role-card.selected .role-label {
+      color: var(--primary);
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      width: 100%;
+      padding: 13px;
+      border: none;
+      border-radius: 10px;
+      font-family: var(--font);
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary), var(--primary-d));
+      color: #000;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 24px rgba(245, 158, 11, 0.3);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .btn-ghost {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .btn-ghost:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text);
+    }
+
+    /* ── Messages ── */
+    .msg {
+      padding: 11px 14px;
+      border-radius: 9px;
+      font-size: 0.85rem;
+      margin-bottom: 14px;
+      display: none;
+    }
+
+    .msg.show {
+      display: block;
+    }
+
+    .msg.error {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #FCA5A5;
+    }
+
+    .msg.success {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #6EE7B7;
+    }
+
+    .msg.info {
+      background: rgba(245, 158, 11, 0.08);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+      color: #FCD34D;
+    }
+
+    .upload-dropzone {
+      border: 1px dashed rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      padding: 12px 14px;
+      background: rgba(255, 255, 255, 0.03);
+      text-align: center;
+      font-size: 0.82rem;
+      color: var(--muted);
+      cursor: pointer;
+      margin-bottom: 14px;
+      transition: all 0.2s;
+    }
+    .upload-dropzone:hover {
+      border-color: var(--primary);
+      background: rgba(16, 185, 129, 0.08);
+      color: var(--text);
+    }
+
+    /* ── Spinner ── */
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(0, 0, 0, 0.2);
+      border-top-color: #000;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      display: inline-block;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* ── Ops link ── */
+    .ops-link {
+      text-align: center;
+      margin-top: 28px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+    }
+
+    .ops-link a {
+      color: var(--sub);
+      font-size: 0.8rem;
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .ops-link a:hover {
+      color: var(--muted);
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 900px) {
+      .page {
+        flex-direction: column;
+      }
+
+      .hero {
+        max-width: 100%;
+        padding: 40px 28px 24px;
+      }
+
+      .hero-tagline {
+        font-size: 2rem;
+      }
+
+      .auth-panel {
+        width: 100%;
+        border-left: none;
+        border-top: 1px solid var(--border);
+        padding: 32px 24px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="bg-glow"></div>
+
+  <div class="page">
+    <!-- Hero Left -->
+    <div class="hero">
+      <div class="brand">
+        <span class="brand-icon">🌉</span>
+        <span class="brand-name">FoodBridge</span>
+      </div>
+
+      <h1 class="hero-tagline">
+        Bridging food<br />
+        <span class="accent">surplus</span> &amp;<br />
+        community need.
+      </h1>
+
+      <p class="hero-sub">
+        An AI-powered network that connects donors, NGOs, food banks, and communities
+        — so surplus food reaches people, not landfills.
+      </p>
+
+      <div class="hero-stats">
+        <div>
+          <div class="hero-stat-value">Post once.</div>
+          <div class="hero-stat-label">We handle the rest</div>
+        </div>
+        <div class="divider"></div>
+        <div>
+          <div class="hero-stat-value">Real-time</div>
+          <div class="hero-stat-label">AI-powered matching</div>
+        </div>
+        <div class="divider"></div>
+        <div>
+          <div class="hero-stat-value">Zero</div>
+          <div class="hero-stat-label">Logistics burden on you</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Auth Right -->
+    <div class="auth-panel">
+      <div class="tabs">
+        <button class="tab-btn active" id="tab-signin" onclick="switchTab('signin')">Sign In</button>
+        <button class="tab-btn" id="tab-signup" onclick="switchTab('signup')">Sign Up</button>
+      </div>
+
+      <!-- ── SIGN IN ── -->
+      <div class="tab-pane active" id="pane-signin">
+        <div class="form-title">Welcome back</div>
+        <div class="form-sub">Sign in to reach your dashboard.</div>
+
+        <div class="msg error" id="signin-error"></div>
+
+        <label for="si-email">Email Address</label>
+        <input type="email" id="si-email" placeholder="you@example.com" autocomplete="email" />
+
+        <label for="si-password">Password</label>
+        <input type="password" id="si-password" placeholder="••••••••" autocomplete="current-password" />
+
+        <button class="btn btn-primary" id="signin-btn" onclick="handleSignIn()">Sign In</button>
+      </div>
+
+      <!-- ── SIGN UP ── -->
+      <div class="tab-pane" id="pane-signup">
+
+        <!-- Stepper -->
+        <div class="stepper">
+          <div class="step-dot active" id="dot-1">1</div>
+          <div class="step-line" id="line-1"></div>
+          <div class="step-dot" id="dot-2">2</div>
+          <div class="step-line" id="line-2"></div>
+          <div class="step-dot" id="dot-3">3</div>
+        </div>
+
+        <div class="msg error" id="signup-error"></div>
+        <div class="msg success" id="signup-success"></div>
+
+        <!-- Step 1: Credentials -->
+        <div class="step-pane active" id="step-1">
+          <div class="form-title">Create your account</div>
+          <div class="form-sub">Start with your name and login credentials.</div>
+
+          <label for="su-name">Your Full Name</label>
+          <input type="text" id="su-name" placeholder="e.g. Priya Sharma" autocomplete="name" />
+
+          <label for="su-email">Email Address</label>
+          <input type="email" id="su-email" placeholder="you@example.com" autocomplete="email" />
+
+          <label for="su-password">Password</label>
+          <input type="password" id="su-password" placeholder="Min. 8 characters" autocomplete="new-password" />
+
+          <button class="btn btn-primary" onclick="goStep2()">Continue →</button>
+        </div>
+
+        <!-- Step 2: Role -->
+        <div class="step-pane" id="step-2">
+          <div class="form-title">Who are you?</div>
+          <div class="form-sub">Choose your role in the FoodBridge network.</div>
+
+          <div class="role-grid">
+            <div class="role-card" id="role-donor" onclick="selectRole('donor')">
+              <div class="role-icon">🏪</div>
+              <div class="role-label">Food<br />Donor</div>
+            </div>
+            <div class="role-card" id="role-demand_org" onclick="selectRole('demand_org')">
+              <div class="role-icon">🤝</div>
+              <div class="role-label">NGO /<br />Food Bank</div>
+            </div>
+            <div class="role-card" id="role-recipient" onclick="selectRole('recipient')">
+              <div class="role-icon">👤</div>
+              <div class="role-label">Individual<br />Recipient</div>
+            </div>
+          </div>
+
+          <div class="msg info show" style="display:block" id="role-hint">
+            Select your role to continue.
+          </div>
+
+          <button class="btn btn-ghost" onclick="goStep1()">← Back</button>
+          <button class="btn btn-primary" id="role-next-btn" onclick="goStep3()" disabled>Continue →</button>
+        </div>
+
+        <!-- Step 3: Role-specific details -->
+        <div class="step-pane" id="step-3">
+          <div class="form-title" id="step3-title">Your Details</div>
+          <div class="form-sub" id="step3-sub">Fill in your organization information.</div>
+
+          <!-- Donor fields -->
+          <div id="fields-donor" style="display:none">
+            <label for="d-org-name">Organization / Business Name *</label>
+            <input type="text" id="d-org-name" placeholder="e.g. The Grand Hotel, Fresh Bites Catering" />
+
+            <label for="d-org-type">Organization Type</label>
+            <select id="d-org-type">
+              <option value="restaurant">Restaurant</option>
+              <option value="hotel">Hotel / Hospitality</option>
+              <option value="caterer">Caterer / Event Organizer</option>
+              <option value="retailer">Supermarket / Retailer</option>
+              <option value="institution">Institution / Canteen</option>
+              <option value="other_donor">Other</option>
+            </select>
+
+            <div class="form-row">
+              <div>
+                <label for="d-address">Location Address</label>
+                <input type="text" id="d-address" placeholder="Street, City" />
+              </div>
+              <div>
+                <label for="d-phone">Contact Phone</label>
+                <input type="tel" id="d-phone" placeholder="+91 98765 43210" />
+              </div>
+            </div>
+
+            <label for="d-hours">Operating Hours</label>
+            <input type="text" id="d-hours" placeholder="e.g. Mon–Sat 7am–10pm" />
+
+            <label>Verification Document (FSSAI License / Food Safety Cert)</label>
+            <div class="upload-dropzone" onclick="document.getElementById('d-doc').click()">
+              <span id="d-doc-label">📎 Click or drag & drop FSSAI License or Certificate (PDF/Image)</span>
+              <input type="file" id="d-doc" accept=".pdf,image/*" style="display:none" onchange="previewDocName('d-doc', 'd-doc-label')" />
+            </div>
+          </div>
+
+          <!-- Demand Org (NGO) fields -->
+          <div id="fields-demand_org" style="display:none">
+            <label for="n-org-name">Organization Name *</label>
+            <input type="text" id="n-org-name" placeholder="e.g. Helping Hands Foundation" />
+
+            <label for="n-org-type">Organization Type</label>
+            <select id="n-org-type">
+              <option value="ngo">NGO / Charity</option>
+              <option value="food_bank">Food Bank</option>
+              <option value="community_kitchen">Community Kitchen</option>
+              <option value="shelter">Shelter / Refuge</option>
+              <option value="other_demand">Other</option>
+            </select>
+
+            <div class="form-row">
+              <div>
+                <label for="n-address">Location Address</label>
+                <input type="text" id="n-address" placeholder="Street, City" />
+              </div>
+              <div>
+                <label for="n-phone">Contact Phone</label>
+                <input type="tel" id="n-phone" placeholder="+91 98765 43210" />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div>
+                <label for="n-capacity">Serving Capacity (meals/day)</label>
+                <input type="number" id="n-capacity" placeholder="e.g. 200" min="0" />
+              </div>
+              <div>
+                <label for="n-hours">Operating Hours</label>
+                <input type="text" id="n-hours" placeholder="e.g. Daily 5–9pm" />
+              </div>
+            </div>
+
+            <label>Verification Document (NGO Registration / 80G Certificate)</label>
+            <div class="upload-dropzone" onclick="document.getElementById('n-doc').click()">
+              <span id="n-doc-label">📎 Click or drag & drop NGO Certificate or Trust Deed (PDF/Image)</span>
+              <input type="file" id="n-doc" accept=".pdf,image/*" style="display:none" onchange="previewDocName('n-doc', 'n-doc-label')" />
+            </div>
+          </div>
+
+          <!-- Individual Recipient fields -->
+          <div id="fields-recipient" style="display:none">
+            <div class="msg info show" style="display:block; margin-bottom:16px;">
+              As an individual recipient, no organization details are needed. You can search for food near you
+              instantly.
+            </div>
+            <label for="r-city">Your City / Area</label>
+            <input type="text" id="r-city" placeholder="e.g. Chennai, Bengaluru" />
+          </div>
+
+          <button class="btn btn-ghost" onclick="goStep2()">← Back</button>
+          <button class="btn btn-primary" id="register-btn" onclick="handleRegister()">
+            Create Account
+          </button>
+
+          <div class="msg info" id="pending-notice" style="margin-top:14px;">
+            ✅ Account created! Your organization is pending admin verification.
+            You'll be notified once approved and can start using the platform.
+          </div>
+        </div>
+      </div>
+
+      <!-- Ops link -->
+      <div class="ops-link">
+        <a href="/ops/index.html">Network Intelligence &amp; Admin Portal →</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = 'http://localhost:3000/api';
+
+    // ── Role destinations (after login) ──
+    const ROLE_ROUTES = {
+      donor: '/donor/dashboard.html',
+      demand_org: '/demand-org/dashboard.html',
+      recipient: '/recipient/index.html',
+      network_admin: '/network-intelligence/dashboard.html',
+      admin: '/admin/dashboard.html',
+    };
+
+    // ── Tab switching ──
+    function switchTab(tab) {
+      document.getElementById('tab-signin').classList.toggle('active', tab === 'signin');
+      document.getElementById('tab-signup').classList.toggle('active', tab === 'signup');
+      document.getElementById('pane-signin').classList.toggle('active', tab === 'signin');
+      document.getElementById('pane-signup').classList.toggle('active', tab === 'signup');
+      clearErrors();
+    }
+
+    // ── Helpers ──
+    function showMsg(id, msg, type) {
+      const el = document.getElementById(id);
+      el.textContent = msg; el.className = `msg ${type} show`;
+    }
+    function clearErrors() {
+      ['signin-error', 'signup-error', 'signup-success'].forEach(id => {
+        document.getElementById(id).className = 'msg error';
+      });
+    }
+    function setLoading(btnId, loading, label) {
+      const btn = document.getElementById(btnId);
+      btn.disabled = loading;
+      btn.innerHTML = loading
+        ? `<span class="spinner"></span> Please wait…`
+        : label;
+    }
+
+    // ── Stepper ──
+    let currentStep = 1;
+    let selectedRole = null;
+    let signupData = {};
+
+    function updateStepper(step) {
+      [1, 2, 3].forEach(i => {
+        const dot = document.getElementById(`dot-${i}`);
+        dot.classList.remove('active', 'done');
+        if (i < step) dot.classList.add('done'), dot.textContent = '✓';
+        else if (i === step) dot.classList.add('active'), dot.textContent = i;
+        else dot.textContent = i;
+      });
+      [1, 2].forEach(i => {
+        document.getElementById(`line-${i}`).classList.toggle('done', i < step);
+      });
+      [1, 2, 3].forEach(i => {
+        document.getElementById(`step-${i}`).classList.toggle('active', i === step);
+      });
+      currentStep = step;
+    }
+
+    function goStep1() { updateStepper(1); }
+
+    function goStep2() {
+      const name = document.getElementById('su-name').value.trim();
+      const email = document.getElementById('su-email').value.trim();
+      const pass = document.getElementById('su-password').value;
+      if (!name || !email || !pass) return showMsg('signup-error', 'Please fill in all fields.', 'error');
+      if (pass.length < 8) return showMsg('signup-error', 'Password must be at least 8 characters.', 'error');
+      clearErrors();
+      signupData = { name, email, password: pass };
+      updateStepper(2);
+    }
+
+    function goStep3() {
+      if (!selectedRole) return;
+      updateStepper(3);
+      showRoleFields(selectedRole);
+    }
+
+    function selectRole(role) {
+      selectedRole = role;
+      document.querySelectorAll('.role-card').forEach(c => c.classList.remove('selected'));
+      document.getElementById(`role-${role}`).classList.add('selected');
+      document.getElementById('role-next-btn').disabled = false;
+
+      const hints = {
+        donor: '🏪 You\'ll be posting surplus food. Your org requires admin verification before going live.',
+        demand_org: '🤝 You\'ll register food needs. Your org requires admin verification before going live.',
+        recipient: '👤 You can search for food near you without verification.'
+      };
+      document.getElementById('role-hint').textContent = hints[role];
+    }
+
+    function showRoleFields(role) {
+      ['donor', 'demand_org', 'recipient'].forEach(r => {
+        document.getElementById(`fields-${r}`).style.display = r === role ? 'block' : 'none';
+      });
+      const titles = {
+        donor: ['Donor Details', 'Tell us about your organization so we can set you up.'],
+        demand_org: ['Organization Details', 'Help the network understand your capacity and needs.'],
+        recipient: ['Almost done!', 'Just one optional detail.']
+      };
+      document.getElementById('step3-title').textContent = titles[role][0];
+      document.getElementById('step3-sub').textContent = titles[role][1];
+    }
+
+    // ── Sign In ──
+    async function handleSignIn() {
+      clearErrors();
+      const email = document.getElementById('si-email').value.trim();
+      const password = document.getElementById('si-password').value;
+      if (!email || !password) return showMsg('signin-error', 'Please enter your email and password.', 'error');
+
+      setLoading('signin-btn', true, 'Sign In');
+      try {
+        const res = await fetch(`${API}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Login failed');
+
+        localStorage.setItem('fb_token', data.token);
+        localStorage.setItem('fb_user', JSON.stringify(data.user));
+
+        const route = ROLE_ROUTES[data.user.role];
+        if (!route) throw new Error('Unknown role. Please contact support.');
+        window.location.href = route;
+      } catch (err) {
+        showMsg('signin-error', err.message, 'error');
+      } finally {
+        setLoading('signin-btn', false, 'Sign In');
+      }
+    }
+
+    window.previewDocName = function(inputId, labelId) {
+      const file = document.getElementById(inputId)?.files?.[0];
+      if (file) {
+        document.getElementById(labelId).textContent = `✅ Selected: ${file.name} (${Math.round(file.size / 1024)} KB)`;
+      }
+    };
+
+    function readFileAsBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // ── Register ──
+    async function handleRegister() {
+      clearErrors();
+
+      const body = { ...signupData, role: selectedRole };
+
+      if (selectedRole === 'donor') {
+        const orgName = document.getElementById('d-org-name').value.trim();
+        if (!orgName) return showMsg('signup-error', 'Organization name is required.', 'error');
+        body.orgName = orgName;
+        body.orgType = document.getElementById('d-org-type').value;
+        body.locationAddress = document.getElementById('d-address').value.trim();
+        body.contactPhone = document.getElementById('d-phone').value.trim();
+        body.operatingHours = document.getElementById('d-hours').value.trim();
+
+        const docFile = document.getElementById('d-doc')?.files?.[0];
+        if (docFile) {
+          body.documentName = docFile.name;
+          body.documentData = await readFileAsBase64(docFile);
+        }
+      } else if (selectedRole === 'demand_org') {
+        const orgName = document.getElementById('n-org-name').value.trim();
+        if (!orgName) return showMsg('signup-error', 'Organization name is required.', 'error');
+        body.orgName = orgName;
+        body.orgType = document.getElementById('n-org-type').value;
+        body.locationAddress = document.getElementById('n-address').value.trim();
+        body.contactPhone = document.getElementById('n-phone').value.trim();
+        body.operatingHours = document.getElementById('n-hours').value.trim();
+
+        const docFile = document.getElementById('n-doc')?.files?.[0];
+        if (docFile) {
+          body.documentName = docFile.name;
+          body.documentData = await readFileAsBase64(docFile);
+        }
+      } else if (selectedRole === 'recipient') {
+        body.orgName = null;
+      }
+
+      setLoading('register-btn', true, 'Create Account');
+      try {
+        const res = await fetch(`${API}/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Registration failed');
+
+        // Recipients go straight in; orgs need verification
+        if (selectedRole === 'recipient') {
+          localStorage.setItem('fb_token', data.token);
+          localStorage.setItem('fb_user', JSON.stringify(data.user));
+          window.location.href = ROLE_ROUTES['recipient'];
+        } else {
+          document.getElementById('pending-notice').classList.add('show');
+          showMsg('signup-success', 'Account created successfully!', 'success');
+          document.getElementById('register-btn').disabled = true;
+        }
+      } catch (err) {
+        showMsg('signup-error', err.message, 'error');
+      } finally {
+        setLoading('register-btn', false, 'Create Account');
+      }
+    }
+
+    // ── Auto-redirect if already logged in ──
+    const existingToken = localStorage.getItem('fb_token');
+    const existingUser = JSON.parse(localStorage.getItem('fb_user') || 'null');
+    if (existingToken && existingUser && ROLE_ROUTES[existingUser.role]) {
+      window.location.href = ROLE_ROUTES[existingUser.role];
+    }
+
+    // ── Enter key support ──
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      const signinActive = document.getElementById('pane-signin').classList.contains('active');
+      if (signinActive) { handleSignIn(); return; }
+      if (currentStep === 1) goStep2();
+      else if (currentStep === 2 && selectedRole) goStep3();
+      else if (currentStep === 3) handleRegister();
+    });
+  </script>
+</body>
+
+</html>

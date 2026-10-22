@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FoodBridge — Donor Dashboard</title>
+  <meta name="description" content="FoodBridge Donor Dashboard — Track your surplus, impact and predictions." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="styles/main.css" />
+</head>
+<body>
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="brand">
+        <span class="brand-icon">🌉</span>
+        <span class="brand-name">FoodBridge</span>
+      </div>
+      <div class="org-badge" id="org-badge">
+        <div class="org-avatar" id="org-avatar">D</div>
+        <div class="org-info">
+          <div class="org-name" id="sidebar-org-name">Loading…</div>
+          <div class="org-status" id="sidebar-org-status">
+            <span class="status-dot"></span>
+            <span>Donor</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" data-section="overview" onclick="navigate('overview',this)">
+        <span class="nav-icon">📊</span>
+        <span>Overview</span>
+      </a>
+      <a href="#" class="nav-item" data-section="post" onclick="navigate('post',this)">
+        <span class="nav-icon">➕</span>
+        <span>Post Surplus</span>
+      </a>
+      <a href="#" class="nav-item" data-section="my-surplus" onclick="navigate('my-surplus',this)">
+        <span class="nav-icon">🍱</span>
+        <span>My Surplus</span>
+        <span class="nav-badge" id="active-count" style="display:none">0</span>
+      </a>
+      <a href="#" class="nav-item" data-section="impact" onclick="navigate('impact',this)">
+        <span class="nav-icon">🌱</span>
+        <span>Impact</span>
+      </a>
+      <a href="#" class="nav-item" data-section="predictions" onclick="navigate('predictions',this)">
+        <span class="nav-icon">🔮</span>
+        <span>Predictions</span>
+      </a>
+      <a href="#" class="nav-item" data-section="profile" onclick="navigate('profile',this)">
+        <span class="nav-icon">🏢</span>
+        <span>Profile</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="logout()">
+        <span>⬅️</span> Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main-wrapper">
+    <!-- Top Bar -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+        <h1 class="page-title" id="page-title">Overview</h1>
+      </div>
+      <div class="topbar-right">
+        <button class="alert-btn" id="alert-btn" onclick="toggleAlerts()">
+          🔔
+          <span class="alert-dot" id="alert-dot" style="display:none"></span>
+        </button>
+        <div class="user-chip" id="user-chip">—</div>
+      </div>
+    </header>
+
+    <!-- Alerts Panel -->
+    <div class="alerts-panel" id="alerts-panel">
+      <div class="alerts-header">
+        <span>Notifications</span>
+        <button onclick="markAllRead()">Mark all read</button>
+      </div>
+      <div class="alerts-list" id="alerts-list">
+        <div class="alert-empty">No notifications yet.</div>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <main class="content">
+
+      <!-- ── OVERVIEW ── -->
+      <section class="section active" id="section-overview">
+        <div class="section-intro">
+          <h2>Welcome back, <span id="welcome-name">Donor</span> 👋</h2>
+          <p>Here's how your surplus is making an impact across the network.</p>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card amber">
+            <div class="stat-icon">📦</div>
+            <div class="stat-body">
+              <div class="stat-value" id="stat-posted">—</div>
+              <div class="stat-label">Posts Created</div>
+            </div>
+          </div>
+          <div class="stat-card green">
+            <div class="stat-icon">✅</div>
+            <div class="stat-body">
+              <div class="stat-value" id="stat-recovered">—</div>
+              <div class="stat-label">Recovered (kg)</div>
+            </div>
+          </div>
+          <div class="stat-card blue">
+            <div class="stat-icon">🤝</div>
+            <div class="stat-body">
+              <div class="stat-value" id="stat-matched">—</div>
+              <div class="stat-label">Matches Made</div>
+            </div>
+          </div>
+          <div class="stat-card purple">
+            <div class="stat-icon">🍽️</div>
+            <div class="stat-body">
+              <div class="stat-value" id="stat-meals">—</div>
+              <div class="stat-label">Meals Equivalent</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Recent Surplus</span>
+              <button class="card-link" onclick="navigate('my-surplus', null)">View all →</button>
+            </div>
+            <div id="recent-surplus-list" class="item-list">
+              <div class="empty-state">No surplus posted yet.<br/>Click <strong>Post Surplus</strong> to get started.</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Monthly Trend</span>
+            </div>
+            <canvas id="trend-chart" height="200"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── POST SURPLUS ── -->
+      <section class="section" id="section-post">
+        <div class="section-intro">
+          <h2>Post Surplus Food ➕</h2>
+          <p>Fill in the details below. Once posted, our network automatically finds the best recipient — you don't need to do anything else.</p>
+        </div>
+
+        <div class="card form-card">
+          <div id="post-error" class="msg error" style="display:none"></div>
+          <div id="post-success" class="msg success" style="display:none"></div>
+
+          <div class="form-group-title">🍱 Food Details</div>
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="p-food-name">Food Name *</label>
+              <input type="text" id="p-food-name" placeholder="e.g. Biryani, Sandwiches, Fresh Bread" />
+            </div>
+            <div class="form-group">
+              <label for="p-food-type">Food Category *</label>
+              <select id="p-food-type">
+                <option value="cooked_meal">Cooked Meal</option>
+                <option value="bakery">Bakery & Bread</option>
+                <option value="produce">Fresh Produce</option>
+                <option value="dairy">Dairy</option>
+                <option value="packaged">Packaged / Canned</option>
+                <option value="beverages">Beverages</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="p-quantity">Quantity *</label>
+              <input type="number" id="p-quantity" placeholder="e.g. 50" min="0.1" step="0.1" />
+            </div>
+            <div class="form-group">
+              <label for="p-unit">Unit</label>
+              <select id="p-unit">
+                <option value="kg">kg</option>
+                <option value="portions">portions</option>
+                <option value="litres">litres</option>
+                <option value="packs">packs</option>
+                <option value="boxes">boxes</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="p-prep-state">Preparation State</label>
+            <select id="p-prep-state">
+              <option value="freshly_prepared">Freshly Prepared</option>
+              <option value="packaged_sealed">Packaged / Sealed</option>
+              <option value="raw_uncooked">Raw / Uncooked</option>
+              <option value="frozen">Frozen</option>
+              <option value="refrigerated">Refrigerated</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Dietary Tags (select all that apply)</label>
+            <div class="tag-selector" id="dietary-tags">
+              <button type="button" class="tag-btn" data-val="vegetarian" onclick="toggleTag(this)">🥦 Vegetarian</button>
+              <button type="button" class="tag-btn" data-val="vegan" onclick="toggleTag(this)">🌱 Vegan</button>
+              <button type="button" class="tag-btn" data-val="halal" onclick="toggleTag(this)">☪️ Halal</button>
+              <button type="button" class="tag-btn" data-val="gluten_free" onclick="toggleTag(this)">🌾 Gluten-Free</button>
+              <button type="button" class="tag-btn" data-val="nut_free" onclick="toggleTag(this)">🚫 Nut-Free</button>
+            </div>
+          </div>
+
+          <div class="form-group-title">⏰ Timing</div>
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="p-avail-time">Available From *</label>
+              <input type="datetime-local" id="p-avail-time" />
+            </div>
+            <div class="form-group">
+              <label for="p-usable-time">Safe Until (Use By) *</label>
+              <input type="datetime-local" id="p-usable-time" />
+            </div>
+          </div>
+
+          <div class="form-group-title">📍 Pickup</div>
+          <div class="form-group">
+            <label for="p-pickup">Pickup Address</label>
+            <input type="text" id="p-pickup" placeholder="Leave blank to use your registered address" />
+          </div>
+          <div class="form-group">
+            <label for="p-instructions">Special Instructions</label>
+            <textarea id="p-instructions" rows="3" placeholder="e.g. Call before arriving, use side entrance, requires refrigerated transport…"></textarea>
+          </div>
+
+          <button class="btn-primary" id="post-btn" onclick="postSurplus()">
+            <span class="btn-icon">🚀</span> Post Surplus — Network Handles the Rest
+          </button>
+        </div>
+      </section>
+
+      <!-- ── MY SURPLUS ── -->
+      <section class="section" id="section-my-surplus">
+        <div class="section-intro">
+          <h2>My Surplus Posts 🍱</h2>
+          <p>Track the status of all your surplus posts. The platform handles matching and redistribution automatically.</p>
+        </div>
+
+        <div class="filter-bar">
+          <button class="filter-btn active" data-filter="all" onclick="filterSurplus('all',this)">All</button>
+          <button class="filter-btn" data-filter="available" onclick="filterSurplus('available',this)">Available</button>
+          <button class="filter-btn" data-filter="matched" onclick="filterSurplus('matched',this)">Matched</button>
+          <button class="filter-btn" data-filter="completed" onclick="filterSurplus('completed',this)">Completed</button>
+          <button class="filter-btn" data-filter="expired" onclick="filterSurplus('expired',this)">Expired</button>
+        </div>
+
+        <div id="surplus-list" class="surplus-grid">
+          <div class="empty-state">Loading your surplus posts…</div>
+        </div>
+      </section>
+
+      <!-- ── IMPACT ── -->
+      <section class="section" id="section-impact">
+        <div class="section-intro">
+          <h2>Your Impact 🌱</h2>
+          <p>See the real difference your surplus donations are making in the community.</p>
+        </div>
+
+        <div class="impact-hero">
+          <div class="impact-hero-stat">
+            <div class="impact-big-num" id="impact-meals">—</div>
+            <div class="impact-big-label">Meals Provided</div>
+          </div>
+          <div class="impact-hero-stat">
+            <div class="impact-big-num" id="impact-kg">—</div>
+            <div class="impact-big-label">kg Recovered</div>
+          </div>
+          <div class="impact-hero-stat">
+            <div class="impact-big-num" id="impact-waste">—</div>
+            <div class="impact-big-label">kg Waste Avoided</div>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="card">
+            <div class="card-header"><span class="card-title">Recovery Rate</span></div>
+            <canvas id="impact-doughnut" height="220"></canvas>
+            <div class="chart-legend" id="impact-legend"></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">Monthly Recovery (kg)</span></div>
+            <canvas id="impact-bar" height="220"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── PREDICTIONS ── -->
+      <section class="section" id="section-predictions">
+        <div class="section-intro">
+          <h2>Surplus Predictions 🔮</h2>
+          <p>AI-driven insights to help you anticipate and reduce waste before it happens.</p>
+        </div>
+
+        <div id="prediction-content">
+          <div class="empty-state">Post at least 2 surplus records to generate predictions.</div>
+        </div>
+      </section>
+
+      <!-- ── PROFILE ── -->
+      <section class="section" id="section-profile">
+        <div class="section-intro">
+          <h2>Organization Profile 🏢</h2>
+          <p>Keep your details up to date so the network can find you easily.</p>
+        </div>
+
+        <div class="card form-card">
+          <div id="profile-error" class="msg error" style="display:none"></div>
+          <div id="profile-success" class="msg success" style="display:none"></div>
+
+          <div class="form-group-title">Organization Details</div>
+          <div class="form-group">
+            <label for="pr-name">Organization Name</label>
+            <input type="text" id="pr-name" />
+          </div>
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="pr-address">Location Address</label>
+              <input type="text" id="pr-address" />
+            </div>
+            <div class="form-group">
+              <label for="pr-phone">Contact Phone</label>
+              <input type="tel" id="pr-phone" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="pr-hours">Operating Hours</label>
+            <input type="text" id="pr-hours" placeholder="e.g. Mon–Fri 8am–10pm" />
+          </div>
+          <div class="form-group">
+            <label for="pr-desc">Description</label>
+            <textarea id="pr-desc" rows="3" placeholder="Brief description of your organization…"></textarea>
+          </div>
+
+          <div class="form-group-title">Food Categories You Typically Donate</div>
+          <div class="tag-selector" id="profile-food-cats">
+            <button type="button" class="tag-btn" data-val="cooked_meal" onclick="toggleProfileTag(this)">🍱 Cooked Meals</button>
+            <button type="button" class="tag-btn" data-val="bakery" onclick="toggleProfileTag(this)">🍞 Bakery</button>
+            <button type="button" class="tag-btn" data-val="produce" onclick="toggleProfileTag(this)">🥦 Produce</button>
+            <button type="button" class="tag-btn" data-val="dairy" onclick="toggleProfileTag(this)">🥛 Dairy</button>
+            <button type="button" class="tag-btn" data-val="packaged" onclick="toggleProfileTag(this)">📦 Packaged</button>
+            <button type="button" class="tag-btn" data-val="beverages" onclick="toggleProfileTag(this)">🥤 Beverages</button>
+          </div>
+
+          <div class="form-group-title">Verification Status</div>
+          <div class="verify-status-box" id="verify-status-box">—</div>
+
+          <button class="btn-primary" id="profile-save-btn" onclick="saveProfile()">
+            Save Profile
+          </button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="js/dashboard.js" type="module"></script>
+</body>
+</html>

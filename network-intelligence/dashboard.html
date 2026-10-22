@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FoodBridge — Network Intelligence</title>
+  <meta name="description" content="FoodBridge Food Network Intelligence — real-time supply/demand coordination, rebalancing, and waste-risk intervention." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles/main.css" />
+</head>
+<body>
+
+<!-- ══════════════════ SIDEBAR ══════════════════ -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <div class="mark">🌐</div>
+    <h2>Network Intelligence</h2>
+    <p>FoodBridge — Coordinator View</p>
+    <div class="access-badge">🔒 Authorized Access</div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <span class="nav-section-label">Operations</span>
+    <button class="nav-item active" id="nav-overview"      onclick="showPage('overview')">
+      <span class="icon">📊</span> Network Overview
+    </button>
+    <button class="nav-item" id="nav-supply-demand"        onclick="showPage('supply-demand')">
+      <span class="icon">⚖️</span> Supply & Demand
+    </button>
+    <button class="nav-item" id="nav-redistributions"      onclick="showPage('redistributions')">
+      <span class="icon">🔄</span> Redistributions
+      <span class="nav-badge" id="redist-badge" style="display:none">0</span>
+    </button>
+    <button class="nav-item" id="nav-rebalancing"          onclick="showPage('rebalancing')">
+      <span class="icon">🗺️</span> Rebalancing
+    </button>
+
+    <span class="nav-section-label">Coordination</span>
+    <button class="nav-item" id="nav-fallback"             onclick="showPage('fallback')">
+      <span class="icon">🏦</span> Reserve Allocation
+    </button>
+    <button class="nav-item" id="nav-community"            onclick="showPage('community')">
+      <span class="icon">🏘️</span> Community Intel
+    </button>
+    <button class="nav-item" id="nav-waste-risk"           onclick="showPage('waste-risk')">
+      <span class="icon">⚠️</span> Waste Risk
+      <span class="nav-badge" id="risk-badge" style="display:none">0</span>
+    </button>
+    <button class="nav-item" id="nav-interventions"        onclick="showPage('interventions')">
+      <span class="icon">💡</span> Interventions
+    </button>
+
+    <span class="nav-section-label">Analytics</span>
+    <button class="nav-item" id="nav-metrics"              onclick="showPage('metrics')">
+      <span class="icon">📈</span> Network Metrics
+    </button>
+
+    <span class="nav-section-label" style="opacity:0.5;">Intelligence (Coming Soon)</span>
+    <button class="nav-item locked">
+      <span class="icon">🔮</span> Supply Prediction
+      <span class="coming-soon">Soon</span>
+    </button>
+    <button class="nav-item locked">
+      <span class="icon">🔮</span> Demand Forecast
+      <span class="coming-soon">Soon</span>
+    </button>
+    <button class="nav-item locked">
+      <span class="icon">🧠</span> ML Optimization
+      <span class="coming-soon">Soon</span>
+    </button>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="user-card">
+      <div class="user-avatar" id="sidebar-avatar">NC</div>
+      <div class="user-info">
+        <div class="user-name" id="sidebar-name">Coordinator</div>
+        <div class="user-role">Network Coordinator</div>
+      </div>
+      <button class="logout-btn" onclick="logout()" title="Sign out">⏻</button>
+    </div>
+  </div>
+</aside>
+
+<!-- ══════════════════ MAIN ══════════════════ -->
+<div class="main">
+
+  <!-- Topbar -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-title" id="topbar-title">Network Overview</div>
+      <div class="topbar-sub"   id="topbar-sub">Real-time food network status</div>
+    </div>
+    <div class="topbar-right">
+      <div class="live-pill">
+        <div class="live-dot"></div>
+        Live
+      </div>
+      <button class="topbar-btn" onclick="refreshAll()">↻ Refresh</button>
+    </div>
+  </header>
+
+  <!-- ─── OVERVIEW ─── -->
+  <section class="page-content active" id="page-overview">
+    <div class="section-header">
+      <div><h2>Network Overview</h2><p>Live status of the entire food redistribution network.</p></div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card highlight">
+        <div class="stat-label">Active Surplus Posts</div>
+        <div class="stat-value green" id="ov-surplus">—</div>
+        <div class="stat-sub" id="ov-surplus-sub">across the network</div>
+      </div>
+      <div class="stat-card highlight">
+        <div class="stat-label">Active Demands</div>
+        <div class="stat-value indigo" id="ov-demand">—</div>
+        <div class="stat-sub" id="ov-demand-sub">registered needs</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Active Redistributions</div>
+        <div class="stat-value cyan" id="ov-redist">—</div>
+        <div class="stat-sub">matches in progress</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Fulfillment Rate</div>
+        <div class="stat-value green" id="ov-rate">—</div>
+        <div class="stat-sub up" id="ov-rate-sub">today</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">⚠️ Waste Risk Items</div>
+        <div class="stat-value red" id="ov-risk">—</div>
+        <div class="stat-sub down">need intervention</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Food Recovered Today</div>
+        <div class="stat-value green" id="ov-recovered">—</div>
+        <div class="stat-sub up">meals / kg</div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <!-- Recent surplus -->
+      <div class="card">
+        <div class="card-title">Latest Surplus</div>
+        <div class="card-sub">Most recent donor postings across the network</div>
+        <div class="net-list" id="ov-surplus-list"></div>
+      </div>
+      <!-- Urgent demands -->
+      <div class="card">
+        <div class="card-title">Urgent Demands</div>
+        <div class="card-sub">Highest-priority unmet needs</div>
+        <div class="net-list" id="ov-demand-list"></div>
+      </div>
+    </div>
+
+    <!-- Waste risks quick panel -->
+    <div class="card">
+      <div class="card-title">⚠️ Immediate Waste Risks</div>
+      <div class="card-sub">Food at risk of going to waste within the next 2 hours</div>
+      <div class="risk-list" id="ov-risk-list"></div>
+    </div>
+  </section>
+
+  <!-- ─── SUPPLY & DEMAND ─── -->
+  <section class="page-content" id="page-supply-demand">
+    <div class="section-header">
+      <div><h2>Supply & Demand</h2><p>All current surplus posts and active demand registrations.</p></div>
+    </div>
+
+    <div class="filter-bar">
+      <button class="filter-chip active" id="sd-filter-all"     onclick="sdFilter('all')">All</button>
+      <button class="filter-chip"        id="sd-filter-surplus"  onclick="sdFilter('surplus')">Surplus Only</button>
+      <button class="filter-chip"        id="sd-filter-demand"   onclick="sdFilter('demand')">Demands Only</button>
+      <button class="filter-chip"        id="sd-filter-unmatched" onclick="sdFilter('unmatched')">Unmatched</button>
+    </div>
+
+    <div class="net-list" id="sd-list"></div>
+  </section>
+
+  <!-- ─── REDISTRIBUTIONS ─── -->
+  <section class="page-content" id="page-redistributions">
+    <div class="section-header">
+      <div><h2>Active Redistributions</h2><p>All ongoing matches — from finding a recipient to completion.</p></div>
+    </div>
+
+    <div class="filter-bar">
+      <button class="filter-chip active" id="rd-filter-all"       onclick="rdFilter('all')">All</button>
+      <button class="filter-chip"        id="rd-filter-finding"    onclick="rdFilter('finding')">Finding</button>
+      <button class="filter-chip"        id="rd-filter-matched"    onclick="rdFilter('matched')">Matched</button>
+      <button class="filter-chip"        id="rd-filter-progress"   onclick="rdFilter('progress')">In Progress</button>
+      <button class="filter-chip"        id="rd-filter-completed"  onclick="rdFilter('completed')">Completed</button>
+    </div>
+
+    <div class="net-list" id="rd-list"></div>
+  </section>
+
+  <!-- ─── REBALANCING ─── -->
+  <section class="page-content" id="page-rebalancing">
+    <div class="section-header">
+      <div><h2>Network Rebalancing</h2><p>Area-level surplus and deficit — where to redirect resources.</p></div>
+    </div>
+
+    <div class="two-col" style="margin-bottom:18px;">
+      <div class="card" style="margin-bottom:0;">
+        <div class="card-title">🟢 Surplus Zones</div>
+        <div class="card-sub">Areas with more supply than demand</div>
+        <div class="area-grid" id="surplus-zones"></div>
+      </div>
+      <div class="card" style="margin-bottom:0;">
+        <div class="card-title">🔴 Deficit Zones</div>
+        <div class="card-sub">Areas where demand exceeds available supply</div>
+        <div class="area-grid" id="deficit-zones"></div>
+      </div>
+    </div>
+
+    <!-- Rebalancing suggestions -->
+    <div class="card">
+      <div class="card-title">💡 Rebalancing Recommendations</div>
+      <div class="card-sub">Suggested redirections to reduce overall network imbalance</div>
+      <div class="intervention-list" id="rebalancing-recs"></div>
+    </div>
+  </section>
+
+  <!-- ─── FALLBACK / RESERVE ─── -->
+  <section class="page-content" id="page-fallback">
+    <div class="section-header">
+      <div><h2>Reserve Allocation</h2><p>Surplus with no immediate demand — routed to food banks and storage points.</p></div>
+    </div>
+
+    <div class="two-col">
+      <div class="card" style="margin-bottom:0;">
+        <div class="card-title">Allocation Hierarchy</div>
+        <div class="card-sub">How surplus is prioritized before fallback</div>
+        <div class="hierarchy-flow">
+          <div class="hier-step">
+            <div class="hier-num">1</div>
+            <div><div class="hier-label">Immediate Demand</div><div class="hier-desc">Emergency &amp; immediate registered needs</div></div>
+          </div>
+          <div class="hier-arrow">↓</div>
+          <div class="hier-step">
+            <div class="hier-num">2</div>
+            <div><div class="hier-label">Regular Demand</div><div class="hier-desc">Planned and recurring demand from orgs</div></div>
+          </div>
+          <div class="hier-arrow">↓</div>
+          <div class="hier-step">
+            <div class="hier-num">3</div>
+            <div><div class="hier-label">Food Bank / Reserve</div><div class="hier-desc">Storage-capable points for future distribution</div></div>
+          </div>
+          <div class="hier-arrow">↓</div>
+          <div class="hier-step">
+            <div class="hier-num">4</div>
+            <div><div class="hier-label">Other Recovery</div><div class="hier-desc">Composting, animal feed, other safe pathways</div></div>
+          </div>
+          <div class="hier-arrow">↓</div>
+          <div class="hier-step" style="border-color:rgba(239,68,68,0.2);">
+            <div class="hier-num" style="background:linear-gradient(135deg,#EF4444,#DC2626);">✗</div>
+            <div><div class="hier-label" style="color:var(--red);">Waste</div><div class="hier-desc">Last resort — system actively avoids this</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:0;">
+        <div class="card-title">Available Reserve Points</div>
+        <div class="card-sub">Storage-capable orgs that can accept overflow</div>
+        <div class="net-list" id="reserve-points"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Surplus Pending Reserve Routing</div>
+      <div class="card-sub">Surplus with no immediate match — awaiting reserve allocation</div>
+      <div class="net-list" id="pending-reserve"></div>
+    </div>
+  </section>
+
+  <!-- ─── COMMUNITY INTEL ─── -->
+  <section class="page-content" id="page-community">
+    <div class="section-header">
+      <div><h2>Community Food Intelligence</h2><p>Hotspots, gaps, and structural patterns across the network.</p></div>
+    </div>
+
+    <div class="two-col">
+      <div class="card" style="margin-bottom:0;">
+        <div class="card-title">🟢 Surplus Hotspots</div>
+        <div class="card-sub">Areas with consistently high food availability</div>
+        <div class="hotspot-grid" id="surplus-hotspots"></div>
+      </div>
+      <div class="card" style="margin-bottom:0;">
+        <div class="card-title">🔴 Demand Hotspots</div>
+        <div class="card-sub">Areas with persistently high unmet need</div>
+        <div class="hotspot-grid" id="demand-hotspots"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:18px;">
+      <div class="card-title">🕳️ Food Access Gaps</div>
+      <div class="card-sub">Underserved areas — no active access points, no supply, recurring unmet demand</div>
+      <div class="hotspot-grid" id="access-gaps"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📊 Recurring Supply–Demand Mismatches</div>
+      <div class="card-sub">Patterns that repeat — structural issues the network should address</div>
+      <div class="net-list" id="recurring-mismatches"></div>
+    </div>
+  </section>
+
+  <!-- ─── WASTE RISK ─── -->
+  <section class="page-content" id="page-waste-risk">
+    <div class="section-header">
+      <div><h2>Waste Risk</h2><p>Surplus food at risk of expiry with no active match — requires intervention.</p></div>
+      <div class="section-actions">
+        <button class="topbar-btn" onclick="loadWasteRisk()">↻ Refresh</button>
+      </div>
+    </div>
+    <div class="risk-list" id="risk-full-list"></div>
+  </section>
+
+  <!-- ─── INTERVENTIONS ─── -->
+  <section class="page-content" id="page-interventions">
+    <div class="section-header">
+      <div><h2>Intervention Recommendations</h2><p>System-generated actions to improve network outcomes.</p></div>
+    </div>
+    <div class="filter-bar">
+      <button class="filter-chip active" id="int-filter-all"    onclick="intFilter('all')">All</button>
+      <button class="filter-chip"        id="int-filter-high"   onclick="intFilter('high')">High Priority</button>
+      <button class="filter-chip"        id="int-filter-medium" onclick="intFilter('medium')">Medium</button>
+      <button class="filter-chip"        id="int-filter-low"    onclick="intFilter('low')">Low</button>
+    </div>
+    <div class="intervention-list" id="interventions-list"></div>
+  </section>
+
+  <!-- ─── METRICS ─── -->
+  <section class="page-content" id="page-metrics">
+    <div class="section-header">
+      <div><h2>Network Metrics</h2><p>High-level performance data across the entire FoodBridge network.</p></div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Surplus (Month)</div>
+        <div class="stat-value green" id="m-total-surplus">—</div>
+        <div class="stat-sub up">meals equivalent</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Demand (Month)</div>
+        <div class="stat-value indigo" id="m-total-demand">—</div>
+        <div class="stat-sub">registered needs</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Food Recovered</div>
+        <div class="stat-value cyan" id="m-recovered">—</div>
+        <div class="stat-sub up">this month</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Waste Prevented</div>
+        <div class="stat-value green" id="m-waste-prevented">—</div>
+        <div class="stat-sub up">vs unintercepted</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Fulfillment Rate</div>
+        <div class="stat-value green" id="m-fulfillment">—</div>
+        <div class="stat-sub up">of demands met</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Unmet Demand</div>
+        <div class="stat-value red" id="m-unmet">—</div>
+        <div class="stat-sub down">needs not fulfilled</div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="card" style="margin-bottom:0;">
+        <div class="card-title">Supply vs Demand (Last 7 Days)</div>
+        <div class="card-sub">Daily totals across the network</div>
+        <div class="chart-wrap" id="sd-chart"></div>
+        <div class="chart-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--green);"></div> Surplus</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--primary);"></div> Demand</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--cyan);"></div> Fulfilled</div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:0;">
+        <div class="card-title">Waste Intercepted (Last 7 Days)</div>
+        <div class="card-sub">Food saved from becoming waste</div>
+        <div class="chart-wrap" id="waste-chart"></div>
+        <div class="chart-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--green);"></div> Intercepted</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--red);"></div> Unintercepted</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Deferred ML panels -->
+    <div style="margin-top:18px;">
+      <div class="coming-soon-panel">
+        <div class="cs-icon">🔮</div>
+        <h3>Prediction Accuracy & Learning Feedback</h3>
+        <p>Compares predicted vs actual surplus and demand. Tracks model improvement over time as the network collects more data. Requires ML pipeline integration.</p>
+        <div class="cs-badge">Planned — Phase 2</div>
+      </div>
+    </div>
+  </section>
+
+</div><!-- /main -->
+
+<div class="toast-container" id="toast-container"></div>
+<script type="module" src="./js/dashboard.js"></script>
+</body>
+</html>

@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FoodBridge — Admin & Verification</title>
+  <meta name="description" content="FoodBridge Admin Portal — organization verification, safety review, dispute resolution, and participant management." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles/main.css" />
+</head>
+<body>
+
+<!-- ══════════════════ SIDEBAR ══════════════════ -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <div class="mark">⚙️</div>
+    <h2>Admin & Verification</h2>
+    <p>FoodBridge Platform Admin</p>
+    <div class="admin-badge">🛡️ Admin Access</div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <span class="nav-section-label">Dashboard</span>
+    <button class="nav-item active" id="nav-overview"    onclick="showPage('overview')">
+      <span class="icon">📊</span> Overview
+    </button>
+
+    <span class="nav-section-label">Verification</span>
+    <button class="nav-item" id="nav-verification"       onclick="showPage('verification')">
+      <span class="icon">🏢</span> Org Verification
+      <span class="nav-badge" id="badge-pending">0</span>
+    </button>
+    <button class="nav-item" id="nav-participants"       onclick="showPage('participants')">
+      <span class="icon">👥</span> All Participants
+    </button>
+
+    <span class="nav-section-label">Trust & Safety</span>
+    <button class="nav-item" id="nav-safety"             onclick="showPage('safety')">
+      <span class="icon">🛡️</span> Safety Review
+      <span class="nav-badge" id="badge-flags">0</span>
+    </button>
+    <button class="nav-item" id="nav-disputes"           onclick="showPage('disputes')">
+      <span class="icon">⚖️</span> Disputes
+      <span class="nav-badge amber" id="badge-disputes">0</span>
+    </button>
+
+    <span class="nav-section-label">Records</span>
+    <button class="nav-item" id="nav-records"            onclick="showPage('records')">
+      <span class="icon">📝</span> Compliance Records
+    </button>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="user-card">
+      <div class="user-avatar" id="sidebar-avatar">AD</div>
+      <div class="user-info">
+        <div class="user-name" id="sidebar-name">Admin</div>
+        <div class="user-role">Platform Administrator</div>
+      </div>
+      <button class="logout-btn" onclick="logout()" title="Sign out">⏻</button>
+    </div>
+  </div>
+</aside>
+
+<!-- ══════════════════ MAIN ══════════════════ -->
+<div class="main">
+
+  <header class="topbar">
+    <div>
+      <div class="topbar-title" id="topbar-title">Overview</div>
+      <div class="topbar-sub"   id="topbar-sub">Platform administration</div>
+    </div>
+    <div class="topbar-actions">
+      <button class="topbar-btn" onclick="refreshPage()">↻ Refresh</button>
+    </div>
+  </header>
+
+  <!-- ─── OVERVIEW ─── -->
+  <section class="page-content active" id="page-overview">
+    <div class="section-header">
+      <div><h2>Admin Overview</h2><p>Platform health, pending actions, and recent activity.</p></div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Pending Verification</div>
+        <div class="stat-value amber" id="ov-pending">—</div>
+        <div class="stat-sub">orgs awaiting approval</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Verified Orgs</div>
+        <div class="stat-value green" id="ov-verified">—</div>
+        <div class="stat-sub">active participants</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Flagged Cases</div>
+        <div class="stat-value red" id="ov-flagged">—</div>
+        <div class="stat-sub">need safety review</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Open Disputes</div>
+        <div class="stat-value amber" id="ov-disputes">—</div>
+        <div class="stat-sub">awaiting resolution</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Suspended</div>
+        <div class="stat-value violet" id="ov-suspended">—</div>
+        <div class="stat-sub">orgs restricted</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Actions Today</div>
+        <div class="stat-value blue" id="ov-actions">—</div>
+        <div class="stat-sub">admin actions taken</div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="card-title">⏳ Pending Verifications</div>
+        <div class="card-sub">Organizations waiting for approval</div>
+        <div class="org-list" id="ov-pending-list"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">🚨 Recent Flags</div>
+        <div class="card-sub">Safety issues needing attention</div>
+        <div class="flag-list" id="ov-flag-list"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📝 Recent Admin Actions</div>
+      <div class="card-sub">Latest compliance actions across the platform</div>
+      <div class="record-list" id="ov-records"></div>
+    </div>
+  </section>
+
+  <!-- ─── VERIFICATION QUEUE ─── -->
+  <section class="page-content" id="page-verification">
+    <div class="section-header">
+      <div><h2>Organization Verification</h2><p>Review and approve pending donor and demand org registrations.</p></div>
+    </div>
+
+    <div class="filter-bar">
+      <button class="filter-chip active" id="vf-all"     onclick="vFilter('all')">All</button>
+      <button class="filter-chip"        id="vf-donor"   onclick="vFilter('donor')">Donors</button>
+      <button class="filter-chip"        id="vf-demand"  onclick="vFilter('demand_org')">Demand Orgs</button>
+    </div>
+
+    <div class="org-list" id="verification-list"></div>
+  </section>
+
+  <!-- ─── ALL PARTICIPANTS ─── -->
+  <section class="page-content" id="page-participants">
+    <div class="section-header">
+      <div><h2>All Participants</h2><p>Every organization registered on the platform.</p></div>
+    </div>
+
+    <div class="search-bar">
+      <input class="search-input" id="participant-search" placeholder="Search by name, email, type…" oninput="searchParticipants()" />
+    </div>
+
+    <div class="filter-bar">
+      <button class="filter-chip active" id="pf-all"       onclick="pFilter('all')">All</button>
+      <button class="filter-chip"        id="pf-verified"  onclick="pFilter('verified')">Verified</button>
+      <button class="filter-chip"        id="pf-pending"   onclick="pFilter('pending')">Pending</button>
+      <button class="filter-chip"        id="pf-suspended" onclick="pFilter('suspended')">Suspended</button>
+      <button class="filter-chip"        id="pf-flagged"   onclick="pFilter('flagged')">Flagged</button>
+    </div>
+
+    <div class="org-list" id="participants-list"></div>
+  </section>
+
+  <!-- ─── SAFETY REVIEW ─── -->
+  <section class="page-content" id="page-safety">
+    <div class="section-header">
+      <div><h2>Safety & Trust Review</h2><p>Flagged cases, suspicious activity, and safety incidents.</p></div>
+    </div>
+
+    <div class="filter-bar">
+      <button class="filter-chip active" id="sf-all"    onclick="sFilter('all')">All</button>
+      <button class="filter-chip"        id="sf-high"   onclick="sFilter('high')">High Priority</button>
+      <button class="filter-chip"        id="sf-medium" onclick="sFilter('medium')">Medium</button>
+      <button class="filter-chip"        id="sf-open"   onclick="sFilter('open')">Open</button>
+      <button class="filter-chip"        id="sf-closed" onclick="sFilter('closed')">Closed</button>
+    </div>
+
+    <div class="flag-list" id="safety-list"></div>
+  </section>
+
+  <!-- ─── DISPUTES ─── -->
+  <section class="page-content" id="page-disputes">
+    <div class="section-header">
+      <div><h2>Issue & Dispute Resolution</h2><p>Failed handovers, quantity disputes, complaints, and conflicts.</p></div>
+    </div>
+
+    <div class="filter-bar">
+      <button class="filter-chip active" id="df-all"      onclick="dFilter('all')">All</button>
+      <button class="filter-chip"        id="df-open"     onclick="dFilter('open')">Open</button>
+      <button class="filter-chip"        id="df-resolved" onclick="dFilter('resolved')">Resolved</button>
+    </div>
+
+    <div class="dispute-list" id="disputes-list"></div>
+  </section>
+
+  <!-- ─── RECORDS ─── -->
+  <section class="page-content" id="page-records">
+    <div class="section-header">
+      <div><h2>Verification & Compliance Records</h2><p>Full audit trail of all administrative actions.</p></div>
+    </div>
+
+    <div class="search-bar">
+      <input class="search-input" id="records-search" placeholder="Search records by org, admin, or action…" oninput="searchRecords()" />
+    </div>
+
+    <div class="record-list" id="records-list"></div>
+  </section>
+
+</div><!-- /main -->
+
+<!-- ── Confirmation Modal ── -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal" id="modal">
+    <h3 id="modal-title">Confirm Action</h3>
+    <p  id="modal-desc">Are you sure?</p>
+    <textarea id="modal-notes" placeholder="Add a note or reason (optional)…"></textarea>
+    <div class="modal-actions">
+      <button class="modal-confirm" id="modal-confirm-btn">Confirm</button>
+      <button class="modal-cancel"  onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+<script type="module" src="./js/dashboard.js"></script>
+</body>
+</html>
