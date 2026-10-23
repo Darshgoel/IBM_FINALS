@@ -10,6 +10,66 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/assets/css/portal.css" />
   <link rel="stylesheet" href="styles/main.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    /* Embedded Network Map section (same behaviour as ./map.html, no redirect) */
+    .nmap-toolbar { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; padding: 12px 14px; border-bottom: 1px solid var(--fb-border); }
+    .nmap-toggle { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; font-size: 11px; font-weight: 650; color: var(--fb-text); background: var(--fb-workspace); border: 1px solid var(--fb-border); border-radius: 99px; padding: 5px 11px 5px 8px; transition: border-color .15s; white-space: nowrap; }
+    .nmap-toggle:hover { border-color: #CBD7CC; }
+    .nmap-toggle input { accent-color: var(--fb-primary); cursor: pointer; margin: 0; }
+    .nmap-toolbar .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
+    .nmap-toolbar .dot-donor { background: #2563EB; }
+    .nmap-toolbar .dot-demand { background: #16833B; }
+    .nmap-toolbar .dot-foodbank { background: #D97706; }
+    .nmap-toolbar .dot-biogas { background: #7C3AED; }
+    .nmap-toolbar .dot-osm { background: transparent; border: 2px solid #FF781F; width: 7px; height: 7px; }
+    .nmap-count { font-size: 10px; font-weight: 750; color: var(--fb-secondary); background: var(--fb-workspace); border: 1px solid var(--fb-border); border-radius: 99px; padding: 4px 10px; margin-left: auto; }
+    .nmap-toolbar-right { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+    .nmap-search { display: flex; align-items: center; gap: 7px; background: #fff; border: 1px solid var(--fb-border); border-radius: 9px; padding: 0 10px; min-height: 32px; }
+    .nmap-search .icon { width: 14px; height: 14px; color: var(--fb-muted); }
+    .nmap-search input { border: none; outline: none; font: inherit; font-size: 12px; color: var(--fb-text); width: 190px; background: transparent; }
+    .nmap-toolbar .btn { min-height: 32px; padding: 0 12px; font-size: 11.5px; }
+    .nmap-discover-btn { background: var(--fb-purple-soft); border: 1px solid #E3D7F8; color: var(--fb-purple); }
+    .nmap-discover-btn:hover { background: #EBE2FA; border-color: #D5C5F3; color: var(--fb-purple); }
+    .nmap-card { padding: 0; overflow: hidden; }
+    .nmap-canvas { position: relative; height: clamp(420px, 60vh, 640px); background: #E9EEEA; }
+    #nmap { position: absolute; inset: 0; }
+    .leaflet-container { font-family: inherit; }
+    .nmap-status { position: absolute; left: 12px; bottom: 12px; z-index: 800; max-width: min(640px, calc(100% - 24px)); background: rgba(255, 255, 255, .94); border: 1px solid var(--fb-border); border-radius: 10px; box-shadow: 0 6px 22px rgba(15, 32, 22, .10); padding: 8px 13px; font-size: 11px; font-weight: 600; color: var(--fb-secondary); line-height: 1.5; }
+    .nmap-osm-badge { display: inline-block; background: var(--fb-purple-soft); color: var(--fb-purple); border: 1px solid #E3D7F8; font-size: 9px; font-weight: 800; letter-spacing: .05em; padding: 1px 6px; border-radius: 99px; margin-left: 4px; vertical-align: middle; }
+    #nmap-panel { position: absolute; top: 12px; right: 12px; width: 290px; max-height: calc(100% - 24px); overflow-y: auto; background: #fff; border: 1px solid var(--fb-border); border-radius: 14px; box-shadow: 0 10px 30px rgba(15, 32, 22, .14); padding: 15px 16px 16px; z-index: 900; font-size: 11.5px; display: none; }
+    #nmap-panel.open { display: block; }
+    #nmap-panel h3 { font-size: 13px; font-weight: 750; color: var(--fb-text); margin-bottom: 10px; padding-right: 22px; line-height: 1.35; }
+    #nmap-close { position: absolute; top: 11px; right: 11px; width: 25px; height: 25px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--fb-border); background: #fff; border-radius: 8px; color: var(--fb-muted); font-size: 12px; line-height: 1; cursor: pointer; }
+    #nmap-close:hover { background: var(--fb-workspace); color: var(--fb-text); }
+    .nmap-row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+    .nmap-row-label { color: var(--fb-secondary); font-weight: 600; flex: 0 0 auto; }
+    .nmap-row-value { font-weight: 650; color: var(--fb-text); text-align: right; min-width: 0; word-break: break-word; }
+    .nmap-panel-hint { color: var(--fb-secondary); font-size: 10.5px; font-weight: 600; }
+    .nmap-route-loading { color: var(--fb-secondary); font-style: italic; margin-top: 8px; font-size: 11px; }
+    .nmap-route-info { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--fb-border); }
+    .nmap-ri-title { font-size: 11px; font-weight: 750; color: var(--fb-primary-dark); margin-bottom: 7px; text-transform: uppercase; letter-spacing: .06em; }
+    .nmap-ri-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 11.5px; color: var(--fb-secondary); }
+    .nmap-provider { font-size: 9.5px; font-weight: 700; background: var(--fb-success-soft); border: 1px solid #CDE6D2; color: var(--fb-primary-dark); border-radius: 99px; padding: 2px 8px; text-align: right; }
+    .nmap-provider.approx { background: var(--fb-warning-soft, #FFF3DF); border-color: #F0D49B; color: var(--fb-warning-text, #B45309); }
+    .nmap-note { font-size: 10px; color: var(--fb-secondary); margin-top: 6px; font-weight: 600; }
+    .leaflet-popup-content-wrapper { background: #fff; color: var(--fb-text); border: 1px solid var(--fb-border); border-radius: 12px; box-shadow: 0 10px 34px rgba(15, 32, 22, .16); }
+    .leaflet-popup-tip { background: #fff; }
+    .leaflet-popup-content { margin: 13px 15px; font-size: 11.5px; line-height: 1.5; min-width: 185px; font-family: inherit; }
+    .nmap-pop-name { font-weight: 750; font-size: 12.5px; margin-bottom: 3px; line-height: 1.35; }
+    .nmap-pop-type { font-size: 9.5px; font-weight: 800; color: var(--fb-primary); text-transform: uppercase; letter-spacing: .07em; margin-bottom: 5px; }
+    .nmap-pop-addr { font-size: 11px; color: var(--fb-muted); margin-bottom: 4px; }
+    .nmap-pop-meta { font-size: 10.5px; color: var(--fb-secondary); margin-top: 4px; line-height: 1.55; }
+    .nmap-pop-status { font-size: 10.5px; color: var(--fb-secondary); }
+    .nmap-badge-v, .nmap-badge-p { display: inline-block; font-size: 9px; font-weight: 800; padding: 1px 7px; border-radius: 99px; margin-left: 4px; vertical-align: middle; }
+    .nmap-badge-v { background: var(--fb-success-soft); border: 1px solid #CDE6D2; color: var(--fb-primary-dark); }
+    .nmap-badge-p { background: var(--fb-warning-soft, #FFF3DF); border: 1px solid #F0D49B; color: var(--fb-warning-text, #B45309); }
+    .nmap-pop-btn { display: block; margin-top: 9px; background: var(--fb-primary); color: #fff; border: none; border-radius: 8px; padding: 7px 10px; font-size: 11px; font-weight: 700; cursor: pointer; width: 100%; text-align: center; font-family: inherit; transition: background .15s; }
+    .nmap-pop-btn:hover { background: var(--fb-primary-dark); }
+    .nmap-pop-btn:disabled { opacity: .6; cursor: wait; }
+    .nmap-imported-note { margin-top: 8px; font-size: 10.5px; font-weight: 750; color: var(--fb-primary-dark); }
+    @media (max-width: 720px) { .nmap-toolbar { padding: 10px; } .nmap-search input { width: 130px; } .nmap-count { margin-left: 0; } .nmap-canvas { height: 65vh; } }
+  </style>
   <script src="/assets/js/portal-ui.js" defer></script>
 </head>
 <body class="portal-network">
@@ -33,7 +93,7 @@
       </div>
       <div class="portal-badge">
         <svg class="icon" aria-hidden="true"><use href="#i-network"></use></svg>
-        Coordinator access
+        Ops access
       </div>
     </div>
 
@@ -94,10 +154,10 @@
         <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-chart"></use></svg></span>
         <span class="nav-label">Network Metrics</span>
       </button>
-      <a class="nav-item" href="/network-intelligence/map.html">
+      <button type="button" class="nav-item" id="nav-network-map" data-section="network-map" onclick="navigate('network-map', this)">
         <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-map"></use></svg></span>
         <span class="nav-label">Network Map</span>
-      </a>
+      </button>
 
       <span class="nav-section-label">Intelligence · coming soon</span>
       <button type="button" class="nav-item" disabled style="opacity:.6;cursor:not-allowed" title="Not available in this build">
@@ -140,7 +200,7 @@
         <button class="topbar-icon" id="refresh-btn" type="button" onclick="refreshCurrentPage()" aria-label="Refresh current page" title="Refresh current page">
           <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg>
         </button>
-        <button class="topbar-primary" id="map-btn" type="button" onclick="window.location.href='/network-intelligence/map.html'">
+        <button class="topbar-primary" id="map-btn" type="button" onclick="navigate('network-map', null)">
           <svg class="icon" aria-hidden="true"><use href="#i-map"></use></svg>
           <span>Network map</span>
         </button>
@@ -148,7 +208,7 @@
           <span class="avatar" id="account-avatar">NC</span>
           <span class="account-copy">
             <span class="account-name" id="user-chip">Coordinator</span>
-            <span class="account-role">Network account</span>
+            <span class="account-role">Ops account</span>
           </span>
           <svg class="icon" aria-hidden="true"><use href="#i-chevron"></use></svg>
         </button>
@@ -196,7 +256,7 @@
               <svg class="icon" aria-hidden="true"><use href="#i-route"></use></svg>
               View redistributions
             </button>
-            <button class="btn btn-primary" type="button" onclick="window.location.href='/network-intelligence/map.html'">
+            <button class="btn btn-primary" type="button" onclick="navigate('network-map', null)">
               <svg class="icon" aria-hidden="true"><use href="#i-map"></use></svg>
               Open network map
             </button>
@@ -415,7 +475,7 @@
               <svg class="icon" aria-hidden="true"><use href="#i-lightbulb"></use></svg>
               Review interventions
             </button>
-            <button class="btn btn-primary" type="button" onclick="window.location.href='/network-intelligence/map.html'">
+            <button class="btn btn-primary" type="button" onclick="navigate('network-map', null)">
               <svg class="icon" aria-hidden="true"><use href="#i-map"></use></svg>
               Open network map
             </button>
@@ -880,10 +940,63 @@
           </div>
         </div>
       </section>
+
+      <!-- ── Embedded network map (no navigation/redirect required) ─────── -->
+      <section class="section" id="page-network-map" aria-labelledby="nmap-title">
+        <div class="page-heading">
+          <div>
+            <h1 id="nmap-title">Network map</h1>
+            <p>Network-wide view of donors, NGOs, food banks, biogas facilities and OSM-discovered locations.</p>
+          </div>
+          <div class="heading-actions">
+            <button class="btn btn-secondary" type="button" onclick="refreshNmapData(true)">
+              <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg>
+              Reload map data
+            </button>
+          </div>
+        </div>
+
+        <div class="card nmap-card">
+          <div class="nmap-toolbar">
+            <label class="nmap-toggle"><input type="checkbox" id="nm-toggle-donor" checked /><span class="dot dot-donor"></span> Donors</label>
+            <label class="nmap-toggle"><input type="checkbox" id="nm-toggle-demand" checked /><span class="dot dot-demand"></span> NGO / Shelters</label>
+            <label class="nmap-toggle"><input type="checkbox" id="nm-toggle-foodbank" checked /><span class="dot dot-foodbank"></span> Food Banks</label>
+            <label class="nmap-toggle"><input type="checkbox" id="nm-toggle-biogas" checked /><span class="dot dot-biogas"></span> Biogas Facilities</label>
+            <label class="nmap-toggle"><input type="checkbox" id="nm-toggle-osm" checked /><span class="dot dot-osm"></span> OSM Discovered <span id="nm-osm-count"></span></label>
+            <span id="nm-count" class="nmap-count">Loading…</span>
+            <div class="nmap-toolbar-right">
+              <div class="nmap-search">
+                <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+                <input id="nmap-search-input" type="search" placeholder="Search place or organisation…" autocomplete="off" />
+                <button class="btn btn-secondary" id="nmap-search-btn" type="button" title="Search">Go</button>
+              </div>
+              <button class="btn btn-secondary" id="nmap-fit" type="button" title="Fit all markers"><svg class="icon" aria-hidden="true"><use href="#i-grid"></use></svg> Fit all</button>
+              <button class="btn btn-secondary" id="nmap-near" type="button"><svg class="icon" aria-hidden="true"><use href="#i-pin"></use></svg> Near me</button>
+              <button class="btn nmap-discover-btn" id="nmap-discover" type="button" title="Query OSM for facilities in the current view"><svg class="icon" aria-hidden="true"><use href="#i-globe"></use></svg> Discover area</button>
+              <button class="btn btn-secondary" id="nmap-clear" type="button"><svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg> Clear route</button>
+            </div>
+          </div>
+
+          <div class="nmap-canvas">
+            <div id="nmap" role="application" aria-label="Network map of donors, NGOs, food banks and biogas facilities"></div>
+
+            <div id="nmap-panel">
+              <button id="nmap-close" type="button" title="Close" aria-label="Close panel">✕</button>
+              <h3 id="nmap-sp-title">Details</h3>
+              <div id="nmap-sp-body"></div>
+              <div id="nmap-sp-route"></div>
+            </div>
+
+            <div id="nmap-status">Fetching network data…</div>
+          </div>
+        </div>
+      </section>
     </main>
   </div>
 
   <div class="toast-container" id="toast-container" aria-live="polite"></div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="./js/map-section.js"></script>
   <script type="module" src="./js/dashboard.js"></script>
 </body>
 </html>

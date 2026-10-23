@@ -227,7 +227,7 @@
       <div class="user-avatar" id="nm-avatar">OP</div>
       <div class="user-info">
         <div class="user-name" id="nm-name">Operations User</div>
-        <div class="user-role" id="nm-role">Ops Portal</div>
+        <div class="user-role" id="nm-role">Ops account</div>
       </div>
       <button class="logout-btn" onclick="nmLogout()" aria-label="Sign out" title="Sign out">
         <svg class="icon" aria-hidden="true"><use href="#i-logout"></use></svg>
@@ -322,7 +322,7 @@
 
   // ── Auth guard ────────────────────────────────────────────────────────────────
   const token = localStorage.getItem('token') || localStorage.getItem('fb_token');
-  if (!token) { window.location.href = '/admin/index.html'; return; }
+  if (!token) { window.location.href = '/?auth=signin'; return; }
 
   // Signed-in user card
   (function renderUser() {
@@ -332,7 +332,7 @@
       document.getElementById('nm-avatar').textContent =
         String(name).trim().split(/\s+/).filter(Boolean).map(p => p[0]).slice(0, 2).join('').toUpperCase();
       document.getElementById('nm-name').textContent = name;
-      document.getElementById('nm-role').textContent = 'Ops Portal';
+      document.getElementById('nm-role').textContent = 'Ops account';
     } catch (err) { /* keep defaults */ }
   })();
 
@@ -473,7 +473,7 @@
   // ── Load map data ─────────────────────────────────────────────────────────────
   fetch('/api/network/map-data', { headers: { Authorization: 'Bearer ' + token } })
     .then(r => {
-      if (r.status === 401 || r.status === 403) { window.location.href = '/ops/'; throw new Error('Auth'); }
+      if (r.status === 401 || r.status === 403) { window.location.href = '/?auth=signin'; throw new Error('Auth'); }
       return r.json();
     })
     .then(data => {

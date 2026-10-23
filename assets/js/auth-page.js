@@ -164,10 +164,14 @@
 
     setLoading(button, true, 'Signing in…');
     try {
+      // Ops portals define data-roles with operator-only roles; any page that
+      // does must never accept public credentials, and vice versa.
+      const OPS_ROLES = ['admin', 'network_admin', 'network_intelligence'];
+      const scope = allowedRoles.some(role => OPS_ROLES.includes(role)) ? 'ops' : 'user';
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password, scope })
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'Sign in failed. Please try again.');

@@ -155,6 +155,23 @@ router.post('/login', (req, res) => {
     const valid = bcrypt.compareSync(password, user.password_hash);
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
 
+    // Role separation: admins / operators may only sign in through the ops
+    // portal (scope 'ops'); public accounts may only sign in through the
+    // shared sign-in on the FoodBridge home page (scope 'user'). Logins
+    // without an explicit scope keep the legacy unrestricted behaviour.
+    const OPS_ROLES = ['admin', 'network_admin', 'network_intelligence'];
+    const scope = req.body.scope;
+    if (scope === 'ops' && !OPS_ROLES.includes(user.role)) {
+      return res.status(403).json({
+        error: 'This sign-in is restricted to FoodBridge admins and operators. Public accounts must sign in from the FoodBridge home page.'
+      });
+    }
+    if (scope === 'user' && OPS_ROLES.includes(user.role)) {
+      return res.status(403).json({
+        error: 'Admin and operator accounts cannot sign in here. Please use "Sign in as Admin" on the ops portal.'
+      });
+    }
+
     db.prepare("UPDATE users SET last_login = datetime('now') WHERE id = ?").run(user.id);
 
     const jwtSecret = process.env.JWT_SECRET || 'foodbridge-local-development-secret-change-me';

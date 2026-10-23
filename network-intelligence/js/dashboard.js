@@ -60,6 +60,11 @@ const PAGES = {
     title: 'Network Metrics',
     subtitle: 'Measured network performance',
     section: 'page-metrics'
+  },
+  'network-map': {
+    title: 'Network Map',
+    subtitle: 'Network-wide coordination view',
+    section: 'page-network-map'
   }
 };
 
@@ -153,6 +158,7 @@ function loadPageData(page) {
     case 'waste-risk': return loadWasteRisk();
     case 'interventions': return loadInterventions();
     case 'metrics': return loadMetrics();
+    case 'network-map': return loadNetworkMap();
     default: return Promise.resolve();
   }
 }
@@ -1197,7 +1203,7 @@ function renderRiskList(items) {
             <span class="badge badge-neutral">No automated re-route</span>
           </div>
           <div class="risk-actions">
-            <button class="risk-btn reserve" type="button" onclick="window.location.href='/network-intelligence/map.html'">
+            <button class="risk-btn reserve" type="button" onclick="navigate('network-map', null)">
               ${icon('map', 'icon icon-sm')} View on network map
             </button>
           </div>

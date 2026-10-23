@@ -260,7 +260,7 @@ function handleSignIn(event) {
   fetch(`${API}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password })
+    body: JSON.stringify({ email, password, scope: 'user' })
   })
     .then(async res => {
       const data = await res.json().catch(() => ({}));
