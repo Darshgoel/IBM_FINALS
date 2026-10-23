@@ -35,7 +35,7 @@ router.get('/overview', (req, res) => {
     // Waste risk count (available & expires within 3 hours)
     const wasteRisksRaw = db.prepare(`
       SELECT sp.*, o.name as donor_name,
-        ROUND((julianday(sp.remaining_usable_time) - julianday('now')) * 24, 2) as hours_left
+        ROUND(CAST((julianday(sp.remaining_usable_time) - julianday('now')) * 24 AS NUMERIC), 2) as hours_left
       FROM surplus_posts sp
       JOIN organizations o ON sp.donor_org_id = o.id
       WHERE sp.status = 'available' AND sp.remaining_usable_time <= datetime('now', '+3.5 hours')
@@ -452,7 +452,7 @@ router.get('/community', (req, res) => {
       SELECT DISTINCT food_requirement, quantity_unit, SUM(quantity_needed) as needed
       FROM demand_registrations
       WHERE status IN ('open', 'partially_fulfilled')
-      GROUP BY food_requirement
+      GROUP BY food_requirement, quantity_unit
     `).all();
 
     const availableTypes = db.prepare(`
@@ -485,7 +485,7 @@ router.get('/waste-risk', (req, res) => {
   try {
     const atRisk = db.prepare(`
       SELECT sp.*, o.name as donor_name, o.location_address,
-        ROUND((julianday(sp.remaining_usable_time) - julianday('now')) * 24, 2) as hours_left
+        ROUND(CAST((julianday(sp.remaining_usable_time) - julianday('now')) * 24 AS NUMERIC), 2) as hours_left
       FROM surplus_posts sp
       JOIN organizations o ON sp.donor_org_id = o.id
       WHERE sp.status = 'available'
