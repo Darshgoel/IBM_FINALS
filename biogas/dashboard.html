@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FoodBridge — Biogas Centre Operator Portal</title>
+  <meta name="description" content="FoodBridge Biogas Centre portal — manage waste intake, availability, incoming routes, and facility profile." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/css/portal.css" />
+  <link rel="stylesheet" href="styles/main.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="/assets/js/portal-ui.js" defer></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+</head>
+<body class="portal-biogas">
+  <a class="sr-only" href="#portal-content">Skip to main content</a>
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+  <!-- ── Sidebar ──────────────────────────────────────────────────────────── -->
+  <aside class="sidebar" id="sidebar" aria-label="Biogas operator navigation">
+    <div class="sidebar-brand">
+      <div class="brand-lockup">
+        <div class="brand-logo" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 44" fill="none">
+            <path d="M22 40C10.4 40 4.5 31.7 4.5 19.5 4.5 8.8 11 3.5 22 3.5s17.5 5.3 17.5 16C39.5 31.7 33.6 40 22 40Z" fill="#16833B"/>
+            <path d="M22 39V18.5" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>
+            <path d="M22 27.5c-7.2 0-11.3-4.1-11.3-10.3 7.2 0 11.3 4.1 11.3 10.3Z" fill="#FF781F"/>
+            <path d="M22 23c6 0 9.5-3.6 9.5-9.1-6 0-9.5 3.6-9.5 9.1Z" fill="#9AF2A8"/>
+          </svg>
+        </div>
+        <div class="brand-copy">
+          <div class="brand-wordmark">Food<span>Bridge</span></div>
+          <div class="brand-subtitle">Biogas Centre</div>
+        </div>
+      </div>
+      <span class="portal-badge biogas-badge">
+        <svg class="icon" aria-hidden="true"><use href="#i-zap"></use></svg>
+        Operator access
+      </span>
+    </div>
+
+    <div class="sidebar-context">
+      <div class="context-main">
+        <div class="org-avatar" id="sidebar-avatar">BG</div>
+        <div class="org-info">
+          <div class="org-name" id="sidebar-org-name">Loading…</div>
+          <div class="org-status" id="sidebar-availability">Checking…</div>
+        </div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav" aria-label="Dashboard sections">
+      <span class="nav-section-label">Workspace</span>
+      <button class="nav-item active" id="nav-overview" type="button" onclick="showPage('overview')" aria-current="page">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-grid"></use></svg></span>
+        <span class="nav-label">Overview</span>
+      </button>
+      <button class="nav-item" id="nav-routes" type="button" onclick="showPage('routes')">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-truck"></use></svg></span>
+        <span class="nav-label">Incoming Routes</span>
+        <span class="nav-badge" id="route-badge" hidden>0</span>
+      </button>
+
+      <span class="nav-section-label">Facility</span>
+      <button class="nav-item" id="nav-capacity" type="button" onclick="showPage('capacity')">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-chart"></use></svg></span>
+        <span class="nav-label">Capacity &amp; Intake</span>
+      </button>
+      <button class="nav-item" id="nav-waste-types" type="button" onclick="showPage('waste-types')">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-inbox"></use></svg></span>
+        <span class="nav-label">Accepted Waste Types</span>
+      </button>
+
+      <span class="nav-section-label">Account</span>
+      <button class="nav-item" id="nav-alerts" type="button" onclick="showPage('alerts')">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-bell"></use></svg></span>
+        <span class="nav-label">Alerts</span>
+        <span class="nav-badge" id="alert-badge" hidden>0</span>
+      </button>
+      <button class="nav-item" id="nav-profile" type="button" onclick="showPage('profile')">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-user"></use></svg></span>
+        <span class="nav-label">Profile &amp; Location</span>
+      </button>
+      <button class="nav-item" id="nav-claim" type="button" onclick="showPage('claim')">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg></span>
+        <span class="nav-label">Claim Facility</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="signout-wide" type="button" onclick="signOut()">
+        <svg class="icon" aria-hidden="true"><use href="#i-logout"></use></svg>
+        Sign out
+      </button>
+    </div>
+  </aside>
+
+  <!-- ── Main ─────────────────────────────────────────────────────────────── -->
+  <div class="main" id="portal-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="nav-toggle" id="nav-toggle" aria-label="Open menu">
+          <svg class="icon" aria-hidden="true"><use href="#i-menu"></use></svg>
+        </button>
+        <div class="topbar-copy">
+          <div class="topbar-title" id="topbar-title">Overview</div>
+          <div class="topbar-sub" id="topbar-sub">Your biogas facility at a glance</div>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <button class="availability-toggle" id="avail-toggle" type="button" onclick="toggleAvailability()">
+          <span id="avail-label">Loading…</span>
+        </button>
+        <button class="alert-btn" id="topbar-alert-btn" aria-label="Alerts" onclick="showPage('alerts')">
+          <svg class="icon" aria-hidden="true"><use href="#i-bell"></use></svg>
+          <span class="alert-dot" id="topbar-alert-dot" hidden></span>
+        </button>
+        <button class="account-trigger" id="account-trigger" type="button" onclick="toggleAccountMenu()">
+          <span class="avatar" id="account-avatar">BG</span>
+          <span class="account-copy">
+            <span class="account-name" id="account-name">…</span>
+            <span class="account-role">Biogas Operator</span>
+          </span>
+          <svg class="icon" aria-hidden="true"><use href="#i-chevron"></use></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="account-menu" id="account-menu" role="menu">
+      <div class="account-menu-head">
+        <div class="avatar" id="account-menu-avatar">BG</div>
+        <div><strong id="account-menu-name">…</strong><small id="account-menu-email">…</small></div>
+      </div>
+      <div class="account-menu-list">
+        <button class="account-menu-item" onclick="showPage('profile');toggleAccountMenu()">
+          <svg class="icon" aria-hidden="true"><use href="#i-user"></use></svg> Profile &amp; Location
+        </button>
+        <button class="account-menu-item danger" onclick="signOut()">
+          <svg class="icon" aria-hidden="true"><use href="#i-logout"></use></svg> Sign out
+        </button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ── Overview ──────────────────────────────────────────────────────── -->
+      <section class="page-content active" id="page-overview">
+        <div class="stats-grid">
+          <div class="stat-card amber">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-truck"></use></svg></div>
+            <div class="stat-value" id="ov-pending-routes">—</div>
+            <div class="stat-label">Pending routes</div>
+          </div>
+          <div class="stat-card green">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-scale"></use></svg></div>
+            <div class="stat-value" id="ov-received-today">—</div>
+            <div class="stat-label">Received today</div>
+          </div>
+          <div class="stat-card blue">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-chart"></use></svg></div>
+            <div class="stat-value" id="ov-capacity-remaining">—</div>
+            <div class="stat-label">Remaining capacity</div>
+          </div>
+          <div class="stat-card purple">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-check-circle"></use></svg></div>
+            <div class="stat-value" id="ov-total-received">—</div>
+            <div class="stat-label">Routes received (all time)</div>
+          </div>
+        </div>
+
+        <div class="two-col" style="margin-top:16px">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-heading">
+                <div class="card-title">Facility status</div>
+              </div>
+            </div>
+            <div id="ov-facility-card"><div class="empty-state-inline">Loading…</div></div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <div class="card-heading">
+                <div class="card-title">Recent incoming routes</div>
+              </div>
+              <button class="card-link btn btn-ghost btn-sm" onclick="showPage('routes')">View all</button>
+            </div>
+            <div id="ov-routes-list"><div class="empty-state-inline">Loading…</div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Incoming Routes ───────────────────────────────────────────────── -->
+      <section class="page-content" id="page-routes">
+        <div class="card-header" style="margin-bottom:16px">
+          <div class="card-heading"><div class="card-title">Incoming Waste Routes</div></div>
+        </div>
+        <div class="filter-row" style="margin-bottom:16px">
+          <button class="filter-chip active" onclick="setRouteFilter('all',this)">All</button>
+          <button class="filter-chip" onclick="setRouteFilter('pending',this)">Pending</button>
+          <button class="filter-chip" onclick="setRouteFilter('accepted',this)">Accepted</button>
+          <button class="filter-chip" onclick="setRouteFilter('received',this)">Received</button>
+          <input class="filter-search" type="search" id="route-search" placeholder="Search routes…" oninput="filterRoutes()" aria-label="Search routes" />
+        </div>
+        <div id="routes-list"></div>
+      </section>
+
+      <!-- ── Capacity & Intake ──────────────────────────────────────────────── -->
+      <section class="page-content" id="page-capacity">
+        <div class="card form-card">
+          <div class="card-header">
+            <div class="card-heading">
+              <div class="card-title">Daily Capacity &amp; Intake</div>
+              <div class="card-sub">Set your maximum daily intake. Today's received volume is tracked automatically when you mark routes received.</div>
+            </div>
+          </div>
+          <div id="cap-msg" class="msg" role="alert" style="display:none"></div>
+
+          <div class="capacity-display">
+            <div class="cap-row"><span class="cap-label">Max daily intake</span><span class="cap-val" id="cap-max">—</span></div>
+            <div class="cap-row"><span class="cap-label">Received today (API)</span><span class="cap-val" id="cap-today">—</span></div>
+            <div class="cap-row"><span class="cap-label">Remaining capacity</span><span class="cap-val" id="cap-remaining">—</span></div>
+          </div>
+
+          <div class="form-grid" style="margin-top:1rem">
+            <div class="form-group">
+              <label for="cap-max-input">Max daily intake (kg)</label>
+              <input type="number" id="cap-max-input" min="0" placeholder="e.g. 500" />
+            </div>
+            <div class="form-group">
+              <label for="cap-unit-input">Capacity unit</label>
+              <select id="cap-unit-input">
+                <option value="kg">kg</option>
+                <option value="tonnes">tonnes</option>
+                <option value="liters">liters</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" type="button" id="save-cap-btn" onclick="saveCapacity()">Save capacity</button>
+            <button class="btn btn-secondary" type="button" onclick="resetIntake()">Reset today's intake</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Accepted Waste Types ───────────────────────────────────────────── -->
+      <section class="page-content" id="page-waste-types">
+        <div class="card form-card">
+          <div class="card-header">
+            <div class="card-heading">
+              <div class="card-title">Accepted Waste Types</div>
+              <div class="card-sub">Only surplus posts whose food type matches your accepted types will be routed to your facility.</div>
+            </div>
+          </div>
+          <div id="wt-msg" class="msg" role="alert" style="display:none"></div>
+          <div class="form-group" style="margin-top:1rem">
+            <fieldset class="checkbox-fieldset">
+              <legend class="form-group-title">Select accepted types</legend>
+              <div class="checkbox-group" id="wt-checkboxes">
+                <label><input type="checkbox" value="cooked_meals" /> Cooked meals</label>
+                <label><input type="checkbox" value="dairy" /> Dairy</label>
+                <label><input type="checkbox" value="produce" /> Produce</label>
+                <label><input type="checkbox" value="bakery" /> Bakery</label>
+                <label><input type="checkbox" value="packaged" /> Packaged goods</label>
+                <label><input type="checkbox" value="all_food_waste" /> All food waste</label>
+              </div>
+            </fieldset>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" type="button" id="save-wt-btn" onclick="saveWasteTypes()">Save waste types</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Alerts ─────────────────────────────────────────────────────────── -->
+      <section class="page-content" id="page-alerts">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-heading"><div class="card-title">Alerts</div></div>
+            <button class="btn btn-ghost btn-sm" onclick="markAllAlertsRead()">Mark all read</button>
+          </div>
+          <div class="alerts-list" id="alerts-list">
+            <div class="alert-empty">No alerts yet.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Profile & Location ─────────────────────────────────────────────── -->
+      <section class="page-content" id="page-profile">
+        <div class="card form-card">
+          <div class="card-header">
+            <div class="card-heading">
+              <div class="card-title">Facility Profile &amp; Location</div>
+              <div class="card-sub">Keep your address, contact, hours, accepted waste types and map pin accurate. Active facilities appear on the network operations map and can receive eligible biogas recovery routes.</div>
+            </div>
+          </div>
+          <div id="profile-msg" class="msg" role="alert" style="display:none"></div>
+          <div id="profile-status-row" class="profile-status-row"></div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="p-name">Facility name</label>
+              <input type="text" id="p-name" placeholder="Your biogas plant name" />
+            </div>
+            <div class="form-group">
+              <label for="p-phone">Contact phone</label>
+              <input type="tel" id="p-phone" placeholder="+91 98XXX XXXXX" />
+            </div>
+            <div class="form-group full">
+              <label for="p-address">Address</label>
+              <input type="text" id="p-address" placeholder="Street, industrial area, city" />
+            </div>
+            <div class="form-group">
+              <label for="p-email">Contact email</label>
+              <input type="email" id="p-email" placeholder="you@biogasplant.in" />
+            </div>
+            <div class="form-group">
+              <label for="p-hours">Operating hours</label>
+              <input type="text" id="p-hours" placeholder="e.g. Mon–Sat 06:00–20:00" />
+            </div>
+            <div class="form-group full">
+              <label for="p-notes">Notes</label>
+              <textarea id="p-notes" rows="2" placeholder="Intake procedures, vehicle access, special instructions…"></textarea>
+            </div>
+          </div>
+
+          <div class="form-group-title" style="margin-top:1.2rem">
+            <svg class="icon" aria-hidden="true"><use href="#i-pin"></use></svg>
+            Map location
+          </div>
+          <p class="form-help">Click on the map or drag the pin to set your exact facility location.</p>
+          <div id="location-map" style="width:100%;height:300px;border-radius:8px;border:1px solid var(--fb-border);margin-bottom:1rem"></div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="p-lat">Latitude</label>
+              <input type="number" id="p-lat" step="0.000001" placeholder="12.9716" />
+            </div>
+            <div class="form-group">
+              <label for="p-lng">Longitude</label>
+              <input type="number" id="p-lng" step="0.000001" placeholder="77.5946" />
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn btn-primary" type="button" id="save-profile-btn" onclick="saveProfile()">Save profile</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Claim Facility ────────────────────────────────────────────────── -->
+      <section class="page-content" id="page-claim">
+        <div class="card form-card">
+          <div class="card-header">
+            <div class="card-heading">
+              <div class="card-title">Claim an Existing Facility</div>
+              <div class="card-sub">If your facility already appears on the FoodBridge map but has no operator account, claim it here to link your account to that record.</div>
+            </div>
+          </div>
+          <div id="claim-msg" class="msg" role="alert" style="display:none"></div>
+          <div id="claim-list" style="margin-top:1rem"></div>
+        </div>
+      </section>
+
+    </div><!-- /.content -->
+  </div><!-- /.main -->
+
+  <!-- ── Weigh-in Modal ────────────────────────────────────────────────────── -->
+  <div class="fb-modal" id="weighin-modal" role="dialog" aria-modal="true" aria-labelledby="weighin-modal-title" aria-hidden="true">
+    <div class="fb-modal-card">
+      <div class="fb-modal-head">
+        <h3 id="weighin-modal-title">Record Received Waste</h3>
+        <button class="btn btn-ghost btn-sm" onclick="closeWeighInModal()" aria-label="Close">
+          <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+        </button>
+      </div>
+      <div class="fb-modal-body" id="weighin-modal-body"></div>
+      <div class="fb-modal-footer" id="weighin-modal-footer"></div>
+    </div>
+  </div>
+
+  <!-- SVG sprite (i-zap not in portal-ui.js — declare inline) -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+    <symbol id="i-zap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+    </symbol>
+  </svg>
+
+  <script type="module" src="js/dashboard.js"></script>
+  <script type="module" src="/assets/js/partner-verification.js"></script>
+</body>
+</html>

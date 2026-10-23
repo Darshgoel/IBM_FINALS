@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Contact FoodBridge — Let’s get more good food to good people</title>
-  <meta name="description" content="Contact the FoodBridge team about donating surplus food, partnering as an NGO, volunteering or using the network." />
+  <meta name="description" content="Contact FoodBridge about donating, NGO or food-bank partnerships, biogas recovery routes, or finding food support." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
@@ -62,7 +62,7 @@
           <nav class="breadcrumb" aria-label="Breadcrumb"><a href="/">Home</a><span aria-hidden="true">/</span><span>Contact</span></nav>
           <p class="section-kicker">Contact</p>
           <h1>Let’s get more good food <em>to good people.</em></h1>
-          <p class="page-lead">Questions about donating, partnering or using the network? Send a note by email and the FoodBridge team will get back to you.</p>
+          <p class="page-lead">Questions about donating, joining as an NGO or food bank, operating a biogas facility, or using the network? Send a note and the FoodBridge team will get back to you.</p>
           <div class="page-hero-actions">
             <a class="btn-solid" href="mailto:hello@foodbridge.org">Email directly</a>
             <a class="btn-outline" href="/how-it-works.html">Read the process first</a>
@@ -72,7 +72,7 @@
           <div>
             <p class="art-kicker">Coordination desk</p>
             <p class="art-title">Real people review every message.</p>
-            <p class="art-copy">Use the form for partnership, donation, volunteering or access questions. We usually respond within one working day.</p>
+            <p class="art-copy">Use the form for partnership, donation or food-access questions. We usually respond within one working day.</p>
           </div>
           <div class="art-chips">
             <span class="art-chip">Bengaluru, Karnataka</span>
@@ -128,7 +128,7 @@
               </div>
               <div class="form-field">
                 <label for="contactOrg">Organisation <span style="color:var(--muted-soft);font-weight:500">(optional)</span></label>
-                <input type="text" id="contactOrg" name="organisation" autocomplete="organization" placeholder="Restaurant, NGO or community group" maxlength="160" />
+              <input type="text" id="contactOrg" name="organisation" autocomplete="organization" placeholder="Business, NGO, food bank or facility" maxlength="160" />
               </div>
               <div class="form-field">
                 <label for="contactTopic">What is this about?</label>
@@ -136,7 +136,8 @@
                   <option value="general">General enquiry</option>
                   <option value="donating">Donating surplus food</option>
                   <option value="ngo_partnership">NGO or community partnership</option>
-                  <option value="volunteering">Volunteering</option>
+                  <option value="food_bank_partnership">Food-bank partnership</option>
+                  <option value="biogas_partnership">Biogas recovery partnership</option>
                   <option value="food_access">Finding food support</option>
                   <option value="technical">Technical or account issue</option>
                 </select>
@@ -168,11 +169,15 @@
           </details>
           <details class="faq-item">
             <summary>Can I choose a specific NGO to receive my food?</summary>
-            <div class="faq-body">The standard network flow matches supply automatically based on dietary fit, urgency, capacity and distance. If you already work with a community partner, mention it in your message and the team can advise on the best route.</div>
+              <div class="faq-body">The standard network flow matches supply automatically to an eligible NGO or food bank based on food safety, dietary fit, urgency, capacity and route time. If you already work with a community partner, mention it in your message and the team can advise on the best route.</div>
           </details>
           <details class="faq-item">
-            <summary>How do I register my NGO or community kitchen?</summary>
-            <div class="faq-body">Use the NGO portal's registration form. You will need your organisation name, address, operating hours and approximate meal capacity. New accounts are reviewed before matching unlocks.</div>
+            <summary>How do I register as an NGO or food bank?</summary>
+            <div class="faq-body">Choose the matching role from Sign Up. NGOs register needs and receiving capacity. Food banks can receive donor surplus, manage inventory and make in-date stock available to demand. Both are reviewed before operational features unlock.</div>
+          </details>
+          <details class="faq-item">
+            <summary>How does a biogas facility join?</summary>
+            <div class="faq-body">Choose Biogas Partner from Sign Up and provide the facility location, accepted waste types and daily intake capacity. After review, the operator can receive eligible recovery routes and record acceptance and receipt.</div>
           </details>
           <details class="faq-item">
             <summary>Do you publish donor names or recipient details?</summary>
@@ -215,6 +220,8 @@
         <h4>Portals</h4>
         <a href="/donor/">Food donors</a>
         <a href="/demand-org/">NGOs &amp; community orgs</a>
+        <a href="/?auth=signup&amp;role=food_bank">Food bank partners</a>
+        <a href="/?auth=signup&amp;role=biogas_operator">Biogas partners</a>
         <a href="/recipient/">Food finder</a>
         <a href="/network-intelligence/">Network intelligence</a>
         <a href="/admin/">Admin</a>

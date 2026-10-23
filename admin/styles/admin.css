@@ -1883,7 +1883,6 @@ body.portal-admin::before {
 .portal-admin .status-badge.sb-pending,
 .portal-admin .status-badge.sb-medium,
 .portal-admin .status-badge.sb-restricted,
-.portal-admin .status-badge.sb-in_transit,
 .portal-admin .status-badge.sb-matched {
   border-color: #F0D49B;
   background: var(--fb-orange-soft);

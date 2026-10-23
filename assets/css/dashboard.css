@@ -1286,7 +1286,6 @@ select option,
   color: var(--blue);
 }
 
-.badge-in_transit,
 .status-searching,
 .sb-finding {
   background: var(--fb-orange-soft);

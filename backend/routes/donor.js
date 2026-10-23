@@ -2,7 +2,7 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
 const { authenticate, requireRole } = require('../middleware/auth');
-const { runMatching, runUnifiedMatching, precomputeRoutes, precomputeRoutesToBiogas, generateSurplusPredictions, convertQuantity } = require('../services/matching');
+const { runMatching, runUnifiedMatching, precomputeRoutes, precomputeRoutesToBiogas, generateSurplusPredictions, convertQuantity, matchOpenDemandsForInventory } = require('../services/matching');
 
 const router = express.Router();
 
@@ -86,8 +86,19 @@ router.post('/surplus', async (req, res) => {
     // Pre-compute routes to all candidate demand orgs AND biogas facilities before the sync tx
     const donorOrg = db.prepare('SELECT * FROM organizations WHERE id = ?').get(orgId);
     const candidateOrgs = db.prepare(`
-      SELECT o.id, o.location_lat, o.location_lng FROM organizations o
-      WHERE o.status = 'active' AND o.type NOT IN ('hotel','caterer','retailer')
+      SELECT DISTINCT o.id, o.location_lat, o.location_lng
+      FROM organizations o
+      WHERE o.status = 'active' AND o.verified = 1 AND (
+        EXISTS (
+          SELECT 1 FROM demand_registrations d
+          WHERE d.demand_org_id = o.id
+            AND d.status IN ('open', 'partially_fulfilled')
+            AND COALESCE(d.remaining_quantity, d.quantity_needed) > 0
+        )
+        OR (o.type LIKE '%food_bank%' AND EXISTS (
+          SELECT 1 FROM demand_org_profiles dp WHERE dp.org_id = o.id
+        ))
+      )
     `).all();
     const [routeResults, biogasRouteResults] = await Promise.all([
       precomputeRoutes(donorOrg, candidateOrgs),
@@ -151,15 +162,21 @@ router.get('/surplus/:id', (req, res) => {
 });
 
 // DELETE /api/donor/surplus/:id - Cancel surplus post
-router.delete('/surplus/:id', (req, res) => {
+router.delete('/surplus/:id', async (req, res) => {
   try {
     const post = db.prepare('SELECT * FROM surplus_posts WHERE id = ? AND donor_org_id = ?').get(req.params.id, req.user.orgId);
     if (!post) return res.status(404).json({ error: 'Post not found' });
-    if (['completed', 'in_transit'].includes(post.status)) {
-      return res.status(400).json({ error: 'Cannot cancel a post that is in transit or completed' });
+    if (post.status === 'completed') {
+      return res.status(400).json({ error: 'Cannot cancel a completed post' });
+    }
+    const committedMatch = db.prepare(`
+      SELECT 1 FROM matches WHERE surplus_id = ? AND status IN ('confirmed', 'completed', 'matched') LIMIT 1
+    `).get(req.params.id);
+    if (committedMatch) {
+      return res.status(409).json({ error: 'This surplus has an accepted or completed handover and can no longer be cancelled here.' });
     }
 
-    db.transaction(() => {
+    const releasedMatchCount = db.transaction(() => {
       // Find pending matches and release reserved demand quantities
       const pendingMatches = db.prepare("SELECT * FROM matches WHERE surplus_id = ? AND status = 'pending'").all(req.params.id);
       const surplus = db.prepare('SELECT * FROM surplus_posts WHERE id = ?').get(req.params.id);
@@ -180,7 +197,13 @@ router.delete('/surplus/:id', (req, res) => {
         // its remaining_quantity; the status update below closes the record.
       }
       db.prepare("UPDATE surplus_posts SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(req.params.id);
+      return pendingMatches.length;
     })();
+
+    if (releasedMatchCount > 0) {
+      try { await matchOpenDemandsForInventory(); }
+      catch (matchErr) { console.error('[Donor/Cancel rematching]', matchErr); }
+    }
 
     res.json({ success: true });
   } catch (err) {
@@ -206,7 +229,7 @@ router.get('/impact', (req, res) => {
              m.allocated_unit as unit
       FROM matches m
       JOIN surplus_posts sp ON m.surplus_id = sp.id
-      WHERE sp.donor_org_id = ? AND m.status IN ('pending','in_transit','matched','completed')
+      WHERE sp.donor_org_id = ? AND m.status = 'completed'
         AND m.notes != 'fallback_food_bank'
       GROUP BY m.allocated_unit
     `).all(orgId);
@@ -218,6 +241,12 @@ router.get('/impact', (req, res) => {
       WHERE sp.donor_org_id = ? AND m.status = 'completed'
       GROUP BY m.allocated_unit
     `).all(orgId);
+    const matchedListings = db.prepare(`
+      SELECT COUNT(DISTINCT sp.id) as count
+      FROM surplus_posts sp
+      JOIN matches m ON sp.id = m.surplus_id
+      WHERE sp.donor_org_id = ? AND m.status IN ('pending','confirmed','matched','completed')
+    `).get(orgId);
 
     // Aggregate totals (convert to kg-equivalent for CO₂/meal calculations)
     // Conversion factors: 1 serving ≈ 0.4 kg, 1 liter ≈ 1 kg
@@ -256,7 +285,7 @@ router.get('/impact', (req, res) => {
              SUM(m.allocated_quantity) as quantity, m.allocated_unit as unit
       FROM surplus_posts sp
       JOIN matches m ON sp.id = m.surplus_id
-      WHERE sp.donor_org_id = ? AND m.status NOT IN ('cancelled','declined')
+      WHERE sp.donor_org_id = ? AND m.status = 'completed'
       GROUP BY month, m.allocated_unit
     `).all(orgId);
 
@@ -277,7 +306,7 @@ router.get('/impact', (req, res) => {
              SUM(m.allocated_quantity) as quantity, m.allocated_unit as unit
       FROM surplus_posts sp
       JOIN matches m ON sp.id = m.surplus_id
-      WHERE sp.donor_org_id = ? AND m.status NOT IN ('cancelled','declined')
+      WHERE sp.donor_org_id = ? AND m.status = 'completed'
       GROUP BY sp.food_type, m.allocated_unit
     `).all(orgId);
 
@@ -286,7 +315,7 @@ router.get('/impact', (req, res) => {
       totalQuantityPosted: Math.round((totalSurplus.total || 0) * 10) / 10,
       recovered: { count: recoveredMatches.reduce((s, r) => s + r.count, 0), quantity: recoveredQty },
       completed: { count: completedMatches.length, quantity: Math.round(completedKg * 10) / 10 },
-      matched: recoveredMatches.length,
+      matched: matchedListings.count || 0,
       available: available.count || 0,
       wasted: { count: wasted.count || 0, quantity: Math.round((wasted.total || 0) * 10) / 10 },
       mealsEquivalent,

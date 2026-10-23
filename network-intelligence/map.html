@@ -211,15 +211,6 @@
     <a class="nav-item" href="../admin/dashboard.html">
       <svg class="nav-icon" aria-hidden="true"><use href="#i-building"></use></svg><span>Admin &amp; Verification</span>
     </a>
-    <a class="nav-item" href="../admin/facilities.html">
-      <svg class="nav-icon" aria-hidden="true"><use href="#i-grid-view"></use></svg><span>Facility Manager</span>
-      <svg class="nav-icon nav-external" aria-hidden="true" style="margin-left:auto;opacity:.6"><use href="#i-external"></use></svg>
-    </a>
-
-    <span class="nav-section-label">More</span>
-    <a class="nav-item" href="../ops/index.html">
-      <svg class="nav-icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg><span>Operations Portal</span>
-    </a>
   </nav>
 
   <div class="sidebar-footer">
@@ -273,6 +264,7 @@
     <span id="org-count" class="org-count">Loading…</span>
     <div class="nm-controls-right">
       <button class="action-btn fm-btn-ghost portal-fm" id="btn-discover-now" title="Query OSM for facilities in the current view"><svg class="icon" aria-hidden="true"><use href="#i-globe"></use></svg> Discover area</button>
+      <button class="action-btn fm-btn-ghost portal-fm" id="btn-discover-india" title="Load food banks and biogas centres mapped across India"><svg class="icon" aria-hidden="true"><use href="#i-globe"></use></svg> Find across India</button>
       <button class="action-btn btn-suspend" id="btn-clear-route"><svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg> Clear Route</button>
     </div>
   </div>
@@ -645,11 +637,11 @@
     document.getElementById('osm-count').textContent = n ? `(${n})` : '';
   }
 
-  function discoverArea(silent) {
+  function discoverArea(silent, scope = 'area') {
     const bounds = map.getBounds();
     // Don't query at very low zoom — bounding box would be too large
-    if (map.getZoom() < 12) {
-      setStatus('Zoom in closer (level 12+) to discover map-sourced food banks and biogas centres. Database markers remain available at this zoom.');
+    if (scope !== 'india' && map.getZoom() < 12) {
+      if (!silent) setStatus('Zoom in closer (level 12+) to discover map-sourced food banks and biogas centres. Database markers remain available at this zoom.');
       return;
     }
 
@@ -657,12 +649,13 @@
       south: bounds.getSouth().toFixed(5),
       west:  bounds.getWest().toFixed(5),
       north: bounds.getNorth().toFixed(5),
-      east:  bounds.getEast().toFixed(5)
+      east:  bounds.getEast().toFixed(5),
+      scope
     });
 
     // Fire two requests — one for each type — in sequence so we don't slam the endpoint
     const types = ['biogas', 'food_bank'];
-    setStatus('Searching this map area for food banks and biogas centres…');
+    setStatus(scope === 'india' ? 'Loading OSM-mapped food banks and biogas centres across India…' : 'Searching this map area for food banks and biogas centres…');
 
     let newCount = 0;
     const searchErrors = [];
@@ -672,9 +665,13 @@
         if (searchErrors.length) {
           setStatus(`Area search was incomplete (${searchErrors.join('; ')}). Try Discover area again in a moment.`);
         } else if (newCount > 0) {
-          setStatus(`Found ${newCount} new OSM location${newCount !== 1 ? 's' : ''} in this area (map-sourced, not yet verified).`);
+          setStatus(scope === 'india'
+            ? `Loaded ${newCount} additional OSM-mapped location${newCount !== 1 ? 's' : ''} across India.`
+            : `Found ${newCount} new OSM location${newCount !== 1 ? 's' : ''} in this area (map-sourced).`);
         } else {
-          setStatus('Search complete: no additional food banks or biogas centres are mapped in this area. Try zooming or panning to another area.');
+          setStatus(scope === 'india'
+            ? 'No additional matching facilities are mapped in OpenStreetMap across India.'
+            : 'No additional matching facilities are mapped in OpenStreetMap in this area.');
         }
         updateOsmCountLabel();
         return;
@@ -773,6 +770,10 @@
 
   // Manual "Discover area" button
   document.getElementById('btn-discover-now').addEventListener('click', () => discoverArea(false));
+  document.getElementById('btn-discover-india').addEventListener('click', () => {
+    map.setView([22.5, 79], 5);
+    discoverArea(false, 'india');
+  });
 
   // ── Layer toggles ─────────────────────────────────────────────────────────────
   function wireToggle(id, key) {

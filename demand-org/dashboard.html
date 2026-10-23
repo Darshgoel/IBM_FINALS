@@ -10,6 +10,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/assets/css/portal.css" />
   <link rel="stylesheet" href="styles/main.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
   <script src="/assets/js/portal-ui.js" defer></script>
 </head>
 <body class="portal-demand">
@@ -162,7 +164,7 @@
           <div>
             <div class="welcome-line"><span class="dot" aria-hidden="true"></span> Demand organization workspace</div>
             <h1 id="overview-title">Good to see you, <span id="welcome-name">Organization</span></h1>
-            <p>Track registered needs, respond to matched supply, and keep your capacity current so the network can plan around you.</p>
+            <p>Track registered needs and matched supply. Eligible matches can come directly from a donor or from another food bank's in-date inventory; keep your capacity and location current for route planning.</p>
           </div>
           <div class="heading-actions">
             <button class="btn btn-secondary" type="button" onclick="showPage('matches')">
@@ -735,6 +737,23 @@
               </div>
             </div>
 
+            <div class="form-group-title" style="margin-top:1.2rem">
+              <svg class="icon" aria-hidden="true"><use href="#i-pin"></use></svg>
+              Map location
+            </div>
+            <p class="form-help">Drag the pin or click the map to set your organisation's exact location. Saved coordinates are used for route calculations and the network map.</p>
+            <div id="demand-location-map" style="width:100%;height:260px;border-radius:8px;border:1px solid var(--fb-border);margin-bottom:0.75rem"></div>
+            <div class="form-grid" style="margin-bottom:1rem">
+              <div class="form-group">
+                <label for="p-lat">Latitude</label>
+                <input type="number" id="p-lat" step="0.000001" placeholder="12.9716" />
+              </div>
+              <div class="form-group">
+                <label for="p-lng">Longitude</label>
+                <input type="number" id="p-lng" step="0.000001" placeholder="77.5946" />
+              </div>
+            </div>
+
             <div class="form-group-title">
               <svg class="icon" aria-hidden="true"><use href="#i-users"></use></svg>
               Serving &amp; capacity
@@ -817,5 +836,6 @@
 
   <div class="toast-container" id="toast-container" aria-live="polite"></div>
   <script src="js/dashboard.js" type="module"></script>
+  <script src="/assets/js/partner-verification.js" type="module"></script>
 </body>
 </html>

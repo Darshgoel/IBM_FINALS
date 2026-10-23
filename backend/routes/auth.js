@@ -2,16 +2,10 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
-const fs = require('fs');
-const path = require('path');
 const db = require('../database/db');
+const { storeDocument } = require('../services/document-storage');
 
 const router = express.Router();
-
-const uploadsDir = path.join(__dirname, '../uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
 
 // POST /api/auth/register
 router.post('/register', (req, res) => {
@@ -28,8 +22,12 @@ router.post('/register', (req, res) => {
       return res.status(400).json({ error: 'Email, password, name and role are required' });
     }
 
-    if (!['donor', 'demand_org', 'recipient'].includes(role)) {
-      return res.status(400).json({ error: 'Invalid role. Must be donor, demand_org, or recipient' });
+    if (!['donor', 'demand_org', 'recipient', 'food_bank', 'biogas_operator'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid role. Must be donor, demand_org, recipient, food_bank, or biogas_operator' });
+    }
+
+    if (role === 'donor' && (!documentName || !documentData)) {
+      return res.status(400).json({ error: 'A valid FSSAI licence document is required to register as a food donor' });
     }
 
     const existing = db.prepare('SELECT id FROM users WHERE lower(email) = ?').get(normalizedEmail);
@@ -54,20 +52,13 @@ router.post('/register', (req, res) => {
       let finalDocName = documentName || '';
 
       if (documentData && documentName) {
-        const cleanName = documentName.replace(/[^a-zA-Z0-9._-]/g, '_');
-        const filename = `doc_${Date.now()}_${cleanName}`;
-        const filePath = path.join(uploadsDir, filename);
-
-        // Strip data:image/...;base64, or data:application/pdf;base64, header if present
-        const base64Data = documentData.includes(';base64,') ? documentData.split(';base64,')[1] : documentData;
-        fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
-
-        finalDocUrl = `/uploads/${filename}`;
+        const stored = storeDocument({ fileName: documentName, fileData: documentData });
+        finalDocUrl = stored.url;
         finalDocName = documentName;
       }
 
-      // Create organization for donor and demand_org
-      if (role !== 'recipient' && orgName) {
+      // Create organization for donor, demand_org, and food_bank
+      if (!['recipient', 'biogas_operator'].includes(role) && orgName) {
         orgId = uuidv4();
         db.prepare(`
         INSERT INTO organizations (id, name, type, location_address, location_lat, location_lng, operating_hours, contact_phone, contact_email, description, status, document_url, document_name)
@@ -88,8 +79,41 @@ router.post('/register', (req, res) => {
 
         if (role === 'donor') {
           db.prepare('INSERT INTO donor_profiles (org_id) VALUES (?)').run(orgId);
-        } else if (role === 'demand_org') {
+        } else if (role === 'demand_org' || role === 'food_bank') {
           db.prepare('INSERT INTO demand_org_profiles (org_id) VALUES (?)').run(orgId);
+        }
+      }
+
+      // biogas_operator: link or create a biogas facility record
+      let biogasFacilityId = req.body.biogasFacilityId || null;
+      if (role === 'biogas_operator') {
+        if (biogasFacilityId) {
+          // Claim an existing unowned facility
+          const facility = db.prepare('SELECT id, operator_user_id FROM biogas_facilities WHERE id = ?').get(biogasFacilityId);
+          if (!facility) throw new Error('Biogas facility not found');
+          if (facility.operator_user_id) throw new Error('That facility already has an operator account');
+          // ownership is set after user is inserted; store for later
+        } else if (orgName) {
+          // Register a brand-new facility
+          biogasFacilityId = uuidv4();
+          db.prepare(`
+            INSERT INTO biogas_facilities
+              (id, name, location_address, location_lat, location_lng, contact_phone, contact_email,
+               operating_hours, accepted_waste_types, max_daily_intake_kg, status, verified, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?)
+          `).run(
+            biogasFacilityId,
+            orgName,
+            locationAddress || '',
+            locationLat || 0,
+            locationLng || 0,
+            contactPhone || '',
+            normalizedEmail,
+            operatingHours || '',
+            req.body.acceptedWasteTypes ? JSON.stringify(req.body.acceptedWasteTypes) : '[]',
+            req.body.maxDailyIntakeKg || 0,
+            description || 'Biogas operator registered through FoodBridge public site.'
+          );
         }
       }
 
@@ -97,15 +121,20 @@ router.post('/register', (req, res) => {
       INSERT INTO users (id, email, password_hash, role, org_id, name) VALUES (?, ?, ?, ?, ?, ?)
       `).run(userId, normalizedEmail, passwordHash, role, orgId, name);
 
+      // Link facility ownership for biogas operators
+      if (role === 'biogas_operator' && biogasFacilityId) {
+        db.prepare('UPDATE biogas_facilities SET operator_user_id = ? WHERE id = ?').run(userId, biogasFacilityId);
+      }
+
       const token = jwt.sign(
-        { id: userId, email: normalizedEmail, role, orgId, name },
+        { id: userId, email: normalizedEmail, role, orgId, name, biogasFacilityId: biogasFacilityId || undefined },
         jwtSecret,
         { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
       );
 
       return {
         token,
-        user: { id: userId, email: normalizedEmail, name, role, orgId },
+        user: { id: userId, email: normalizedEmail, name, role, orgId, biogasFacilityId: biogasFacilityId || undefined },
         documentUploaded: !!finalDocUrl
       };
     })();
@@ -125,16 +154,11 @@ router.post('/upload', (req, res) => {
       return res.status(400).json({ error: 'fileName and fileData are required' });
     }
 
-    const cleanName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const savedName = `doc_${Date.now()}_${cleanName}`;
-    const filePath = path.join(uploadsDir, savedName);
-
-    const base64Data = fileData.includes(';base64,') ? fileData.split(';base64,')[1] : fileData;
-    fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+    const stored = storeDocument({ fileName, fileData });
 
     res.json({
       success: true,
-      documentUrl: `/uploads/${savedName}`,
+      documentUrl: stored.url,
       documentName: fileName
     });
   } catch (err) {
@@ -172,16 +196,33 @@ router.post('/login', (req, res) => {
       });
     }
 
+    // Rejected biogas registrations must not create a fresh session. Pending
+    // operators may sign in to review their facility profile, while operational
+    // API actions remain blocked until an administrator activates the facility.
+    if (user.role === 'biogas_operator') {
+      const facility = db.prepare('SELECT status FROM biogas_facilities WHERE operator_user_id = ? LIMIT 1').get(user.id);
+      if (facility?.status === 'rejected') {
+        return res.status(403).json({ error: 'This biogas facility registration was rejected. Contact FoodBridge support for next steps.' });
+      }
+    }
+
     db.prepare("UPDATE users SET last_login = datetime('now') WHERE id = ?").run(user.id);
+
+    // Look up linked biogas facility for operators
+    let biogasFacilityId = null;
+    if (user.role === 'biogas_operator') {
+      const fac = db.prepare('SELECT id FROM biogas_facilities WHERE operator_user_id = ? LIMIT 1').get(user.id);
+      if (fac) biogasFacilityId = fac.id;
+    }
 
     const jwtSecret = process.env.JWT_SECRET || 'foodbridge-local-development-secret-change-me';
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role, orgId: user.org_id, name: user.name },
+      { id: user.id, email: user.email, role: user.role, orgId: user.org_id, name: user.name, biogasFacilityId: biogasFacilityId || undefined },
       jwtSecret,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
 
-    res.json({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role, orgId: user.org_id } });
+    res.json({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role, orgId: user.org_id, biogasFacilityId: biogasFacilityId || undefined } });
   } catch (err) {
     console.error('[Auth/Login]', err);
     res.status(500).json({ error: 'Login failed' });

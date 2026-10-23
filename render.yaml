@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: foodbridge
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm --prefix backend install
+    startCommand: npm --prefix backend start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: FOODBRIDGE_DATABASE_DRIVER
+        value: postgres
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true

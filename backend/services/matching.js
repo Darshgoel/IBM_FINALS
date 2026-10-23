@@ -40,8 +40,8 @@ function haversineDistance(lat1, lng1, lat2, lng2) {
 
 const FOOD_CLUSTERS = {
   cooked_meals: [
-    'cooked_meals', 'hot_meals', 'prepared_meals', 'meals', 'rice_curry', 'cooked_food',
-    'curry', 'pulav', 'pulao', 'biryani', 'dinner', 'lunch', 'breakfast', 'sandwiches',
+    'cooked_meals', 'cooked_meal', 'hot_meals', 'hot_meal', 'prepared_meals', 'prepared_meal', 'meals', 'meal', 'rice_curry', 'cooked_food',
+    'curry', 'pulav', 'pulao', 'biryani', 'dinner', 'lunch', 'breakfast', 'sandwiches', 'sandwich',
     'chapati', 'dal', 'paneer', 'roti', 'snack', 'snacks', 'cooked_snacks'
   ],
   produce: [
@@ -96,8 +96,8 @@ function isFoodAcceptedByProfile(surplusFoodType, surplusFoodName, profileRequir
     if (!pNorm) return false;
     if (pNorm === 'all' || pNorm === 'any' || pNorm === 'all types' || pNorm === 'all food') return true;
 
-    if (surplusTypeNorm.includes(pNorm) || pNorm.includes(surplusTypeNorm)) return true;
-    if (surplusNameNorm.includes(pNorm) || pNorm.includes(surplusNameNorm)) return true;
+    if (surplusTypeNorm && (surplusTypeNorm.includes(pNorm) || pNorm.includes(surplusTypeNorm))) return true;
+    if (surplusNameNorm && (surplusNameNorm.includes(pNorm) || pNorm.includes(surplusNameNorm))) return true;
 
     const pCluster = findCluster(r);
     if (pCluster && surplusCluster && pCluster === surplusCluster) return true;
@@ -114,9 +114,9 @@ function areFoodTypesCompatible(surplusFoodType, surplusFoodName, demandRequirem
   let matchesDemand = false;
   if (!reqNorm || reqNorm === 'all' || reqNorm === 'any' || reqNorm.includes('all types') || reqNorm.includes('all food')) {
     matchesDemand = true;
-  } else if (surplusTypeNorm.includes(reqNorm) || reqNorm.includes(surplusTypeNorm)) {
+  } else if (surplusTypeNorm && (surplusTypeNorm.includes(reqNorm) || reqNorm.includes(surplusTypeNorm))) {
     matchesDemand = true;
-  } else if (surplusNameNorm.includes(reqNorm) || reqNorm.includes(surplusNameNorm)) {
+  } else if (surplusNameNorm && (surplusNameNorm.includes(reqNorm) || reqNorm.includes(surplusNameNorm))) {
     matchesDemand = true;
   } else {
     const surplusCluster = findCluster(surplusFoodType) || findCluster(surplusFoodName);
@@ -222,11 +222,26 @@ function parseSqliteDate(str) {
   if (!str) return null;
   if (typeof str !== 'string') return new Date(str).getTime();
   const s = str.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const endOfIndiaDay = new Date(`${s}T23:59:59.999+05:30`).getTime();
+    return Number.isNaN(endOfIndiaDay) ? null : endOfIndiaDay;
+  }
   const iso = s.includes('T')
-    ? (s.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(s) ? s : s + 'Z')
-    : s.replace(' ', 'T') + 'Z';
+    ? (s.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(s) ? s : s + '+05:30')
+    : s.replace(' ', 'T') + '+05:30';
   const ts = new Date(iso).getTime();
   return isNaN(ts) ? new Date(str).getTime() : ts;
+}
+
+function parseInventoryExpiry(str) {
+  if (!str) return null;
+  const value = String(str).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const timestamp = new Date(`${value}T23:59:59.999+05:30`).getTime();
+    return Number.isNaN(timestamp) ? null : timestamp;
+  }
+  const timestamp = parseSqliteDate(value);
+  return Number.isNaN(timestamp) ? null : timestamp;
 }
 
 // ── 5. HARD COMPATIBILITY GATE ────────────────────────────────────────────────
@@ -270,12 +285,14 @@ function checkCompatibility(surplus, demand, donorOrg, demandOrg, demandProfile,
   if (routeResult && routeResult.distanceKm != null) {
     // Use pre-computed road distance
     distanceKm = routeResult.distanceKm;
-    transitMinutes = Math.round(routeResult.durationMinutes);
+    transitMinutes = Number.isFinite(Number(routeResult.durationMinutes))
+      ? Math.round(Number(routeResult.durationMinutes))
+      : Math.round(40 + (distanceKm / 25) * 60);
     routeProvider = routeResult.provider || 'osrm';
     if (distanceKm > MAX_MATCH_DISTANCE_KM) {
       return { pass: false, reason: `Road distance (${distanceKm.toFixed(1)} km) exceeds operational limit of ${MAX_MATCH_DISTANCE_KM} km` };
     }
-  } else if (donorOrg?.location_lat && demandOrg?.location_lat) {
+  } else if (donorOrg?.location_lat && donorOrg?.location_lng && demandOrg?.location_lat && demandOrg?.location_lng) {
     distanceKm = haversineDistance(
       donorOrg.location_lat, donorOrg.location_lng,
       demandOrg.location_lat, demandOrg.location_lng
@@ -286,6 +303,8 @@ function checkCompatibility(surplus, demand, donorOrg, demandOrg, demandProfile,
       }
       transitMinutes = Math.round(40 + (distanceKm / 25) * 60);
     }
+  } else {
+    return { pass: false, reason: 'Recipient location or route ETA is unavailable; manual review is required' };
   }
 
   const estimatedArrival = now + transitMinutes * 60 * 1000;
@@ -297,7 +316,9 @@ function checkCompatibility(surplus, demand, donorOrg, demandOrg, demandProfile,
     };
   }
 
-  if (demand.required_by) {
+  // Recurring requests are standing needs; their stored deadline belongs to an
+  // occurrence and must not permanently block later matching cycles.
+  if (demand.required_by && !Number(demand.is_recurring)) {
     const demandDeadline = parseSqliteDate(demand.required_by);
     if (!isNaN(demandDeadline)) {
       if (estimatedArrival > demandDeadline) {
@@ -306,12 +327,9 @@ function checkCompatibility(surplus, demand, donorOrg, demandOrg, demandProfile,
           reason: `Estimated arrival (${new Date(estimatedArrival).toLocaleTimeString()}) is after recipient deadline (${new Date(demandDeadline).toLocaleTimeString()})`
         };
       }
-      if (surplusExpiry < demandDeadline - 30 * 60 * 1000) {
-        return {
-          pass: false,
-          reason: `Surplus expires at ${new Date(surplusExpiry).toLocaleTimeString()}, which is before recipient meal time ${new Date(demandDeadline).toLocaleTimeString()}`
-        };
-      }
+      // A later expiry is safe and should not disqualify the donation. The
+      // arrival deadline above is the relevant demand constraint; the separate
+      // freshness-buffer gate ensures the food remains safe on arrival.
     }
   }
 
@@ -370,7 +388,7 @@ function rankCandidate(gateResult, surplus, demand, demandOrg) {
 
   let urgencyPts = URGENCY_POINTS[demand.urgency] || 7;
   let deadlinePts = 2;
-  if (demand.required_by) {
+  if (demand.required_by && !Number(demand.is_recurring)) {
     const diffHours = (parseSqliteDate(demand.required_by) - Date.now()) / 3600000;
     if (diffHours <= 2) deadlinePts = 10;
     else if (diffHours <= 4) deadlinePts = 7;
@@ -437,22 +455,25 @@ function rankCandidate(gateResult, surplus, demand, demandOrg) {
 
 /**
  * Step 1/7: Routes a surplus post to biogas. Creates audit record and notifies donor.
- * Tries to find a matching biogas_facility first using road routes; falls back to generic.
+ * Routes only when a specific active, eligible biogas facility can be selected.
  * @param {Object} surplus
  * @param {string} reason
  * @param {Map}    [precomputedBiogasRoutes]  Map(facilityId → routeResult) from precomputeRoutesToBiogas()
  */
 function routeToBiogas(surplus, reason, precomputedBiogasRoutes) {
   const qty = surplus.remaining_quantity != null ? Number(surplus.remaining_quantity) : Number(surplus.quantity);
+  const facilityResult = routeToBiogasFacility(surplus, reason, qty, precomputedBiogasRoutes);
+  if (!facilityResult.facilityId) {
+    const reviewReason = `Biogas routing unavailable: ${reason}; no active eligible biogas centre could be selected`;
+    routeToReview(surplus, reviewReason);
+    return { surplusId: surplus.id, destination: 'review', facilityId: null, reason: reviewReason };
+  }
 
   db.prepare(`
     UPDATE surplus_posts
-    SET status = 'biogas_routed', biogas_reason = ?, remaining_quantity = 0, updated_at = CURRENT_TIMESTAMP
+    SET status = 'biogas_pending', biogas_reason = ?, remaining_quantity = 0, updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `).run(reason, surplus.id);
-
-  // Try to route to a specific verified biogas facility using road distances
-  const facilityResult = routeToBiogasFacility(surplus, reason, qty, precomputedBiogasRoutes);
 
   const destLabel = facilityResult.destinationName;
   const etaLabel = facilityResult.routeDurMin
@@ -460,10 +481,45 @@ function routeToBiogas(surplus, reason, precomputedBiogasRoutes) {
     : '';
 
   createAlert(surplus.donor_org_id, null, 'biogas', '♻️ Surplus Routed to Biogas',
-    `Your surplus "${surplus.food_name}" (${qty} ${surplus.quantity_unit}) has been safely directed to ${destLabel}${etaLabel}. Reason: ${reason}`);
+    `A biogas delivery request for "${surplus.food_name}" (${qty} ${surplus.quantity_unit}) was sent to ${destLabel}${etaLabel}. It is awaiting facility acceptance. Reason: ${reason}`);
 
   console.log(`[Matching] Biogas route: surplus ${surplus.id} → ${destLabel} — ${reason}`);
   return { surplusId: surplus.id, destination: 'biogas', facilityId: facilityResult.facilityId, destinationName: destLabel, reason };
+}
+
+/** Route expired food-bank stock to a specific eligible biogas facility. */
+function routeInventoryToBiogas(item, reason, precomputedBiogasRoutes) {
+  const quantity = Number(item.quantity_remaining || 0);
+  if (quantity <= 0.001) return null;
+  const inventorySource = {
+    id: `inventory:${item.id}`,
+    sourceType: 'food_bank_inventory',
+    sourceInventoryId: item.id,
+    donor_org_id: item.org_id,
+    food_name: item.food_name,
+    food_type: item.food_type || '',
+    quantity,
+    remaining_quantity: quantity,
+    quantity_unit: item.quantity_unit || 'kg'
+  };
+  const facilityResult = routeToBiogasFacility(inventorySource, reason, quantity, precomputedBiogasRoutes);
+  if (!facilityResult.facilityId) {
+    const reviewReason = `${reason}; no active eligible biogas centre could be selected`;
+    db.prepare(`UPDATE food_bank_inventory SET biogas_status = 'review_required', biogas_reason = ? WHERE id = ?`)
+      .run(reviewReason, item.id);
+    createAlert(item.org_id, null, 'review', 'Expired food needs biogas routing review',
+      `Expired inventory "${item.food_name}" (${quantity} ${inventorySource.quantity_unit}) has no available eligible biogas destination.`);
+    return { inventoryId: item.id, destination: 'review', facilityId: null, reason: reviewReason };
+  }
+
+  db.prepare(`UPDATE food_bank_inventory SET quantity_remaining = 0, biogas_status = 'pending', biogas_reason = ? WHERE id = ?`)
+    .run(reason, item.id);
+  const etaLabel = facilityResult.routeDurMin
+    ? ` (~${Math.round(facilityResult.routeDurMin)} min, ${facilityResult.routeDistKm?.toFixed(1)} km via ${facilityResult.routeProv})`
+    : '';
+  createAlert(item.org_id, null, 'biogas', 'Expired stock routed to biogas',
+    `A biogas delivery request for "${item.food_name}" (${quantity} ${inventorySource.quantity_unit}) was sent to ${facilityResult.destinationName}${etaLabel}. It is awaiting facility acceptance.`);
+  return { inventoryId: item.id, destination: 'biogas', facilityId: facilityResult.facilityId, reason };
 }
 
 /**
@@ -472,7 +528,7 @@ function routeToBiogas(surplus, reason, precomputedBiogasRoutes) {
  * Picks nearest verified+active facility by road distance whose accepted_waste_types covers
  * the food type and whose daily capacity (in kg) has not been exceeded today.
  * Falls back to haversine distance if no route result is available for a candidate.
- * Falls back to generic destination_name if no facility qualifies.
+ * Returns no destination if no facility qualifies; callers must escalate to review.
  * @param {Object}  surplus
  * @param {string}  reason
  * @param {number}  [qty]
@@ -483,15 +539,19 @@ function routeToBiogasFacility(surplus, reason, qty, precomputedBiogasRoutes) {
   const donorOrg = db.prepare('SELECT location_lat, location_lng FROM organizations WHERE id = ?').get(surplus.donor_org_id);
 
   const facilities = db.prepare(`
-    SELECT * FROM biogas_facilities WHERE status = 'active'
+    SELECT * FROM biogas_facilities WHERE status = 'active' AND verified = 1 AND COALESCE(is_available, 1) = 1
   `).all();
 
   const rejectionLog = [];
+  const rejectedFacilityIds = new Set(db.prepare(`
+    SELECT biogas_facility_id FROM biogas_routes WHERE surplus_id = ? AND status = 'rejected' AND biogas_facility_id IS NOT NULL
+  `).all(surplus.id).map(row => row.biogas_facility_id));
   let chosen = null;
   let chosenDist = Infinity;
   let chosenRouteResult = null;
 
   for (const fac of facilities) {
+    if (rejectedFacilityIds.has(fac.id)) continue;
     // Check accepted_waste_types — empty array means accepts all
     let accepted;
     try { accepted = JSON.parse(fac.accepted_waste_types || '[]'); } catch { accepted = []; }
@@ -510,12 +570,15 @@ function routeToBiogasFacility(surplus, reason, qty, precomputedBiogasRoutes) {
 
     // Check daily intake capacity — convert surplus qty to kg if needed before comparing
     if (fac.max_daily_intake_kg > 0) {
-      const todayUsage = db.prepare(`
-        SELECT COALESCE(SUM(quantity), 0) as used
+      const todayRoutes = db.prepare(`
+        SELECT quantity, quantity_unit, food_type
         FROM biogas_routes
-        WHERE biogas_facility_id = ? AND date(created_at) = date('now')
-      `).get(fac.id);
-      const usedKg = todayUsage ? Number(todayUsage.used) : 0;
+        WHERE biogas_facility_id = ? AND date(created_at) = date('now') AND status != 'rejected'
+      `).all(fac.id);
+      const usedKg = todayRoutes.reduce((sum, route) => {
+        const converted = convertQuantity(Number(route.quantity) || 0, route.quantity_unit || 'kg', 'kg', route.food_type);
+        return sum + (converted.success ? converted.convertedQty : (Number(route.quantity) || 0));
+      }, 0);
       // Convert actualQty to kg equivalent for capacity check
       const qtyKg = (() => {
         const unit = (surplus.quantity_unit || 'kg').toLowerCase();
@@ -550,8 +613,10 @@ function routeToBiogasFacility(surplus, reason, qty, precomputedBiogasRoutes) {
     }
   }
 
-  const destinationName = chosen ? chosen.name : 'Biogas Centre';
-  const facilityId = chosen ? chosen.id : null;
+  if (!chosen) return { facilityId: null, destinationName: null, rejectionLog };
+
+  const destinationName = chosen.name;
+  const facilityId = chosen.id;
   const routeDistKm = chosenRouteResult?.distanceKm ?? null;
   const routeDurMin = chosenRouteResult?.durationMinutes ?? null;
   const routeProv = chosenRouteResult?.provider ?? 'haversine';
@@ -561,10 +626,10 @@ function routeToBiogasFacility(surplus, reason, qty, precomputedBiogasRoutes) {
     : null;
 
   db.prepare(`
-    INSERT INTO biogas_routes (id, surplus_id, donor_org_id, food_name, food_type, quantity, quantity_unit,
+    INSERT INTO biogas_routes (id, surplus_id, source_type, source_inventory_id, donor_org_id, food_name, food_type, quantity, quantity_unit,
       reason, destination_name, biogas_facility_id, route_distance_km, route_duration_minutes, route_provider)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(uuidv4(), surplus.id, surplus.donor_org_id, surplus.food_name, surplus.food_type,
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(uuidv4(), surplus.id, surplus.sourceType || 'surplus', surplus.sourceInventoryId || null, surplus.donor_org_id, surplus.food_name, surplus.food_type,
          actualQty, surplus.quantity_unit, reason, destinationName, facilityId,
          routeDistKm, routeDurMin, routeProv);
 
@@ -607,8 +672,6 @@ function estimateDeliveryFeasibility(surplus, donorOrg) {
     return { feasible: false, missingData: false, reason: 'Surplus has already expired or expiry time is invalid' };
   }
 
-  const timeToExpiryMs = expiryMs - now;
-
   // Missing or uncertain location data -> flowchart branch C: Missing or uncertain data -> REVIEW
   if (!donorOrg?.location_lat || !donorOrg?.location_lng ||
       (donorOrg.location_lat === 0 && donorOrg.location_lng === 0)) {
@@ -619,15 +682,8 @@ function estimateDeliveryFeasibility(surplus, donorOrg) {
     };
   }
 
-  // Minimum feasible window: 40 min transit + 15 min safety buffer
-  if (timeToExpiryMs < 55 * 60 * 1000) {
-    return {
-      feasible: false,
-      missingData: false,
-      reason: `Only ${Math.round(timeToExpiryMs / 60000)} minutes until expiry — insufficient time for any safe delivery`
-    };
-  }
-
+  // Do not use a global minimum-transit cutoff here. Each demand and food-bank
+  // candidate is checked against its own route ETA and 15-minute freshness buffer.
   return { feasible: true, missingData: false, reason: null };
 }
 
@@ -641,11 +697,11 @@ function estimateDeliveryFeasibility(surplus, donorOrg) {
 function tryFoodBankFallback(surplus, donorOrg, precomputedRoutes) {
   const now = Date.now();
   const expiryMs = parseSqliteDate(surplus.remaining_usable_time);
-  const remainingQty = surplus.remaining_quantity != null ? Number(surplus.remaining_quantity) : Number(surplus.quantity);
+  let remainingQty = surplus.remaining_quantity != null ? Number(surplus.remaining_quantity) : Number(surplus.quantity);
   if (remainingQty <= 0.001) return null;
 
   const foodBankCandidates = db.prepare(`
-    SELECT o.*, dp.food_requirements, dp.dietary_restrictions, dp.receiving_capacity,
+    SELECT o.*, dp.food_requirements, dp.dietary_restrictions, dp.receiving_capacity, dp.receiving_capacity_kg,
            dp.storage_capacity, dp.serving_capacity
     FROM organizations o
     JOIN demand_org_profiles dp ON o.id = dp.org_id
@@ -654,9 +710,7 @@ function tryFoodBankFallback(surplus, donorOrg, precomputedRoutes) {
 
   if (!foodBankCandidates.length) return null;
 
-  let chosen = null;
-  let chosenDistance = Infinity;
-  let chosenRouteResult = null;
+  const eligibleBanks = [];
 
   for (const fb of foodBankCandidates) {
     let dist = null;
@@ -687,6 +741,7 @@ function tryFoodBankFallback(surplus, donorOrg, precomputedRoutes) {
     if (!isFoodAcceptedByProfile(surplus.food_type, surplus.food_name, profileFoodReqs)) {
       continue;
     }
+    if (!checkDietarySafety(surplus.dietary_tags, [], fb.dietary_restrictions).pass) continue;
 
     // Cold storage check for perishables (require positive evidence)
     const isPerishable = findCluster(surplus.food_type) === 'dairy' ||
@@ -697,7 +752,9 @@ function tryFoodBankFallback(surplus, donorOrg, precomputedRoutes) {
       if (!hasCold) continue;
     }
 
-    // Receiving capacity check
+    // A bank may accept part of the remaining surplus; the rest can be offered
+    // to another eligible bank instead of rejecting this bank outright.
+    let capacityInSurplusUnit = Infinity;
     if (fb.receiving_capacity) {
       const rcStr = String(fb.receiving_capacity).trim();
       const rcMatch = rcStr.match(/^(\d+(?:\.\d+)?)\s*(\w+)?/);
@@ -705,48 +762,90 @@ function tryFoodBankFallback(surplus, donorOrg, precomputedRoutes) {
         const rcQty = parseFloat(rcMatch[1]);
         const rcUnit = (rcMatch[2] || surplus.quantity_unit || '').toLowerCase();
         const surplusUnit = (surplus.quantity_unit || '').toLowerCase();
-        const fromNorm = UNIT_SYNONYMS[normalizeString(rcUnit)] || normalizeString(rcUnit);
-        const toNorm = UNIT_SYNONYMS[normalizeString(surplusUnit)] || normalizeString(surplusUnit);
-        if (!isNaN(rcQty) && rcQty > 0 && fromNorm === toNorm && remainingQty > rcQty) continue;
+        const convertedCapacity = convertQuantity(rcQty, rcUnit, surplusUnit, surplus.food_type);
+        if (!isNaN(rcQty) && rcQty > 0 && convertedCapacity.success) {
+          capacityInSurplusUnit = convertedCapacity.convertedQty;
+        }
       }
     }
-
-    const d = dist != null ? dist : Infinity;
-    if (d < chosenDistance) {
-      chosenDistance = d;
-      chosen = fb;
-      chosenRouteResult = precomputed || (dist != null ? { distanceKm: dist, durationMinutes: routeDuration || (40 + (dist / 25) * 60), provider: routeProv } : null);
+    const capacityKg = Number(fb.receiving_capacity_kg);
+    if (Number.isFinite(capacityKg) && capacityKg > 0) {
+      const convertedCapacity = convertQuantity(capacityKg, 'kg', surplus.quantity_unit, surplus.food_type);
+      if (convertedCapacity.success) capacityInSurplusUnit = Math.min(capacityInSurplusUnit, convertedCapacity.convertedQty);
     }
+
+    if (dist == null || dist > MAX_MATCH_DISTANCE_KM) continue;
+    const routeResult = precomputed?.distanceKm != null
+      ? precomputed
+      : { distanceKm: dist, durationMinutes: routeDuration || (40 + (dist / 25) * 60), provider: routeProv };
+    const transitMinutes = Number(routeResult.durationMinutes) || Math.round(40 + (dist / 25) * 60);
+    const allocQty = Math.min(remainingQty, capacityInSurplusUnit);
+    const demandForRanking = {
+      id: `food-bank-fallback:${fb.id}`,
+      demand_org_id: fb.id,
+      urgency: 'regular',
+      required_by: null,
+      quantity_unit: surplus.quantity_unit || 'kg'
+    };
+    const ranking = rankCandidate({
+      distanceKm: dist,
+      transitMinutes,
+      routeProvider: routeResult.provider || routeProv,
+      surplusExpiry: expiryMs,
+      estimatedArrival: now + transitMinutes * 60000,
+      potentialAlloc: allocQty,
+      demandRem: Math.max(remainingQty, 0.001),
+      surplusRem: remainingQty
+    }, surplus, demandForRanking, fb);
+    eligibleBanks.push({ bank: fb, distance: dist, routeResult, capacityInSurplusUnit, ranking });
   }
 
-  if (!chosen) return null;
+  // Same explainable score as direct demand matching: urgency/freshness,
+  // route distance, capacity fit and fairness. The route distance is a major
+  // component and breaks ties by the nearest bank.
+  eligibleBanks.sort((a, b) => b.ranking.score - a.ranking.score || a.distance - b.distance);
+  const allocations = [];
+  for (const candidate of eligibleBanks) {
+    if (remainingQty <= 0.001) break;
+    const allocatedQty = Math.min(remainingQty, candidate.capacityInSurplusUnit);
+    if (allocatedQty <= 0.001) continue;
 
-  const matchId = uuidv4();
-  const distText = chosenDistance !== Infinity ? `${chosenDistance.toFixed(1)} km` : 'nearby';
-  const explanation = `No immediate direct demand found. Routed ${remainingQty} ${surplus.quantity_unit} to food bank reserve hub "${chosen.name}" (${distText}) for community distribution.`;
+    const matchId = uuidv4();
+    const distText = candidate.distance !== Infinity ? `${candidate.distance.toFixed(1)} km` : 'distance unavailable';
+    const explanation = `No compatible direct demand used this quantity. Allocated ${allocatedQty} ${surplus.quantity_unit} to food bank "${candidate.bank.name}" (${distText}) for community distribution. ${candidate.ranking.explanation}`;
+
+    db.prepare(`
+      INSERT INTO matches (id, surplus_id, demand_org_id, match_score, allocated_quantity, allocated_unit, explanation, status, notes,
+        route_distance_km, route_duration_minutes, route_provider)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 'fallback_food_bank', ?, ?, ?)
+    `).run(
+      matchId, surplus.id, candidate.bank.id, candidate.ranking.score, allocatedQty, surplus.quantity_unit, explanation,
+      candidate.routeResult?.distanceKm ?? null,
+      candidate.routeResult?.durationMinutes ?? null,
+      candidate.routeResult?.provider ?? 'haversine'
+    );
+
+    allocations.push({ matchId, foodBankId: candidate.bank.id, foodBankName: candidate.bank.name, quantity: allocatedQty, explanation });
+    remainingQty = Math.max(0, remainingQty - allocatedQty);
+    createAlert(surplus.donor_org_id, null, 'fallback', '🏦 Surplus Routed to Food Bank',
+      `${allocatedQty} ${surplus.quantity_unit} of "${surplus.food_name}" has been allocated to ${candidate.bank.name}.`);
+    createAlert(candidate.bank.id, null, 'incoming', '📦 Incoming Food Bank Delivery',
+      `${allocatedQty} ${surplus.quantity_unit} of "${surplus.food_name}" from donor has been allocated to your food bank.`);
+  }
+
+  if (!allocations.length) return null;
 
   db.prepare(`
-    INSERT INTO matches (id, surplus_id, demand_org_id, match_score, allocated_quantity, allocated_unit, explanation, status, notes,
-      route_distance_km, route_duration_minutes, route_provider)
-    VALUES (?, ?, ?, 35, ?, ?, ?, 'pending', 'fallback_food_bank', ?, ?, ?)
-  `).run(
-    matchId, surplus.id, chosen.id, remainingQty, surplus.quantity_unit, explanation,
-    chosenRouteResult?.distanceKm ?? null,
-    chosenRouteResult?.durationMinutes ?? null,
-    chosenRouteResult?.provider ?? 'haversine'
-  );
+    UPDATE surplus_posts SET remaining_quantity = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+  `).run(Math.round(remainingQty * 100) / 100, remainingQty <= 0.001 ? 'matched' : 'partially_matched', surplus.id);
 
-  db.prepare(`
-    UPDATE surplus_posts SET status = 'matched', remaining_quantity = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?
-  `).run(surplus.id);
-
-  createAlert(surplus.donor_org_id, null, 'fallback', '🏦 Surplus Routed to Food Bank',
-    `No immediate direct demand found. ${remainingQty} ${surplus.quantity_unit} of "${surplus.food_name}" safely routed to ${chosen.name}.`);
-
-  createAlert(chosen.id, null, 'incoming', '📦 Incoming Food Bank Delivery',
-    `${remainingQty} ${surplus.quantity_unit} of "${surplus.food_name}" from donor has been allocated to your food bank.`);
-
-  return { matchId, fallback: true, foodBankId: chosen.id, foodBankName: chosen.name, explanation };
+  return {
+    fallback: true,
+    allocations,
+    remainingQuantity: Math.round(remainingQty * 100) / 100,
+    foodBankId: allocations[0].foodBankId,
+    foodBankName: allocations[0].foodBankName
+  };
 }
 
 // ── 8. UNIFIED TRANSACTIONAL MATCHER ──────────────────────────────────────────
@@ -812,8 +911,13 @@ function runUnifiedMatching({ surplusId, demandId, routeResults, biogasRouteResu
           AND o.status = 'active'
           AND o.verified = 1
           AND COALESCE(dr.remaining_quantity, dr.quantity_needed) > 0
+          AND NOT EXISTS (
+            SELECT 1 FROM matches rejected
+            WHERE rejected.source_type = 'surplus' AND rejected.surplus_id = ?
+              AND rejected.demand_id = dr.id AND rejected.status = 'declined'
+          )
         ORDER BY CASE dr.urgency WHEN 'emergency' THEN 1 WHEN 'immediate' THEN 2 WHEN 'regular' THEN 3 WHEN 'planned' THEN 4 END
-      `).all();
+      `).all(surplus.id);
 
       const candidates = [];
       for (const dem of demands) {
@@ -828,7 +932,9 @@ function runUnifiedMatching({ surplusId, demandId, routeResults, biogasRouteResu
       }
 
       // STEP 4 — Rank eligible demands
-      candidates.sort((a, b) => b.ranking.score - a.ranking.score);
+      candidates.sort((a, b) => b.ranking.score - a.ranking.score ||
+        (a.ranking.durationMinutes ?? Infinity) - (b.ranking.durationMinutes ?? Infinity) ||
+        (a.ranking.distanceKm ?? Infinity) - (b.ranking.distanceKm ?? Infinity));
 
       // STEP 5 — Allocate to ranked demands while surplus remains
       for (const cand of candidates) {
@@ -892,7 +998,7 @@ function runUnifiedMatching({ surplusId, demandId, routeResults, biogasRouteResu
         const fallback = tryFoodBankFallback({ ...surplus, remaining_quantity: currentSurplusRem }, donorOrg, routeResults);
         if (fallback) {
           matchesCreated.push(fallback);
-          currentSurplusRem = 0;
+          currentSurplusRem = fallback.remainingQuantity;
         }
       }
 
@@ -925,17 +1031,46 @@ function runUnifiedMatching({ surplusId, demandId, routeResults, biogasRouteResu
       const demandOrg = db.prepare('SELECT * FROM organizations WHERE id = ?').get(demand.demand_org_id);
       const demandProfile = db.prepare('SELECT * FROM demand_org_profiles WHERE org_id = ?').get(demand.demand_org_id);
 
-      // Find active surplus from verified donors — include available and partially matched
+      // Find active surplus from verified donors and all usable food-bank stock.
+      // Inventory rows must have an explicit, future expiry date; unknown expiry
+      // is not treated as safe/in-date. Inventory quantity is reserved by
+      // decrementing quantity_remaining in the same transaction as the match.
       const surplusPosts = db.prepare(`
         SELECT sp.*, o.location_lat, o.location_lng, o.status as org_status, o.name as org_name
         FROM surplus_posts sp
         JOIN organizations o ON sp.donor_org_id = o.id
-        WHERE sp.status IN ('available', 'partially_matched')
+        WHERE sp.status IN ('available', 'partially_matched', 'review_required')
+          AND (sp.status != 'review_required' OR COALESCE(sp.review_reason, '') NOT LIKE 'Biogas routing unavailable:%')
           AND o.status = 'active'
           AND o.verified = 1
           AND COALESCE(sp.remaining_quantity, sp.quantity) > 0
+          AND NOT EXISTS (
+            SELECT 1 FROM matches rejected
+            WHERE rejected.source_type = 'surplus' AND rejected.surplus_id = sp.id
+              AND rejected.demand_id = ? AND rejected.status = 'declined'
+          )
         ORDER BY sp.remaining_usable_time ASC
-      `).all();
+      `).all(demand.id);
+
+      const inventoryItems = db.prepare(`
+        SELECT i.*, o.location_lat, o.location_lng, o.status AS org_status,
+               o.name AS org_name, o.verified AS org_verified
+        FROM food_bank_inventory i
+        JOIN organizations o ON o.id = i.org_id
+        WHERE o.type LIKE '%food_bank%'
+          AND o.status = 'active' AND o.verified = 1
+          AND i.org_id != ?
+          AND COALESCE(i.quantity_remaining, 0) > 0
+          AND COALESCE(i.biogas_status, 'available') = 'available'
+          AND i.expiry_date IS NOT NULL
+          AND date(i.expiry_date) >= date('now')
+          AND NOT EXISTS (
+            SELECT 1 FROM matches rejected
+            WHERE rejected.source_type = 'food_bank_inventory' AND rejected.source_inventory_id = i.id
+              AND rejected.demand_id = ? AND rejected.status = 'declined'
+          )
+        ORDER BY i.expiry_date ASC
+      `).all(demand.demand_org_id, demand.id);
 
       const candidates = [];
       for (const sp of surplusPosts) {
@@ -975,14 +1110,53 @@ function runUnifiedMatching({ surplusId, demandId, routeResults, biogasRouteResu
         }
       }
 
-      candidates.sort((a, b) => b.ranking.score - a.ranking.score);
+      for (const item of inventoryItems) {
+        const donorOrg = db.prepare('SELECT * FROM organizations WHERE id = ?').get(item.org_id);
+        if (!donorOrg) continue;
+        // Date-only inventory entries remain valid through that day in India.
+        // Timestamp entries preserve their exact safe-until instant.
+        const expiryValue = String(item.expiry_date).trim();
+        const inventoryExpiry = /^\d{4}-\d{2}-\d{2}$/.test(expiryValue)
+          ? new Date(`${expiryValue}T23:59:59.999+05:30`).toISOString()
+          : new Date(parseSqliteDate(expiryValue)).toISOString();
+        const inventorySupply = {
+          id: `inventory:${item.id}`,
+          donor_org_id: item.org_id,
+          food_name: item.food_name,
+          food_type: item.food_type || '',
+          dietary_tags: item.dietary_tags || '[]',
+          quantity: Number(item.quantity_remaining),
+          remaining_quantity: Number(item.quantity_remaining),
+          quantity_unit: item.quantity_unit || 'kg',
+          remaining_usable_time: inventoryExpiry,
+          unsafe: 0,
+          sourceType: 'food_bank_inventory',
+          sourceInventoryId: item.id
+        };
+        const routeResult = routeResults && routeResults.get(item.org_id);
+        const gate = checkCompatibility(inventorySupply, { ...demand, remaining_quantity: currentDemandRem }, donorOrg, demandOrg, demandProfile, routeResult);
+        if (gate.pass) {
+          const ranking = rankCandidate(gate, inventorySupply, demand, demandOrg);
+          candidates.push({ surplus: inventorySupply, donorOrg, ranking, sourceType: 'food_bank_inventory', inventory: item });
+        }
+      }
+
+      candidates.sort((a, b) => b.ranking.score - a.ranking.score ||
+        (a.ranking.durationMinutes ?? Infinity) - (b.ranking.durationMinutes ?? Infinity) ||
+        (a.ranking.distanceKm ?? Infinity) - (b.ranking.distanceKm ?? Infinity));
 
       for (const cand of candidates) {
         if (currentDemandRem <= 0.001) break;
 
         const sp = cand.surplus;
-        const freshSp = db.prepare('SELECT * FROM surplus_posts WHERE id = ?').get(sp.id);
-        let freshSurplusRem = freshSp.remaining_quantity != null ? Number(freshSp.remaining_quantity) : Number(freshSp.quantity);
+        const isInventory = cand.sourceType === 'food_bank_inventory';
+        const freshSp = isInventory
+          ? db.prepare('SELECT * FROM food_bank_inventory WHERE id = ? AND org_id = ?').get(cand.inventory.id, cand.inventory.org_id)
+          : db.prepare('SELECT * FROM surplus_posts WHERE id = ?').get(sp.id);
+        if (!freshSp) continue;
+        let freshSurplusRem = isInventory
+          ? Number(freshSp.quantity_remaining || 0)
+          : (freshSp.remaining_quantity != null ? Number(freshSp.remaining_quantity) : Number(freshSp.quantity));
         if (freshSurplusRem <= 0.001) continue;
 
         const conv = convertQuantity(freshSurplusRem, sp.quantity_unit, demand.quantity_unit, sp.food_type);
@@ -995,11 +1169,15 @@ function runUnifiedMatching({ surplusId, demandId, routeResults, biogasRouteResu
         const allocInSurplusUnit = convBack.success ? convBack.convertedQty : allocInDemandUnit;
 
         const newSurplusRem = Math.max(0, freshSurplusRem - allocInSurplusUnit);
-        const newSurplusStatus = newSurplusRem <= 0.001 ? 'matched' : 'partially_matched';
-
-        db.prepare(`
-          UPDATE surplus_posts SET remaining_quantity = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
-        `).run(Math.round(newSurplusRem * 100) / 100, newSurplusStatus, sp.id);
+        if (isInventory) {
+          db.prepare(`UPDATE food_bank_inventory SET quantity_remaining = ? WHERE id = ? AND org_id = ?`)
+            .run(Math.round(newSurplusRem * 100) / 100, cand.inventory.id, cand.inventory.org_id);
+        } else {
+          const newSurplusStatus = newSurplusRem <= 0.001 ? 'matched' : 'partially_matched';
+          db.prepare(`
+            UPDATE surplus_posts SET remaining_quantity = ?, status = ?, review_reason = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+          `).run(Math.round(newSurplusRem * 100) / 100, newSurplusStatus, sp.id);
+        }
 
         currentDemandRem = Math.max(0, currentDemandRem - allocInDemandUnit);
         const newDemandStatus = currentDemandRem <= 0.001 ? 'fulfilled' : 'partially_fulfilled';
@@ -1010,10 +1188,12 @@ function runUnifiedMatching({ surplusId, demandId, routeResults, biogasRouteResu
 
         const matchId = uuidv4();
         db.prepare(`
-          INSERT INTO matches (id, surplus_id, demand_id, demand_org_id, match_score, allocated_quantity, allocated_unit, explanation, status, notes,
+          INSERT INTO matches (id, surplus_id, source_type, source_inventory_id, demand_id, demand_org_id, match_score, allocated_quantity, allocated_unit, explanation, status, notes,
             route_distance_km, route_duration_minutes, route_provider)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)
-        `).run(matchId, sp.id, demand.id, demand.demand_org_id,
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)
+        `).run(matchId, isInventory ? `inventory:${cand.inventory.id}` : sp.id,
+          isInventory ? 'food_bank_inventory' : 'surplus', isInventory ? cand.inventory.id : null,
+          demand.id, demand.demand_org_id,
           cand.ranking.score, allocInDemandUnit, demand.quantity_unit,
           cand.ranking.explanation, cand.ranking.explanation,
           cand.ranking.distanceKm ?? null,
@@ -1028,15 +1208,28 @@ function runUnifiedMatching({ surplusId, demandId, routeResults, biogasRouteResu
 
         createAlert(demand.demand_org_id, null, 'match', '🍱 Food Match Found!',
           `Matched ${allocInDemandUnit} ${demand.quantity_unit} of ${sp.food_name}. ${cand.ranking.explanation}`);
-        createAlert(sp.donor_org_id, null, 'match', '✅ Surplus Matched',
+        createAlert(sp.donor_org_id, null, 'match', '✅ Food Matched',
           `Allocated ${allocInDemandUnit} ${demand.quantity_unit} of ${sp.food_name} to ${demandOrg.name}.`);
 
         // FINISH ROUTING LEFTOVER SURPLUS (Flowchart Branches FB, J, K, BIO, REVIEW)
-        if (newSurplusRem > 0.001) {
+        if (!isInventory && newSurplusRem > 0.001) {
           const donorOrg = cand.donorOrg || db.prepare('SELECT * FROM organizations WHERE id = ?').get(sp.donor_org_id);
           const fallback = tryFoodBankFallback({ ...sp, remaining_quantity: newSurplusRem }, donorOrg, routeResults);
           if (fallback) {
             matchesCreated.push(fallback);
+            if (fallback.remainingQuantity > 0.001) {
+              const freshSpAfter = db.prepare('SELECT * FROM surplus_posts WHERE id = ?').get(sp.id);
+              const spExpiryMs = parseSqliteDate(sp.remaining_usable_time);
+              const timeLeftMs = spExpiryMs ? spExpiryMs - Date.now() : 0;
+              if (timeLeftMs < 2 * 60 * 60 * 1000) {
+                routeToBiogas(freshSpAfter,
+                  `Food banks could accept only part of the remaining surplus; ${fallback.remainingQuantity} ${sp.quantity_unit} remain and food expires in ${Math.round(timeLeftMs / 60000)} minutes`,
+                  biogasRouteResults);
+              } else {
+                routeToReview(freshSpAfter,
+                  `Food banks could accept only part of the remaining surplus; ${fallback.remainingQuantity} ${sp.quantity_unit} still needs a destination.`);
+              }
+            }
           } else {
             const spExpiryMs = parseSqliteDate(sp.remaining_usable_time);
             const timeLeftMs = spExpiryMs ? spExpiryMs - Date.now() : 0;
@@ -1087,6 +1280,44 @@ async function precomputeRoutes(donorOrg, candidateOrgs) {
   return routeResults;
 }
 
+/** Re-run open demands when newly received/manual food-bank stock becomes available. */
+async function matchOpenDemandsForInventory() {
+  const openDemands = db.prepare(`
+    SELECT dr.id, dr.demand_org_id
+    FROM demand_registrations dr
+    JOIN organizations o ON o.id = dr.demand_org_id
+    WHERE dr.status IN ('open', 'partially_fulfilled')
+      AND o.status = 'active' AND o.verified = 1
+      AND COALESCE(dr.remaining_quantity, dr.quantity_needed) > 0
+    ORDER BY CASE dr.urgency WHEN 'emergency' THEN 1 WHEN 'immediate' THEN 2 WHEN 'regular' THEN 3 ELSE 4 END
+  `).all();
+  const suppliers = db.prepare(`
+    SELECT DISTINCT o.id, o.location_lat, o.location_lng
+    FROM organizations o
+    WHERE o.status = 'active' AND o.verified = 1 AND (
+      EXISTS (
+        SELECT 1 FROM surplus_posts sp
+        WHERE sp.donor_org_id = o.id
+          AND sp.status IN ('available', 'partially_matched', 'review_required')
+          AND (sp.status != 'review_required' OR COALESCE(sp.review_reason, '') NOT LIKE 'Biogas routing unavailable:%')
+          AND COALESCE(sp.remaining_quantity, sp.quantity) > 0
+      ) OR (o.type LIKE '%food_bank%' AND EXISTS (
+        SELECT 1 FROM food_bank_inventory i WHERE i.org_id = o.id
+          AND COALESCE(i.quantity_remaining, 0) > 0
+          AND COALESCE(i.biogas_status, 'available') = 'available'
+          AND i.expiry_date IS NOT NULL AND date(i.expiry_date) >= date('now')
+      ))
+    )
+  `).all();
+  for (const row of openDemands) {
+    const demandOrg = db.prepare('SELECT * FROM organizations WHERE id = ?').get(row.demand_org_id);
+    if (!demandOrg) continue;
+    const routeResults = await precomputeRoutes(demandOrg, suppliers);
+    runUnifiedMatching({ demandId: row.id, routeResults });
+  }
+  return openDemands.length;
+}
+
 /**
  * Pre-computes road routes from a donor org to all active biogas facilities.
  * Called BEFORE runUnifiedMatching so the sync transaction can use road distances.
@@ -1099,7 +1330,7 @@ async function precomputeRoutesToBiogas(donorOrg) {
 
   let facilities = [];
   try {
-    facilities = db.prepare(`SELECT id, location_lat, location_lng FROM biogas_facilities WHERE status = 'active'`).all();
+    facilities = db.prepare(`SELECT id, location_lat, location_lng FROM biogas_facilities WHERE status = 'active' AND verified = 1 AND COALESCE(is_available, 1) = 1`).all();
   } catch { return routeResults; }
 
   for (const fac of facilities) {
@@ -1112,6 +1343,226 @@ async function precomputeRoutesToBiogas(donorOrg) {
     }
   }
   return routeResults;
+}
+
+/**
+ * Periodic safety sweep for donor surplus and food-bank stock. Expired bank
+ * stock is reserved from human-food use and routed to a real eligible facility.
+ */
+async function processExpiredSurplus() {
+  const expiredDemands = expireOverdueDemands();
+  const expiredRows = db.prepare(`
+    SELECT id, donor_org_id, remaining_usable_time
+    FROM surplus_posts
+    WHERE remaining_usable_time IS NOT NULL
+      AND status IN ('available', 'partially_matched', 'review_required', 'matched')
+      AND (
+        (COALESCE(remaining_quantity, quantity) > 0.001 AND status != 'matched')
+        OR EXISTS (SELECT 1 FROM matches m WHERE m.surplus_id = surplus_posts.id AND m.status IN ('pending', 'confirmed'))
+      )
+      AND (status != 'review_required' OR COALESCE(review_reason, '') NOT LIKE 'Biogas routing unavailable:%')
+    ORDER BY remaining_usable_time ASC
+  `).all().filter(row => {
+    const expiry = parseSqliteDate(row.remaining_usable_time);
+    return expiry != null && !Number.isNaN(expiry) && expiry <= Date.now();
+  }).slice(0, 100);
+
+  const routesByDonor = new Map();
+  let processed = 0;
+  for (const row of expiredRows) {
+    if (!routesByDonor.has(row.donor_org_id)) {
+      const donor = db.prepare('SELECT * FROM organizations WHERE id = ?').get(row.donor_org_id);
+      routesByDonor.set(row.donor_org_id, donor ? await precomputeRoutesToBiogas(donor) : new Map());
+    }
+
+    const result = db.transaction(() => {
+      const surplus = db.prepare('SELECT * FROM surplus_posts WHERE id = ?').get(row.id);
+      if (!surplus) return null;
+      const expiry = parseSqliteDate(surplus.remaining_usable_time);
+      if (!expiry || expiry > Date.now()) return null;
+      if (!['available', 'partially_matched', 'review_required', 'matched'].includes(surplus.status)) return null;
+      if (surplus.status === 'review_required' && String(surplus.review_reason || '').startsWith('Biogas routing unavailable:')) return null;
+      const allocatedMatches = db.prepare(`
+        SELECT * FROM matches WHERE surplus_id = ? AND status IN ('pending', 'confirmed')
+      `).all(surplus.id);
+      let restoredQuantity = 0;
+      for (const match of allocatedMatches) {
+        const allocated = Math.max(0, Number(match.allocated_quantity) || 0);
+        const converted = convertQuantity(allocated, match.allocated_unit || surplus.quantity_unit, surplus.quantity_unit, surplus.food_type);
+        if (converted.success) restoredQuantity += converted.convertedQty;
+        db.prepare("UPDATE matches SET status = 'cancelled', notes = 'Cancelled: donor surplus expired before receipt confirmation' WHERE id = ?")
+          .run(match.id);
+        if (match.demand_id && allocated > 0) {
+          db.prepare(`
+            UPDATE demand_registrations
+            SET remaining_quantity = MIN(quantity_needed, COALESCE(remaining_quantity, 0) + ?),
+                status = CASE WHEN COALESCE(remaining_quantity, 0) + ? >= quantity_needed THEN 'open' ELSE 'partially_fulfilled' END,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `).run(allocated, allocated, match.demand_id);
+          createAlert(match.demand_org_id, null, 'alert', 'Food match expired before receipt',
+            `The ${surplus.food_name} match expired before receipt was confirmed. Your unmet demand has been reopened.`);
+        }
+      }
+      const unallocated = surplus.remaining_quantity != null ? Number(surplus.remaining_quantity) : Number(surplus.quantity);
+      const remaining = Math.min(Number(surplus.quantity), unallocated + restoredQuantity);
+      if (remaining <= 0.001) return null;
+      db.prepare('UPDATE surplus_posts SET remaining_quantity = ? WHERE id = ?').run(remaining, surplus.id);
+      return routeToBiogas({ ...surplus, remaining_quantity: remaining }, 'Surplus expired; no longer safe for human consumption', routesByDonor.get(row.donor_org_id));
+    })();
+    if (result) processed++;
+  }
+
+  const inventoryRows = db.prepare(`
+    SELECT i.id, i.org_id, i.expiry_date
+    FROM food_bank_inventory i
+    WHERE i.expiry_date IS NOT NULL
+      AND (COALESCE(i.quantity_remaining, 0) > 0.001 OR EXISTS (
+        SELECT 1 FROM matches m WHERE m.source_type = 'food_bank_inventory'
+          AND m.source_inventory_id = i.id AND m.status IN ('pending', 'confirmed')
+      ))
+      AND COALESCE(i.biogas_status, 'available') = 'available'
+    ORDER BY i.expiry_date ASC
+    LIMIT 500
+  `).all();
+  const expiredInventoryRows = inventoryRows.filter(row => {
+    const expiry = parseInventoryExpiry(row.expiry_date);
+    return expiry != null && expiry <= Date.now();
+  });
+  const routesByFoodBank = new Map();
+  let processedInventory = 0;
+  for (const row of expiredInventoryRows) {
+    if (!routesByFoodBank.has(row.org_id)) {
+      const org = db.prepare('SELECT * FROM organizations WHERE id = ?').get(row.org_id);
+      routesByFoodBank.set(row.org_id, org ? await precomputeRoutesToBiogas(org) : new Map());
+    }
+    const result = db.transaction(() => {
+      const item = db.prepare('SELECT * FROM food_bank_inventory WHERE id = ?').get(row.id);
+      if (!item || item.biogas_status !== 'available') return null;
+      const expiry = parseInventoryExpiry(item.expiry_date);
+      if (expiry == null || expiry > Date.now()) return null;
+
+      // Unreceived offers still belong to the bank. Cancel them, reopen their
+      // demands, and include all reserved stock in the biogas shipment.
+      const outstanding = db.prepare(`
+        SELECT * FROM matches WHERE source_type = 'food_bank_inventory'
+          AND source_inventory_id = ? AND status IN ('pending', 'confirmed')
+      `).all(item.id);
+      let restoreQty = 0;
+      for (const match of outstanding) {
+        const allocated = Number(match.allocated_quantity || 0);
+        const converted = convertQuantity(allocated, match.allocated_unit || item.quantity_unit, item.quantity_unit, item.food_type);
+        const restore = converted.success ? converted.convertedQty : 0;
+        restoreQty += restore;
+        db.prepare(`UPDATE matches SET status = 'cancelled', notes = 'Cancelled: source inventory expired before receipt confirmation' WHERE id = ?`)
+          .run(match.id);
+        if (match.demand_id && allocated > 0) {
+          db.prepare(`
+            UPDATE demand_registrations
+            SET remaining_quantity = MIN(quantity_needed, COALESCE(remaining_quantity, 0) + ?),
+                status = CASE WHEN COALESCE(remaining_quantity, 0) + ? >= quantity_needed THEN 'open' ELSE 'partially_fulfilled' END,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `).run(allocated, allocated, match.demand_id);
+          createAlert(match.demand_org_id, null, 'alert', 'Food match expired before dispatch',
+            `The ${item.food_name} match could not proceed because the food-bank stock expired. Your demand has been reopened.`);
+        }
+      }
+      const routeQuantity = Number(item.quantity_remaining || 0) + restoreQty;
+      if (routeQuantity <= 0.001) return null;
+      db.prepare('UPDATE food_bank_inventory SET quantity_remaining = ? WHERE id = ?').run(routeQuantity, item.id);
+      const routableItem = { ...item, quantity_remaining: routeQuantity };
+      return routeInventoryToBiogas(routableItem, 'Food-bank inventory expired; no longer available for human consumption', routesByFoodBank.get(row.org_id));
+    })();
+    if (result) processedInventory++;
+  }
+
+  return {
+    scanned: expiredRows.length + inventoryRows.length,
+    processed: processed + processedInventory,
+    processedSurplus: processed,
+    processedInventory,
+    expiredDemands
+  };
+}
+
+/**
+ * Close one-time demands once their required-by deadline has passed. Recurring
+ * demands stay active; their deadline applies to the current occurrence only.
+ * Pending allocations are cancelled and their reserved stock is released before
+ * the unmet demand is marked expired. Accepted matches remain untouched while
+ * awaiting receipt confirmation.
+ */
+function expireOverdueDemands() {
+  const overdueRows = db.prepare(`
+    SELECT id, required_by
+    FROM demand_registrations
+    WHERE status IN ('open', 'partially_fulfilled', 'searching')
+      AND COALESCE(is_recurring, 0) = 0
+      AND required_by IS NOT NULL AND TRIM(required_by) != ''
+      AND COALESCE(remaining_quantity, quantity_needed) > 0.001
+    ORDER BY required_by ASC
+  `).all().filter(row => {
+    const deadline = parseSqliteDate(row.required_by);
+    return deadline != null && !Number.isNaN(deadline) && deadline <= Date.now();
+  }).slice(0, 500);
+
+  const cancelPending = db.prepare(`
+    SELECT * FROM matches WHERE demand_id = ? AND status = 'pending'
+  `);
+  let expiredCount = 0;
+
+  for (const { id } of overdueRows) {
+    const didExpire = db.transaction(() => {
+      const demand = db.prepare('SELECT * FROM demand_registrations WHERE id = ?').get(id);
+      if (!demand || !['open', 'partially_fulfilled', 'searching'].includes(demand.status) ||
+          Number(demand.is_recurring) === 1 || !demand.required_by ||
+          parseSqliteDate(demand.required_by) > Date.now() ||
+          Number(demand.remaining_quantity ?? demand.quantity_needed) <= 0.001) return false;
+
+      let cancelledAllocation = 0;
+      for (const match of cancelPending.all(id)) {
+        const allocated = Math.max(0, Number(match.allocated_quantity) || 0);
+        if (allocated > 0) {
+          const isInventory = match.source_type === 'food_bank_inventory';
+          const source = isInventory
+            ? db.prepare('SELECT * FROM food_bank_inventory WHERE id = ?').get(match.source_inventory_id)
+            : db.prepare('SELECT * FROM surplus_posts WHERE id = ?').get(match.surplus_id);
+          if (source && isInventory) {
+            const converted = convertQuantity(allocated, match.allocated_unit || demand.quantity_unit, source.quantity_unit, source.food_type);
+            const restore = converted.success ? converted.convertedQty : allocated;
+            db.prepare(`UPDATE food_bank_inventory
+              SET quantity_remaining = MIN(quantity_received, COALESCE(quantity_remaining, 0) + ?)
+              WHERE id = ?`).run(Math.round(restore * 100) / 100, source.id);
+          } else if (source) {
+            const converted = convertQuantity(allocated, match.allocated_unit || demand.quantity_unit, source.quantity_unit, source.food_type);
+            const restore = converted.success ? converted.convertedQty : allocated;
+            db.prepare(`UPDATE surplus_posts
+              SET remaining_quantity = MIN(quantity, COALESCE(remaining_quantity, quantity) + ?),
+                  status = 'available', updated_at = CURRENT_TIMESTAMP
+              WHERE id = ?`).run(Math.round(restore * 100) / 100, source.id);
+          }
+          cancelledAllocation += allocated;
+        }
+        db.prepare(`UPDATE matches SET status = 'cancelled',
+          notes = 'Cancelled: recipient demand deadline passed' WHERE id = ?`).run(match.id);
+      }
+
+      db.prepare(`UPDATE demand_registrations
+        SET remaining_quantity = MIN(quantity_needed, COALESCE(remaining_quantity, 0) + ?),
+            status = 'expired', updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?`).run(cancelledAllocation, id);
+      return { demandOrgId: demand.demand_org_id };
+    })();
+
+    if (didExpire) {
+      expiredCount++;
+      createAlert(didExpire.demandOrgId, null, 'alert', 'Demand deadline passed',
+        'Your unmet one-time demand expired after its required-by date. Any pending allocations were released.');
+    }
+  }
+
+  return expiredCount;
 }
 
 /**
@@ -1154,7 +1605,10 @@ module.exports = {
   runMatching,
   runUnifiedMatching,
   precomputeRoutes,
+  matchOpenDemandsForInventory,
   precomputeRoutesToBiogas,
+  processExpiredSurplus,
+  expireOverdueDemands,
   checkCompatibility,
   rankCandidate,
   convertQuantity,

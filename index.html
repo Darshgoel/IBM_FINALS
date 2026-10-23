@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FoodBridge — Rescue Food. Feed People. Build a Greener Tomorrow.</title>
   <meta name="description"
-    content="FoodBridge connects food donors, NGOs and communities to redistribute surplus food and build a hunger-free, sustainable world." />
+    content="FoodBridge connects food donors, NGOs, food banks and biogas partners to move safe surplus to communities and recover food that cannot be redistributed." />
   <meta name="theme-color" content="#13833B" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -109,6 +109,13 @@
     <symbol id="i-sparkle" viewBox="0 0 24 24">
       <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8" />
     </symbol>
+    <symbol id="i-inbox" viewBox="0 0 24 24">
+      <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
+      <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+    </symbol>
+    <symbol id="i-zap" viewBox="0 0 24 24">
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+    </symbol>
   </svg>
 
   <!-- ── Header ────────────────────────────────────────────────────────── -->
@@ -171,8 +178,8 @@
         <div class="hero-copy">
           <p class="hero-eyebrow"><span class="eyebrow-dot"></span>Food Rescue Network</p>
           <h1 class="hero-title" id="hero-title">Good Food<br />Should <span>Never Go to Waste</span></h1>
-          <p class="hero-sub">We connect surplus food from hotels, restaurants and kitchens with NGOs and communities
-            who need it most — quickly, safely and with dignity.</p>
+          <p class="hero-sub">We connect surplus food from hotels, restaurants and kitchens with NGOs and food banks
+            serving nearby communities — with biogas partners recovering food that can no longer be redistributed.</p>
           <div class="hero-cta">
             <a class="hero-btn hero-btn-primary" href="/donor/">
               <svg class="ico" aria-hidden="true"><use href="#i-heart"></use></svg>
@@ -222,6 +229,18 @@
             <h2>NGO / Community Org</h2>
             <p>Organisations that collect and distribute food to communities.</p>
             <span class="role-btn role-btn-blue">Request Food <svg class="ico" aria-hidden="true"><use href="#i-arrow-right"></use></svg></span>
+          </a>
+          <a class="role-card role-purple" href="/?auth=signup&amp;role=food_bank">
+            <span class="role-icon"><svg class="ico" aria-hidden="true"><use href="#i-inbox"></use></svg></span>
+            <h2>Food Bank</h2>
+            <p>Receive donor surplus, manage safe reserves and share in-date stock with local demand.</p>
+            <span class="role-btn role-btn-purple">Join as a Food Bank <svg class="ico" aria-hidden="true"><use href="#i-arrow-right"></use></svg></span>
+          </a>
+          <a class="role-card role-gray" href="/?auth=signup&amp;role=biogas_operator">
+            <span class="role-icon"><svg class="ico" aria-hidden="true"><use href="#i-zap"></use></svg></span>
+            <h2>Biogas Partner</h2>
+            <p>Receive assigned recovery routes for food no longer suitable for people.</p>
+            <span class="role-btn role-btn-gray">Join as a Biogas Partner <svg class="ico" aria-hidden="true"><use href="#i-arrow-right"></use></svg></span>
           </a>
           <a class="role-card role-orange" href="/recipient/">
             <span class="role-icon"><svg class="ico" aria-hidden="true"><use href="#i-user"></use></svg></span>
@@ -287,7 +306,7 @@
               <span class="panel-icon"><svg class="ico" aria-hidden="true"><use href="#i-utensils"></use></svg></span>
               <div>
                 <h2>Food Access Points</h2>
-                <p class="panel-sub">Verified community organisations accepting food.</p>
+                <p class="panel-sub">Verified NGOs and food banks serving people; biogas recovery facilities stay on the operations map.</p>
               </div>
             </div>
             <a class="panel-link" href="/recipient/">View all <svg class="ico" aria-hidden="true"><use href="#i-arrow-right"></use></svg></a>
@@ -309,14 +328,14 @@
           <p class="section-eyebrow">About FoodBridge</p>
           <h2 class="section-title" id="about-title">A bridge between good food and real need.</h2>
           <p class="section-lead">Every day, edible food is thrown away while families nearby go hungry. FoodBridge
-            makes the handover simple: donors list surplus in seconds, our matching engine finds the right community
-            partner, and verified organisations collect it while it is still safe to eat.</p>
+            connects donors with verified NGOs and food banks that can receive, store and redistribute safe food.
+            Biogas partners provide a separate recovery route when food can no longer go to people.</p>
           <div class="about-features">
             <div class="about-feature">
               <span class="feature-icon icon-green"><svg class="ico" aria-hidden="true"><use href="#i-shield"></use></svg></span>
               <div>
                 <h3>Verified partners</h3>
-                <p>Organisations are reviewed before they can request or receive food.</p>
+                <p>Donors, NGOs, food banks and biogas partners are reviewed before their operational role is enabled.</p>
               </div>
             </div>
             <div class="about-feature">
@@ -360,7 +379,7 @@
       <div class="shell">
         <div class="section-head">
           <p class="section-eyebrow">How It Works</p>
-          <h2 class="section-title" id="how-title">From surplus to a shared meal in three steps.</h2>
+          <h2 class="section-title" id="how-title">From surplus to a shared meal — and safe recovery.</h2>
           <p class="section-lead">The network handles the coordination so donors can give quickly and community teams
             can focus on people, not paperwork.</p>
         </div>
@@ -376,7 +395,7 @@
             <span class="step-number">02</span>
             <span class="step-icon icon-blue"><svg class="ico" aria-hidden="true"><use href="#i-network"></use></svg></span>
             <h3>FoodBridge matches need</h3>
-            <p>Our engine ranks nearby verified partners by dietary fit, urgency, capacity and collection distance.</p>
+            <p>Our engine ranks nearby verified NGO and food-bank demand by food fit, urgency, capacity and route time. Unmatched edible food may be offered to a food bank; expired or unsafe food follows the biogas recovery path.</p>
             <span class="step-tag">Safety &amp; distance aware</span>
           </article>
           <article class="step-card">
@@ -404,12 +423,12 @@
           <div class="impact-stat">
             <strong data-stat="points">—</strong>
             <span>Verified access points</span>
-            <small>Active, verified community organisations</small>
+            <small>Active, verified NGOs, community organisations and food banks</small>
           </div>
           <div class="impact-stat">
             <strong data-stat="incoming">—</strong>
             <span>Incoming food matches</span>
-            <small>Pending, confirmed and in-transit allocations</small>
+            <small>Pending and accepted allocations</small>
           </div>
           <div class="impact-stat">
             <strong data-stat="areas">—</strong>
@@ -430,9 +449,8 @@
       <div class="shell">
         <div class="section-head center">
           <p class="section-eyebrow">Get Involved</p>
-          <h2 class="section-title" id="involved-title">There is a place for everyone at this table.</h2>
-          <p class="section-lead">Whether you have food to share, a community to serve, or time to give — the network
-            is stronger with you in it.</p>
+          <h2 class="section-title" id="involved-title">Four partners. One food rescue network.</h2>
+          <p class="section-lead">FoodBridge connects food donors, NGOs and community organisations, food banks, and biogas facilities to move surplus safely and recover what cannot be redistributed.</p>
         </div>
         <div class="involved-grid">
           <article class="involved-card involved-donor">
@@ -446,17 +464,23 @@
           <article class="involved-card involved-ngo">
             <span class="involved-icon"><svg class="ico" aria-hidden="true"><use href="#i-users"></use></svg></span>
             <h3>Bring food to your community</h3>
-            <p>Register your NGO or community kitchen, tell us your capacity, and receive matched surplus nearby.</p>
+            <p>NGOs and food banks register needs and capacity. Food banks can also hold and redistribute in-date inventory.</p>
             <a class="btn-card btn-card-blue" href="/demand-org/">Register your organisation <svg class="ico" aria-hidden="true"><use href="#i-arrow-right"></use></svg></a>
             <span class="involved-note">Verification keeps the network safe for everyone</span>
           </article>
-          <article class="involved-card involved-volunteer">
-            <span class="involved-icon"><svg class="ico" aria-hidden="true"><use href="#i-heart"></use></svg></span>
-            <h3>Give a little time</h3>
-            <p>Help with pickups, sorting or community meals. Reach out and we will connect you with a partner near
-              you.</p>
-            <a class="btn-card btn-card-orange" href="mailto:volunteer@foodbridge.org?subject=Volunteering%20with%20FoodBridge">Volunteer with us <svg class="ico" aria-hidden="true"><use href="#i-arrow-right"></use></svg></a>
-            <span class="involved-note">Flexible roles, real community impact</span>
+          <article class="involved-card involved-ngo">
+            <span class="involved-icon"><svg class="ico" aria-hidden="true"><use href="#i-inbox"></use></svg></span>
+            <h3>Operate a food bank</h3>
+            <p>Receive suitable donor surplus, confirm delivery, manage inventory and make in-date stock available to nearby demand.</p>
+            <a class="btn-card btn-card-blue" href="/?auth=signup&amp;role=food_bank">Join as a food bank <svg class="ico" aria-hidden="true"><use href="#i-arrow-right"></use></svg></a>
+            <span class="involved-note">Food banks are verified co-partners and can both receive and supply food</span>
+          </article>
+          <article class="involved-card involved-recovery">
+            <span class="involved-icon"><svg class="ico" aria-hidden="true"><use href="#i-zap"></use></svg></span>
+            <h3>Recover food through biogas</h3>
+            <p>Register a facility to receive assigned recovery routes for food that is expired, unsafe or cannot be redistributed in time.</p>
+            <a class="btn-card btn-card-orange" href="/?auth=signup&amp;role=biogas_operator">Join as a biogas partner <svg class="ico" aria-hidden="true"><use href="#i-arrow-right"></use></svg></a>
+            <span class="involved-note">Facility intake is recorded by the operator</span>
           </article>
         </div>
       </div>
@@ -528,6 +552,8 @@
         <h4>Portals</h4>
         <a href="/donor/">Food donors</a>
         <a href="/demand-org/">NGOs &amp; community orgs</a>
+        <a href="/?auth=signup&amp;role=food_bank">Food bank partners</a>
+        <a href="/?auth=signup&amp;role=biogas_operator">Biogas partners</a>
         <a href="/recipient/">Food finder</a>
       </div>
       <div class="footer-col footer-contact">
@@ -592,6 +618,8 @@
             <span>Network</span><code>network@foodbridge.org / network123</code>
             <span>Donor</span><code>donor@grandhotel.com / password123</code>
             <span>NGO</span><code>ngo@helpinghands.org / password123</code>
+            <span>Food Bank</span><code>ops@citycarefoodbank.org / password123</code>
+            <span>Biogas</span><code>operator@greenenergybiogas.in / password123</code>
           </div>
         </details>
         <p class="auth-foot">New to FoodBridge? <button class="link-btn" type="button" onclick="switchTab('signup')">Create an account</button></p>
@@ -599,7 +627,7 @@
 
       <div class="tab-pane" id="pane-signup" role="tabpanel" aria-labelledby="tab-signup">
         <h2 class="auth-title">Join the network</h2>
-        <p class="auth-sub">Create an account in three short steps.</p>
+        <p class="auth-sub" id="signup-sub">Pick your role to get started.</p>
 
         <div class="stepper" aria-label="Sign up progress">
           <span class="step-dot active" id="dot-1">1</span>
@@ -612,17 +640,8 @@
         <div class="msg" id="signup-error" role="alert"></div>
         <div class="msg success" id="signup-success" role="status"></div>
 
+        <!-- Step 1: Role picker (was step 2) -->
         <div class="step-pane active" id="step-1">
-          <label class="field-label" for="su-name">Your name</label>
-          <input class="field-input" type="text" id="su-name" placeholder="Full name" autocomplete="name" />
-          <label class="field-label" for="su-email">Email address</label>
-          <input class="field-input" type="email" id="su-email" placeholder="you@organisation.org" autocomplete="email" />
-          <label class="field-label" for="su-password">Password</label>
-          <input class="field-input" type="password" id="su-password" placeholder="At least 8 characters, with a letter and a number" autocomplete="new-password" />
-          <button class="btn-primary auth-submit" type="button" onclick="goStep(2)">Continue</button>
-        </div>
-
-        <div class="step-pane" id="step-2">
           <p class="step-question">How will you use FoodBridge?</p>
           <div class="signup-roles">
             <button class="signup-role" id="role-donor" type="button" onclick="selectRole('donor')">
@@ -635,6 +654,16 @@
               <strong>NGO / Community Org</strong>
               <small>We distribute food to people</small>
             </button>
+            <button class="signup-role" id="role-food_bank" type="button" onclick="selectRole('food_bank')">
+              <span class="signup-role-icon icon-blue"><svg class="ico" aria-hidden="true"><use href="#i-inbox"></use></svg></span>
+              <strong>Food Bank Partner</strong>
+              <small>We receive surplus and offer in-date stock to demand</small>
+            </button>
+            <button class="signup-role" id="role-biogas_operator" type="button" onclick="selectRole('biogas_operator')">
+              <span class="signup-role-icon icon-green"><svg class="ico" aria-hidden="true"><use href="#i-zap"></use></svg></span>
+              <strong>Biogas Recovery Partner</strong>
+              <small>We receive and record eligible recovery routes</small>
+            </button>
             <button class="signup-role" id="role-recipient" type="button" onclick="selectRole('recipient')">
               <span class="signup-role-icon icon-orange"><svg class="ico" aria-hidden="true"><use href="#i-user"></use></svg></span>
               <strong>Individual</strong>
@@ -643,11 +672,25 @@
           </div>
           <p class="role-hint" id="role-hint">Choose the option that fits you best.</p>
           <div class="step-actions">
-            <button class="btn-ghost" type="button" onclick="goStep(1)">Back</button>
-            <button class="btn-primary" type="button" id="role-next-btn" onclick="goStep(3)" disabled>Continue</button>
+            <button class="btn-primary" type="button" id="role-next-btn" onclick="goStep(2)" disabled>Continue</button>
           </div>
         </div>
 
+        <!-- Step 2: Credentials (was step 1) — hidden for recipient (they skip to step 3) -->
+        <div class="step-pane" id="step-2">
+          <label class="field-label" for="su-name">Your name</label>
+          <input class="field-input" type="text" id="su-name" placeholder="Full name" autocomplete="name" />
+          <label class="field-label" for="su-email">Email address</label>
+          <input class="field-input" type="email" id="su-email" placeholder="you@organisation.org" autocomplete="email" />
+          <label class="field-label" for="su-password">Password</label>
+          <input class="field-input" type="password" id="su-password" placeholder="At least 8 characters, with a letter and a number" autocomplete="new-password" />
+          <div class="step-actions">
+            <button class="btn-ghost" type="button" onclick="goStep(1)">Back</button>
+            <button class="btn-primary auth-submit" type="button" onclick="goStep(3)">Continue</button>
+          </div>
+        </div>
+
+        <!-- Step 3: Details -->
         <div class="step-pane" id="step-3">
           <h3 class="step-title" id="step3-title">Your details</h3>
           <p class="step-sub" id="step3-sub">A few details so the network can support you.</p>
@@ -665,13 +708,25 @@
               <option value="other">Other</option>
             </select>
             <label class="field-label" for="d-address">Pickup address</label>
-            <input class="field-input" type="text" id="d-address" placeholder="Street, area, city" />
+            <input class="field-input" type="text" id="d-address" placeholder="Street, area, city" oninput="onAddressInput('donor')" />
+            <div class="map-pin-section" id="map-pin-donor">
+              <button class="map-pin-toggle" type="button" onclick="openSignupMap('donor')">
+                <svg class="ico" aria-hidden="true"><use href="#i-map-pin"></use></svg>
+                Pin your exact location on the map
+              </button>
+              <div class="map-pin-selected" id="map-pin-selected-donor" hidden>
+                <svg class="ico" aria-hidden="true"><use href="#i-map-pin"></use></svg>
+                <span id="map-pin-addr-donor">Location pinned</span>
+                <button class="map-pin-clear" type="button" onclick="clearSignupPin('donor')" aria-label="Remove pin">×</button>
+              </div>
+            </div>
+            <input type="hidden" id="d-lat" /><input type="hidden" id="d-lng" />
             <label class="field-label" for="d-phone">Contact phone</label>
             <input class="field-input" type="tel" id="d-phone" placeholder="+91 98XXX XXXXX" />
             <label class="field-label" for="d-hours">Operating hours</label>
             <input class="field-input" type="text" id="d-hours" placeholder="e.g. Mon–Sun 10:00–23:00" />
-            <label class="field-label" for="d-doc">FSSAI / licence (optional)</label>
-            <input class="file-input" type="file" id="d-doc" accept=".pdf,.jpg,.jpeg,.png" onchange="previewDocName(this, 'd-doc-label')" />
+            <label class="field-label" for="d-doc">FSSAI licence <span class="req">*</span></label>
+            <input class="file-input" type="file" id="d-doc" accept=".pdf,.jpg,.jpeg,.png" required aria-required="true" onchange="previewDocName(this, 'd-doc-label')" />
             <span class="file-name" id="d-doc-label">No file chosen</span>
           </div>
 
@@ -687,7 +742,19 @@
               <option value="other">Other</option>
             </select>
             <label class="field-label" for="n-address">Address</label>
-            <input class="field-input" type="text" id="n-address" placeholder="Street, area, city" />
+            <input class="field-input" type="text" id="n-address" placeholder="Street, area, city" oninput="onAddressInput('ngo')" />
+            <div class="map-pin-section" id="map-pin-ngo">
+              <button class="map-pin-toggle" type="button" onclick="openSignupMap('ngo')">
+                <svg class="ico" aria-hidden="true"><use href="#i-map-pin"></use></svg>
+                Pin your exact location on the map
+              </button>
+              <div class="map-pin-selected" id="map-pin-selected-ngo" hidden>
+                <svg class="ico" aria-hidden="true"><use href="#i-map-pin"></use></svg>
+                <span id="map-pin-addr-ngo">Location pinned</span>
+                <button class="map-pin-clear" type="button" onclick="clearSignupPin('ngo')" aria-label="Remove pin">×</button>
+              </div>
+            </div>
+            <input type="hidden" id="n-lat" /><input type="hidden" id="n-lng" />
             <label class="field-label" for="n-phone">Contact phone</label>
             <input class="field-input" type="tel" id="n-phone" placeholder="+91 98XXX XXXXX" />
             <label class="field-label" for="n-capacity">Meals you can handle per day</label>
@@ -699,17 +766,89 @@
             <span class="file-name" id="n-doc-label">No file chosen</span>
           </div>
 
+          <div id="fields-food_bank" class="role-fields" hidden>
+            <label class="field-label" for="fb-org-name">Food bank name</label>
+            <input class="field-input" type="text" id="fb-org-name" placeholder="e.g. CityCare Community Food Bank" />
+            <label class="field-label" for="fb-address">Address</label>
+            <input class="field-input" type="text" id="fb-address" placeholder="Street, area, city" oninput="onAddressInput('fb')" />
+            <div class="map-pin-section" id="map-pin-fb">
+              <button class="map-pin-toggle" type="button" onclick="openSignupMap('fb')">
+                <svg class="ico" aria-hidden="true"><use href="#i-map-pin"></use></svg>
+                Pin your exact location on the map
+              </button>
+              <div class="map-pin-selected" id="map-pin-selected-fb" hidden>
+                <svg class="ico" aria-hidden="true"><use href="#i-map-pin"></use></svg>
+                <span id="map-pin-addr-fb">Location pinned</span>
+                <button class="map-pin-clear" type="button" onclick="clearSignupPin('fb')" aria-label="Remove pin">×</button>
+              </div>
+            </div>
+            <input type="hidden" id="fb-lat" /><input type="hidden" id="fb-lng" />
+            <label class="field-label" for="fb-phone">Contact phone</label>
+            <input class="field-input" type="tel" id="fb-phone" placeholder="+91 98XXX XXXXX" />
+            <label class="field-label" for="fb-capacity">Storage capacity (kg, approx.)</label>
+            <input class="field-input" type="number" id="fb-capacity" min="0" placeholder="e.g. 2000" />
+            <label class="field-label" for="fb-hours">Operating hours</label>
+            <input class="field-input" type="text" id="fb-hours" placeholder="e.g. Mon–Sat 08:00–20:00" />
+            <label class="field-label" for="fb-doc">Registration certificate (optional)</label>
+            <input class="file-input" type="file" id="fb-doc" accept=".pdf,.jpg,.jpeg,.png" onchange="previewDocName(this, 'fb-doc-label')" />
+            <span class="file-name" id="fb-doc-label">No file chosen</span>
+          </div>
+
+          <div id="fields-biogas_operator" class="role-fields" hidden>
+            <label class="field-label" for="bg-org-name">Facility name</label>
+            <input class="field-input" type="text" id="bg-org-name" placeholder="e.g. Green Energy Biogas Plant" />
+            <label class="field-label" for="bg-address">Facility address</label>
+            <input class="field-input" type="text" id="bg-address" placeholder="Street, area, city" oninput="onAddressInput('bg')" />
+            <div class="map-pin-section" id="map-pin-bg">
+              <button class="map-pin-toggle" type="button" onclick="openSignupMap('bg')">
+                <svg class="ico" aria-hidden="true"><use href="#i-map-pin"></use></svg>
+                Pin your exact location on the map
+              </button>
+              <div class="map-pin-selected" id="map-pin-selected-bg" hidden>
+                <svg class="ico" aria-hidden="true"><use href="#i-map-pin"></use></svg>
+                <span id="map-pin-addr-bg">Location pinned</span>
+                <button class="map-pin-clear" type="button" onclick="clearSignupPin('bg')" aria-label="Remove pin">×</button>
+              </div>
+            </div>
+            <input type="hidden" id="bg-lat" /><input type="hidden" id="bg-lng" />
+            <label class="field-label" for="bg-phone">Contact phone</label>
+            <input class="field-input" type="tel" id="bg-phone" placeholder="+91 98XXX XXXXX" />
+            <label class="field-label" for="bg-capacity">Max daily intake (kg)</label>
+            <input class="field-input" type="number" id="bg-capacity" min="0" placeholder="e.g. 300" />
+            <label class="field-label" for="bg-hours">Operating hours</label>
+            <input class="field-input" type="text" id="bg-hours" placeholder="e.g. Mon–Sat 06:00–20:00" />
+            <label class="field-label" for="bg-waste-types">Accepted waste types</label>
+            <div class="checkbox-group" id="bg-waste-types">
+              <label><input type="checkbox" value="cooked_meals" /> Cooked meals</label>
+              <label><input type="checkbox" value="dairy" /> Dairy</label>
+              <label><input type="checkbox" value="produce" /> Produce</label>
+              <label><input type="checkbox" value="bakery" /> Bakery</label>
+              <label><input type="checkbox" value="packaged" /> Packaged goods</label>
+              <label><input type="checkbox" value="all_food_waste" /> All food waste</label>
+            </div>
+            <p class="field-note">Registering creates a new facility. If your plant already appears on the FoodBridge map you can claim it from your dashboard.</p>
+          </div>
+
           <div id="fields-recipient" class="role-fields" hidden>
+            <label class="field-label" for="r-name">Your name</label>
+            <input class="field-input" type="text" id="r-name" placeholder="Full name" autocomplete="name" />
+            <label class="field-label" for="r-email">Email address</label>
+            <input class="field-input" type="email" id="r-email" placeholder="you@example.com" autocomplete="email" />
+            <label class="field-label" for="r-password">Password</label>
+            <input class="field-input" type="password" id="r-password" placeholder="At least 8 characters, with a letter and a number" autocomplete="new-password" />
             <label class="field-label" for="r-city">Your city or area</label>
             <input class="field-input" type="text" id="r-city" placeholder="e.g. Indiranagar, Bengaluru" />
             <p class="field-note"><svg class="ico" aria-hidden="true"><use href="#i-shield"></use></svg>Your details stay private. Food points are shown without revealing who you are.</p>
           </div>
 
           <div class="step-actions">
-            <button class="btn-ghost" type="button" onclick="goStep(2)">Back</button>
+            <button class="btn-ghost" type="button" id="back-to-step2-btn" onclick="goStep(2)">Back</button>
             <button class="btn-primary" type="button" id="register-btn" onclick="handleRegister()">Create Account</button>
           </div>
           <div class="pending-notice" id="pending-notice" hidden></div>
+          <div class="pending-notice" id="pending-notice-signin" hidden style="margin-top:8px">
+            <button class="btn-primary" type="button" style="width:100%;margin-top:6px" onclick="switchTab('signin')">Sign In to Your Dashboard</button>
+          </div>
         </div>
 
         <p class="auth-foot">Already have an account? <button class="link-btn" type="button" onclick="switchTab('signin')">Sign in</button></p>
@@ -732,6 +871,30 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Signup map picker modal -->
+  <div class="signup-map-modal" id="signup-map-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Pick your location on the map">
+    <div class="signup-map-backdrop" onclick="closeSignupMap()"></div>
+    <div class="signup-map-dialog">
+      <div class="signup-map-head">
+        <div>
+          <strong>Pin your location</strong>
+          <span>Click or drag the marker to set your exact address on the map.</span>
+        </div>
+        <button class="modal-close" type="button" aria-label="Close map" onclick="closeSignupMap()">
+          <svg class="ico" aria-hidden="true"><use href="#i-x"></use></svg>
+        </button>
+      </div>
+      <div id="signup-map-leaflet" style="width:100%;height:340px"></div>
+      <div class="signup-map-addr" id="signup-map-addr">
+        <svg class="ico" aria-hidden="true"><use href="#i-map-pin"></use></svg>
+        <span id="signup-map-addr-text">Click the map to place a pin</span>
+      </div>
+      <div class="signup-map-foot">
+        <button class="btn-ghost" type="button" onclick="closeSignupMap()">Cancel</button>
+        <button class="btn-primary" type="button" id="signup-map-confirm" onclick="confirmSignupPin()" disabled>Use this location</button>
+      </div>
+    </div>
+  </div>
   <script src="assets/js/landing.js"></script>
   <script src="assets/js/landing-data.js"></script>
 </body>

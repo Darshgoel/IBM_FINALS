@@ -96,8 +96,8 @@ button { cursor: pointer; }
   padding: 58px 0 46px;
   text-align: center;
   background:
-    radial-gradient(900px 380px at 85% -10%, rgba(19, 131, 59, .10), transparent 68%),
-    radial-gradient(620px 320px at 5% 100%, rgba(255, 120, 31, .09), transparent 70%),
+    linear-gradient(180deg, rgba(247, 249, 247, .68), rgba(247, 249, 247, .76)),
+    url("https://www.kccf.org.uk/app/uploads/2024/11/local-welcome-photo.jpeg") center 43% / cover no-repeat,
     var(--soft);
   border-bottom: 1px solid var(--border);
 }

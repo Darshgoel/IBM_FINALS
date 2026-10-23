@@ -320,7 +320,10 @@ function formatDuration(milliseconds) {
 const STATUS_LABELS = {
   available: 'Available',
   matched: 'Matched',
-  in_transit: 'In transit',
+  partially_matched: 'Partially matched',
+  biogas_pending: 'Awaiting biogas acceptance',
+  biogas_routed: 'Accepted by biogas centre',
+  review_required: 'Needs coordinator review',
   completed: 'Completed',
   expired: 'Expired',
   cancelled: 'Cancelled',
@@ -348,7 +351,7 @@ function statusBadgeClass(status) {
   if (['pending', 'partially_fulfilled', 'matched', 'near capacity', 'at-risk', 'pending_buffer'].includes(value)) {
     return 'badge-warning';
   }
-  if (['in_transit', 'open', 'reserve'].includes(value)) {
+  if (['open', 'reserve'].includes(value)) {
     return 'badge-info';
   }
   if (['expired', 'cancelled', 'canceled', 'declined', 'rejected', 'failed'].includes(value)) {
@@ -707,10 +710,16 @@ function renderSdList(items) {
           </div>
           <div class="net-item-meta">${meta}</div>
           <div class="redist-badges">${statusBadge(item.status)}${item.urgency && !surplus ? urgencyBadge(item.urgency) : ''}</div>
+          ${surplus && item.status === 'review_required' && item.reviewReason
+            ? `<div class="net-item-meta"><span class="meta-strong">Review reason:</span> ${escapeHtml(cleanText(item.reviewReason))}</div>`
+            : ''}
         </div>
         <div class="net-item-right">
           <div class="net-qty ${surplus ? 'green' : 'indigo'}">${formatNumber(item.quantity)}</div>
           <div>${escapeHtml(cleanText(item.unit) || 'units')}</div>
+          ${surplus && Number(item.originalQuantity) > Number(item.quantity)
+            ? `<div class="net-item-meta">of ${formatNumber(item.originalQuantity)} posted</div>`
+            : ''}
         </div>
       </div>
     `;
@@ -758,7 +767,7 @@ async function loadRedistributions() {
 function updateRdCounts() {
   const items = state.redistributions.items;
   setText('rd-count-all', items.length);
-  ['pending', 'confirmed', 'in_transit', 'completed', 'declined', 'cancelled'].forEach(status => {
+  ['pending', 'confirmed', 'completed', 'declined', 'cancelled'].forEach(status => {
     setText(`rd-count-${status}`, items.filter(item => item.status === status).length);
   });
 }
@@ -970,7 +979,7 @@ async function loadReserve() {
     const available = points.reduce((total, point) => {
       const capacity = Number(point.capacity) || 0;
       const load = Number(point.currentLoad) || 0;
-      return total + Math.max(0, capacity - load);
+      return total + (capacity > 0 ? Math.max(0, capacity - load) : 0);
     }, 0);
 
     setText('rs-points', formatNumber(points.length));
@@ -996,7 +1005,8 @@ function renderReservePoints(points) {
   host.innerHTML = points.map(point => {
     const capacity = Number(point.capacity) || 0;
     const load = Number(point.currentLoad) || 0;
-    const available = Math.max(0, capacity - load);
+    const hasCapacity = capacity > 0;
+    const available = hasCapacity ? Math.max(0, capacity - load) : null;
     const percent = capacity > 0 ? Math.min(100, Math.round((load / capacity) * 100)) : 0;
     const tone = percent >= 90 ? 'danger' : percent >= 75 ? 'warn' : '';
     return `
@@ -1013,13 +1023,13 @@ function renderReservePoints(points) {
           <span>${escapeHtml(cleanText(point.storageInfo) || 'Storage capacity not declared')}</span>
         </div>
         <div class="reserve-capacity-head">
-          <span>Committed load</span>
-          <strong>${formatNumber(load)} / ${formatNumber(capacity)} servings</strong>
+          <span>Stored + incoming</span>
+          <strong>${formatNumber(load)}${hasCapacity ? ` / ${formatNumber(capacity)} servings` : ' servings · capacity not declared'}</strong>
         </div>
-        <div class="reserve-capacity-track"><i class="${tone}" style="width:${percent}%"></i></div>
+        ${hasCapacity ? `<div class="reserve-capacity-track"><i class="${tone}" style="width:${percent}%"></i></div>` : ''}
         <div class="reserve-foot">
-          <span>${percent}% used</span>
-          <strong>${formatNumber(available)} available</strong>
+          <span>${hasCapacity ? `${percent}% used · ${formatNumber(point.inventoryLoad || 0)} stored + ${formatNumber(point.incomingLoad || 0)} incoming` : `${formatNumber(point.inventoryLoad || 0)} stored + ${formatNumber(point.incomingLoad || 0)} incoming`}</span>
+          <strong>${hasCapacity ? `${formatNumber(available)} servings available` : 'Capacity unavailable'}</strong>
         </div>
       </article>
     `;

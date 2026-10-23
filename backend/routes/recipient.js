@@ -48,7 +48,7 @@ router.get(['/search', '/nearby'], (req, res) => {
     const enriched = accessPoints.map(ap => {
       const activeMatches = db.prepare(`
         SELECT COUNT(*) as count FROM matches m
-        WHERE m.demand_org_id = ? AND m.status IN ('pending','confirmed','in_transit','completed')
+        WHERE m.demand_org_id = ? AND m.status IN ('pending','confirmed','completed')
       `).get(ap.id);
 
       // Check current surplus or recent food allocations
@@ -56,7 +56,7 @@ router.get(['/search', '/nearby'], (req, res) => {
         SELECT s.food_name, s.food_type, s.quantity, s.quantity_unit, s.dietary_tags
         FROM matches m
         JOIN surplus_posts s ON m.surplus_id = s.id
-        WHERE m.demand_org_id = ? AND m.status IN ('confirmed', 'in_transit', 'completed')
+        WHERE m.demand_org_id = ? AND m.status IN ('confirmed', 'completed')
         ORDER BY m.matched_at DESC LIMIT 3
       `).all(ap.id);
 
@@ -127,7 +127,7 @@ router.get('/access-point/:id', (req, res) => {
       SELECT s.food_name, s.food_type, s.quantity, s.quantity_unit, s.dietary_tags, m.status, m.matched_at
       FROM matches m
       JOIN surplus_posts s ON m.surplus_id = s.id
-      WHERE m.demand_org_id = ? AND m.status IN ('pending', 'confirmed', 'in_transit', 'completed')
+      WHERE m.demand_org_id = ? AND m.status IN ('pending', 'confirmed', 'completed')
       ORDER BY m.matched_at DESC LIMIT 5
     `).all(org.id);
 

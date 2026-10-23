@@ -22,6 +22,11 @@
   align-items: start;
 }
 
+/* Keep native date-time controls wide enough to show both date and time. */
+.portal-donor #section-post .grid-aside-main {
+  grid-template-columns: minmax(0, 1.55fr) minmax(280px, .72fr);
+}
+
 .portal-donor #section-post .card.form-card,
 .portal-donor #section-profile .card.form-card {
   min-width: 0;

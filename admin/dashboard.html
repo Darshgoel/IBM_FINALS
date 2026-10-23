@@ -66,7 +66,7 @@
 
     <span class="nav-section-label">Verification</span>
     <button class="nav-item" id="nav-verification" onclick="showPage('verification')">
-      <svg class="nav-icon" aria-hidden="true"><use href="#i-building"></use></svg><span>Org Verification</span>
+      <svg class="nav-icon" aria-hidden="true"><use href="#i-building"></use></svg><span>Partner Verification</span>
       <span class="nav-badge" id="badge-pending" hidden>0</span>
     </button>
     <button class="nav-item" id="nav-participants" onclick="showPage('participants')">
@@ -88,17 +88,6 @@
       <svg class="nav-icon" aria-hidden="true"><use href="#i-file"></use></svg><span>Compliance Records</span>
     </button>
 
-    <span class="nav-section-label">Operations</span>
-    <a class="nav-item" href="./facilities.html">
-      <svg class="nav-icon" aria-hidden="true"><use href="#i-grid-view"></use></svg><span>Facility Verification</span>
-      <svg class="nav-icon nav-external" aria-hidden="true" style="margin-left:auto;opacity:.6"><use href="#i-external"></use></svg>
-    </a>
-    <a class="nav-item" href="./map.html">
-      <svg class="nav-icon" aria-hidden="true"><use href="#i-map"></use></svg><span>Admin Map</span>
-    </a>
-    <a class="nav-item" href="../ops/index.html">
-      <svg class="nav-icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg><span>Operations Portal</span>
-    </a>
   </nav>
 
   <div class="sidebar-footer">
@@ -155,7 +144,7 @@
       <div class="page-header-copy">
         <nav class="breadcrumb" aria-label="Breadcrumb"><span>Admin</span><svg class="icon" aria-hidden="true"><use href="#i-chevron-right"></use></svg><span aria-current="page">Overview</span></nav>
         <h2>Admin Overview</h2>
-        <p>Platform health, pending actions, and recent verification activity.</p>
+        <p>Partner registrations, pending decisions, and recent verification activity.</p>
       </div>
       <div class="page-header-actions">
         <span class="updated-pill"><span class="live-dot" aria-hidden="true"></span><span id="overview-updated">Waiting for data…</span></span>
@@ -170,13 +159,13 @@
         <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-clock"></use></svg></div>
         <div class="stat-label">Pending Verification</div>
         <div class="stat-value" id="ov-pending">—</div>
-        <div class="stat-sub">organizations awaiting review</div>
+        <div class="stat-sub">partner applications awaiting review</div>
       </div>
       <div class="stat-card green clickable" role="link" tabindex="0" data-page="participants" data-filter="verified" title="View verified organizations">
         <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-shield"></use></svg></div>
-        <div class="stat-label">Verified Organizations</div>
+        <div class="stat-label">Verified Partners</div>
         <div class="stat-value" id="ov-verified">—</div>
-        <div class="stat-sub">active and approved</div>
+        <div class="stat-sub">active and approved across the network</div>
       </div>
       <div class="stat-card red clickable" role="link" tabindex="0" data-page="safety" title="Review open safety flags">
         <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-alert"></use></svg></div>
@@ -194,7 +183,7 @@
         <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg></div>
         <div class="stat-label">Suspended</div>
         <div class="stat-value" id="ov-suspended">—</div>
-        <div class="stat-sub">organizations restricted</div>
+        <div class="stat-sub">partners currently suspended</div>
       </div>
       <div class="stat-card green" title="Administrative actions recorded today">
         <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-activity"></use></svg></div>
@@ -209,7 +198,7 @@
         <div class="card-head">
           <div>
             <h3 class="card-title">Pending verification</h3>
-            <p class="card-sub">Organizations waiting for approval.</p>
+            <p class="card-sub">Partner applications waiting for approval.</p>
           </div>
           <button class="link-btn" onclick="showPage('verification')">Review all <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg></button>
         </div>
@@ -228,53 +217,26 @@
       </article>
     </div>
 
-    <div class="two-col overview-panels">
-      <article class="card">
-        <div class="card-head">
-          <div>
-            <h3 class="card-title">Recent administrative activity</h3>
-            <p class="card-sub">Latest decisions recorded in the compliance log.</p>
-          </div>
-          <button class="link-btn" onclick="showPage('records')">Open records <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg></button>
+    <article class="card overview-activity-card">
+      <div class="card-head">
+        <div>
+          <h3 class="card-title">Recent administrative activity</h3>
+          <p class="card-sub">Latest partner decisions recorded in the compliance log.</p>
         </div>
-        <div class="compact-list" id="ov-records"></div>
-      </article>
+        <button class="link-btn" onclick="showPage('records')">Open records <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg></button>
+      </div>
+      <div class="compact-list" id="ov-records"></div>
+    </article>
 
-      <article class="card">
-        <div class="card-head">
-          <div>
-            <h3 class="card-title">Operational workspaces</h3>
-            <p class="card-sub">Directory and map tools that support verification.</p>
-          </div>
-        </div>
-        <div class="quick-actions">
-          <a class="quick-action" href="./facilities.html">
-            <span class="qa-icon"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg></span>
-            <span><strong>Facility verification</strong><small>Access points, coordinates, and verification status</small></span>
-            <svg class="icon qa-arrow" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
-          </a>
-          <a class="quick-action" href="./map.html">
-            <span class="qa-icon amber"><svg class="icon" aria-hidden="true"><use href="#i-map"></use></svg></span>
-            <span><strong>Admin map</strong><small>Verified network participants — admin-managed</small></span>
-            <svg class="icon qa-arrow" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
-          </a>
-          <a class="quick-action" href="../ops/index.html">
-            <span class="qa-icon purple"><svg class="icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg></span>
-            <span><strong>Operations portal</strong><small>Role entry point and workspace directory</small></span>
-            <svg class="icon qa-arrow" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
-          </a>
-        </div>
-      </article>
-    </div>
   </section>
 
   <!-- ─── VERIFICATION QUEUE ─── -->
   <section class="page-content" id="page-verification">
     <header class="page-header">
       <div class="page-header-copy">
-        <nav class="breadcrumb" aria-label="Breadcrumb"><span>Admin</span><svg class="icon" aria-hidden="true"><use href="#i-chevron-right"></use></svg><span aria-current="page">Org Verification</span></nav>
-        <h2>Organization Verification</h2>
-        <p>Review submitted organizations and manage verification decisions.</p>
+        <nav class="breadcrumb" aria-label="Breadcrumb"><span>Admin</span><svg class="icon" aria-hidden="true"><use href="#i-chevron-right"></use></svg><span aria-current="page">Partner Verification</span></nav>
+        <h2>Partner Verification</h2>
+        <p>Review donors, NGOs, food banks, and biogas centres through one partner-verification workflow. Review submitted details and documents before deciding.</p>
       </div>
       <div class="page-header-actions">
         <span class="count-pill" id="verification-count">0</span>
@@ -289,7 +251,7 @@
     <div class="table-toolbar">
       <div class="search-bar">
         <svg class="icon search-icon" aria-hidden="true"><use href="#i-search"></use></svg>
-        <label class="sr-only" for="verification-search">Search pending organizations</label>
+        <label class="sr-only" for="verification-search">Search pending registrations</label>
         <input class="search-input" id="verification-search" type="search"
                placeholder="Search by name, email, or location…" oninput="searchVerification()" />
       </div>
@@ -298,10 +260,12 @@
       </div>
     </div>
 
-    <div class="filter-bar" role="group" aria-label="Filter pending organizations">
+    <div class="filter-bar" role="group" aria-label="Filter pending registrations">
       <button class="filter-chip active" id="vf-all" aria-pressed="true" onclick="vFilter('all')">All</button>
       <button class="filter-chip" id="vf-donor" aria-pressed="false" onclick="vFilter('donor')">Donors</button>
       <button class="filter-chip" id="vf-demand_org" aria-pressed="false" onclick="vFilter('demand_org')">Demand Orgs</button>
+      <button class="filter-chip" id="vf-food_bank" aria-pressed="false" onclick="vFilter('food_bank')">Food Banks</button>
+      <button class="filter-chip" id="vf-biogas_operator" aria-pressed="false" onclick="vFilter('biogas_operator')">Biogas Operators</button>
       <button class="filter-chip" id="vf-nodoc" aria-pressed="false" onclick="vFilter('nodoc')">Missing document</button>
     </div>
 

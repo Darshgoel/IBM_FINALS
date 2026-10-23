@@ -238,7 +238,7 @@
       try {
         const topicLabels = {
           general: 'General enquiry', donation: 'Surplus food donation',
-          ngo_partnership: 'NGO or community partnership', volunteer: 'Volunteering',
+          ngo_partnership: 'NGO or community partnership',
           access: 'Food access', media: 'Media', safety: 'Food safety concern'
         };
         const subject = `[FoodBridge] ${topicLabels[topic] || 'Website enquiry'}`;

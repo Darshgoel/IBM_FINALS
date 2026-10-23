@@ -589,13 +589,13 @@ document.getElementById('d-recurring').addEventListener('change', event => {
 // ── Matches ──────────────────────────────────────────────────
 function matchGroup(status) {
   if (status === 'pending') return 'action';
-  if (status === 'in_transit' || status === 'accepted') return 'active';
+  if (status === 'confirmed' || status === 'accepted') return 'active';
   if (status === 'completed') return 'completed';
   return 'other';
 }
 
 function matchPriority(a, b) {
-  const rank = { pending: 0, in_transit: 1, completed: 2, declined: 3, cancelled: 4 };
+  const rank = { pending: 0, confirmed: 1, completed: 2, declined: 3, cancelled: 4 };
   return (rank[a.status] ?? 9) - (rank[b.status] ?? 9);
 }
 
@@ -645,9 +645,9 @@ function renderMatchList(containerId, matches, options = {}) {
 
   if (isMain) {
     const pending = matches.filter(match => match.status === 'pending').length;
-    const active = matches.filter(match => match.status === 'in_transit').length;
+    const active = matches.filter(match => match.status === 'confirmed').length;
     const completed = matches.filter(match => match.status === 'completed').length;
-    setText('match-summary', `${pending} awaiting decision · ${active} in transit · ${completed} completed`);
+    setText('match-summary', `${pending} awaiting decision · ${active} accepted, awaiting receipt · ${completed} completed`);
   }
 
   if (!list || list.length === 0) {
@@ -726,7 +726,8 @@ function renderMatchList(containerId, matches, options = {}) {
             ? `<button class="match-btn decline" type="button" onclick="declineMatch('${escapeAttr(match.id)}')">${fbIcon('x')} Decline</button>`
             : ''}
         </div>
-        ${match.status === 'in_transit' ? '<div class="form-help" style="margin-top:8px">You have accepted this offer and confirmed the transfer. The donor records the completed handover.</div>' : ''}
+        ${match.status === 'confirmed' ? '<div class="form-help" style="margin-top:8px">Accepted. Confirm receipt after the food arrives and has been checked.</div>' : ''}
+        ${match.status === 'confirmed' ? `<button class="btn btn-primary btn-sm" type="button" onclick="confirmMatchReceipt('${escapeAttr(match.id)}')">Confirm receipt</button>` : ''}
         ${match.status === 'completed' ? '<div class="form-help" style="margin-top:8px">This handover is complete and is included in your impact history.</div>' : ''}
       </article>`;
   }).join('');
@@ -746,7 +747,7 @@ window.resetMatchFilters = () => {
 function matchStatusMeta(status) {
   const map = {
     pending: { label: 'Awaiting decision', tone: 'warning' },
-    in_transit: { label: 'Accepted · in transit', tone: 'info' },
+    confirmed: { label: 'Accepted · awaiting receipt', tone: 'info' },
     completed: { label: 'Completed', tone: 'success' },
     declined: { label: 'Declined', tone: 'danger' },
     cancelled: { label: 'Cancelled', tone: 'danger' }
@@ -785,7 +786,7 @@ window.openMatchDetail = function (id) {
     </div>
     ${match.explanation ? `<div class="fb-detail-note"><strong>Why this matched:</strong> ${escapeHtml(match.explanation)}</div>` : ''}
     ${match.status === 'pending' ? '<div class="fb-dialog-details">Accepting confirms that your team can collect and safely handle this food within its usable window. Pending offers are held for your decision.</div>' : ''}
-    ${match.status === 'in_transit' ? '<div class="fb-detail-note">You have accepted this offer. The donor completes the handover record.</div>' : ''}
+    ${match.status === 'confirmed' ? '<div class="fb-detail-note">You accepted this offer. Confirm receipt when the food arrives.</div>' : ''}
   `;
 
   footer.innerHTML = `
@@ -794,6 +795,9 @@ window.openMatchDetail = function (id) {
       : ''}
     ${match.status === 'pending'
       ? `<button class="btn btn-danger" type="button" onclick="declineMatch('${escapeAttr(match.id)}')">${fbIcon('x')} Decline</button>`
+      : ''}
+    ${match.status === 'confirmed'
+      ? `<button class="btn btn-primary" type="button" onclick="confirmMatchReceipt('${escapeAttr(match.id)}')">${fbIcon('check')} Confirm receipt</button>`
       : ''}
     <button class="btn" type="button" onclick="closeMatchDetail()">Close</button>
   `;
@@ -867,6 +871,31 @@ window.declineMatch = async function (id) {
     await Promise.all([loadMatches(), loadOverview(), checkUnreadBadges()]);
   } catch (err) {
     showToast(err.message || 'The offer could not be declined.', 'error');
+  }
+};
+
+window.confirmMatchReceipt = async function (id) {
+  const match = allMatches.find(item => item.id === id);
+  if (!match || match.status !== 'confirmed') return;
+  const confirmed = await window.fbConfirm({
+    title: 'Confirm food receipt?',
+    message: 'Only confirm after the food has arrived and your team has checked that it is safe to receive.',
+    confirmLabel: 'Confirm receipt',
+    cancelLabel: 'Not yet',
+    details: `<strong>${escapeHtml(match.foodType || 'Matched food')}</strong><br>${escapeHtml(match.quantity)} ${escapeHtml(match.unit || 'servings')} from ${escapeHtml(match.donorName || 'donor')}`
+  });
+  if (!confirmed) return;
+  try {
+    await api.demandOrg.confirmReceipt(token, id, {
+      quantityConfirmed: Number(match.quantity),
+      quantityUnit: match.unit || 'servings',
+      conditionOk: true
+    });
+    showToast('Receipt confirmed. The handover is complete.', 'success');
+    closeMatchDetail();
+    await Promise.all([loadMatches(), loadOverview(), checkUnreadBadges()]);
+  } catch (err) {
+    showToast(err.message || 'Receipt could not be confirmed.', 'error');
   }
 };
 
@@ -1210,6 +1239,33 @@ window.markAllAlertsRead = async function () {
 };
 
 // ── Profile ──────────────────────────────────────────────────
+let _demandMap = null;
+let _demandMarker = null;
+
+function _initDemandMap(lat, lng) {
+  if (typeof L === 'undefined') return;
+  const el = document.getElementById('demand-location-map');
+  if (!el) return;
+  const startLat = lat || 12.9716;
+  const startLng = lng || 77.5946;
+  if (_demandMap) {
+    _demandMap.setView([startLat, startLng], 14);
+    if (_demandMarker) _demandMarker.setLatLng([startLat, startLng]);
+    return;
+  }
+  _demandMap = L.map('demand-location-map').setView([startLat, startLng], 14);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+  }).addTo(_demandMap);
+  _demandMarker = L.marker([startLat, startLng], { draggable: true }).addTo(_demandMap);
+  function _sync(latlng) {
+    setValue('p-lat', latlng.lat.toFixed(6));
+    setValue('p-lng', latlng.lng.toFixed(6));
+  }
+  _demandMarker.on('dragend', e => _sync(e.target.getLatLng()));
+  _demandMap.on('click', e => { _demandMarker.setLatLng(e.latlng); _sync(e.latlng); });
+}
+
 async function loadProfile() {
   try {
     const data = await api.demandOrg.getProfile(token);
@@ -1226,6 +1282,13 @@ async function loadProfile() {
     setValue('p-food-req', parseJsonList(orgProfile.food_requirements).join(', '));
     setText('profile-account-email', user.email || '—');
     setText('profile-org-type', formatOrgType(org.type));
+
+    const lat = parseFloat(org.location_lat) || 0;
+    const lng = parseFloat(org.location_lng) || 0;
+    setValue('p-lat', lat || '');
+    setValue('p-lng', lng || '');
+    // Defer map init until Leaflet has loaded
+    setTimeout(() => _initDemandMap(lat || 12.9716, lng || 77.5946), 50);
   } catch (err) {
     showToast(err.message || 'Profile could not be loaded.', 'error');
   }
@@ -1248,9 +1311,14 @@ window.saveProfile = async function () {
     button.innerHTML = '<span class="spinner" style="border-color:rgba(255,255,255,.35);border-top-color:#fff"></span> Saving…';
   }
 
+  const lat = parseFloat(getValue('p-lat'));
+  const lng = parseFloat(getValue('p-lng'));
+
   const body = {
     name,
     locationAddress: getValue('p-address').trim(),
+    locationLat: isNaN(lat) ? undefined : lat,
+    locationLng: isNaN(lng) ? undefined : lng,
     contactPhone: getValue('p-phone').trim(),
     operatingHours: getValue('p-hours').trim(),
     servingCapacity: parseInt(getValue('p-serve-cap'), 10) || 0,
@@ -1262,6 +1330,10 @@ window.saveProfile = async function () {
 
   try {
     await api.demandOrg.updateProfile(token, body);
+    if (!isNaN(lat) && _demandMarker) {
+      _demandMarker.setLatLng([lat, lng]);
+      _demandMap?.setView([lat, lng]);
+    }
     showMsg('profile-success', 'Profile updated. The next matching run will use the saved details.');
     setText('sidebar-org-name', name);
     setText('welcome-name', name);

@@ -368,8 +368,6 @@ function computeRecommendation() {
     // 5. Urgency weighting
     if (state.urgency === 'now') {
       if (ap.type === 'ngo' || ap.type === 'shelter') score += 15;
-    } else if (state.urgency === 'tomorrow') {
-      if (ap.type === 'food_bank') score += 15;
     }
 
     if (score > bestScore) {

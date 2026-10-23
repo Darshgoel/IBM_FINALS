@@ -268,14 +268,15 @@ async function loadOverview() {
           </div>`;
       } else {
         list.innerHTML = recent.map(post => {
-          const status = statusMeta(post.status);
+          const status = postStatusMeta(post);
+          const quantitySummary = surplusQuantitySummary(post);
           return `
             <button class="item-row interactive" type="button" onclick="openSurplusDetail('${escapeAttr(post.id)}')">
               <span class="item-row-left">
                 ${foodIcon(post.food_type)}
                 <span>
                   <span class="item-food">${escapeHtml(post.food_name || 'Surplus food')}</span>
-                  <span class="item-qty">${escapeHtml(post.quantity)} ${escapeHtml(post.quantity_unit)} · ${timeAgo(post.created_at)}</span>
+                  <span class="item-qty">${quantitySummary} · ${timeAgo(post.created_at)}</span>
                 </span>
               </span>
               <span class="item-row-right">
@@ -572,14 +573,15 @@ function renderSurplus(filter) {
   }
 
   el.innerHTML = list.map(post => {
-    const status = statusMeta(post.status);
+    const status = postStatusMeta(post);
+    const quantitySummary = surplusQuantitySummary(post);
     return `
       <article class="surplus-card">
         <div class="surplus-card-header">
           <div class="surplus-card-title-wrap">
             <div class="surplus-food-name">${foodIcon(post.food_type)} ${escapeHtml(post.food_name || 'Surplus food')}</div>
             <div class="surplus-meta">
-              <span>${fbIcon('scale', 'icon icon-sm')} ${escapeHtml(post.quantity)} ${escapeHtml(post.quantity_unit)}</span>
+              <span>${fbIcon('scale', 'icon icon-sm')} ${quantitySummary}</span>
               <span>${fbIcon('calendar', 'icon icon-sm')} ${fmtDt(post.availability_time)}</span>
             </div>
           </div>
@@ -598,7 +600,7 @@ function renderSurplus(filter) {
           ${post.status === 'available'
             ? `<button class="btn btn-sm btn-danger" type="button" onclick="cancelSurplus('${escapeAttr(post.id)}', this)">${fbIcon('trash')} Cancel post</button>`
             : ''}
-          ${post.status === 'matched' || post.status === 'in_transit'
+          ${post.status === 'matched'
             ? `<span class="form-help" style="margin:0 0 0 auto">A recipient has this offer. Changes are handled through the collection workflow.</span>`
             : ''}
         </div>
@@ -625,11 +627,12 @@ window.openSurplusDetail = async id => {
   try {
     const { post } = await api.donor.getSurplusDetail(token, id);
     if (title) title.textContent = post.food_name || 'Surplus post';
-    const status = statusMeta(post.status);
+    const status = postStatusMeta(post);
+    const quantitySummary = surplusQuantitySummary(post);
     body.innerHTML = `
       <div class="fb-detail-grid">
         <div class="fb-detail-item"><small>Status</small><strong><span class="badge badge-${status.tone}">${status.label}</span></strong></div>
-        <div class="fb-detail-item"><small>Quantity</small><strong>${escapeHtml(post.quantity)} ${escapeHtml(post.quantity_unit)}</strong></div>
+        <div class="fb-detail-item"><small>Posted / allocated / remaining</small><strong>${quantitySummary}</strong></div>
         <div class="fb-detail-item"><small>Food category</small><span>${escapeHtml(String(post.food_type || 'Not specified').replace(/_/g, ' '))}</span></div>
         <div class="fb-detail-item"><small>Preparation</small><span>${escapeHtml(String(post.preparation_state || 'Not specified').replace(/_/g, ' '))}</span></div>
         <div class="fb-detail-item"><small>Available from</small><span>${fmtDt(post.availability_time)}</span></div>
@@ -641,7 +644,7 @@ window.openSurplusDetail = async id => {
         <div class="fb-detail-item"><small>Created</small><span>${fmtDt(post.created_at)}</span></div>
       </div>
       ${post.status === 'completed' ? '<div class="fb-detail-note">This handover is complete and is included in your impact totals.</div>' : ''}
-      ${post.status === 'matched' || post.status === 'in_transit' ? '<div class="fb-detail-note">This listing is matched but not yet complete. It is not counted as rescued food until the recipient confirms the handover.</div>' : ''}
+      ${post.status === 'matched' ? '<div class="fb-detail-note">This listing has allocated food. Allocations count as rescued only after receipt is confirmed.</div>' : ''}
       ${post.status === 'expired' ? '<div class="fb-detail-note" style="border-color:#F3C8C4;background:var(--fb-error-soft);color:#B42D24">This offer expired before a completed handover. It does not count as recovered food.</div>' : ''}
     `;
   } catch (err) {
@@ -894,6 +897,35 @@ async function loadPredictions() {
 }
 
 // ── Profile ───────────────────────────────────────────────────────────────────
+let _donorMap = null;
+let _donorMarker = null;
+
+function _initDonorMap(lat, lng) {
+  if (typeof L === 'undefined') return;
+  const el = document.getElementById('donor-location-map');
+  if (!el) return;
+  const startLat = lat || 12.9716;
+  const startLng = lng || 77.5946;
+  if (_donorMap) {
+    _donorMap.setView([startLat, startLng], 14);
+    if (_donorMarker) _donorMarker.setLatLng([startLat, startLng]);
+    return;
+  }
+  _donorMap = L.map('donor-location-map').setView([startLat, startLng], 14);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+  }).addTo(_donorMap);
+  _donorMarker = L.marker([startLat, startLng], { draggable: true }).addTo(_donorMap);
+  function _sync(latlng) {
+    const latEl = document.getElementById('pr-lat');
+    const lngEl = document.getElementById('pr-lng');
+    if (latEl) latEl.value = latlng.lat.toFixed(6);
+    if (lngEl) lngEl.value = latlng.lng.toFixed(6);
+  }
+  _donorMarker.on('dragend', e => _sync(e.target.getLatLng()));
+  _donorMap.on('click', e => { _donorMarker.setLatLng(e.latlng); _sync(e.latlng); });
+}
+
 async function loadProfile() {
   try {
     const { org, profile } = await api.donor.getProfile(token);
@@ -903,6 +935,15 @@ async function loadProfile() {
     document.getElementById('pr-phone').value = org?.contact_phone || '';
     document.getElementById('pr-hours').value = org?.operating_hours || '';
     document.getElementById('pr-desc').value = org?.description || '';
+
+    const lat = parseFloat(org?.location_lat) || 0;
+    const lng = parseFloat(org?.location_lng) || 0;
+    const latEl = document.getElementById('pr-lat');
+    const lngEl = document.getElementById('pr-lng');
+    if (latEl) latEl.value = lat || '';
+    if (lngEl) lngEl.value = lng || '';
+    // Defer map init until Leaflet is loaded
+    setTimeout(() => _initDonorMap(lat || 12.9716, lng || 77.5946), 50);
 
     let cats = [];
     try {
@@ -955,6 +996,9 @@ window.saveProfile = async () => {
 
   const foodCategories = [...document.querySelectorAll('#profile-food-cats .tag-btn.selected')].map(tag => tag.dataset.val);
 
+  const lat = parseFloat(document.getElementById('pr-lat')?.value);
+  const lng = parseFloat(document.getElementById('pr-lng')?.value);
+
   try {
     await api.donor.updateProfile(token, {
       name,
@@ -962,8 +1006,14 @@ window.saveProfile = async () => {
       contactPhone: document.getElementById('pr-phone').value.trim(),
       operatingHours: document.getElementById('pr-hours').value.trim(),
       description: document.getElementById('pr-desc').value.trim(),
-      foodCategories
+      foodCategories,
+      locationLat: isNaN(lat) ? undefined : lat,
+      locationLng: isNaN(lng) ? undefined : lng
     });
+    if (!isNaN(lat) && _donorMarker) {
+      _donorMarker.setLatLng([lat, lng]);
+      _donorMap?.setView([lat, lng]);
+    }
     successEl.textContent = 'Profile updated. Matching and pickup details now use the saved information.';
     successEl.style.display = 'block';
     setText('sidebar-org-name', name);
@@ -1022,13 +1072,33 @@ function statusMeta(status) {
   const map = {
     available: { label: 'Available', tone: 'available' },
     matched: { label: 'Matched', tone: 'info' },
-    in_transit: { label: 'In transit', tone: 'info' },
+    partially_matched: { label: 'Partially matched', tone: 'info' },
+    biogas_pending: { label: 'Awaiting biogas acceptance', tone: 'info' },
+    biogas_routed: { label: 'Accepted by biogas centre', tone: 'success' },
+    review_required: { label: 'Needs coordinator review', tone: 'danger' },
     completed: { label: 'Completed', tone: 'success' },
     expired: { label: 'Expired', tone: 'danger' },
     cancelled: { label: 'Cancelled', tone: 'danger' },
     canceled: { label: 'Cancelled', tone: 'danger' }
   };
   return map[status] || { label: String(status || 'Unknown').replace(/_/g, ' '), tone: 'neutral' };
+}
+
+function surplusQuantitySummary(post) {
+  const total = Number(post.quantity);
+  const remaining = Number(post.remaining_quantity);
+  const unit = String(post.quantity_unit || 'kg');
+  if (!Number.isFinite(total)) return `${escapeHtml(post.quantity ?? '—')} ${escapeHtml(unit)}`;
+  if (!Number.isFinite(remaining)) return `${escapeHtml(total)} ${escapeHtml(unit)}`;
+  const matched = Math.max(0, total - remaining);
+  return `${escapeHtml(total)} ${escapeHtml(unit)} posted · ${escapeHtml(matched)} allocated · ${escapeHtml(remaining)} remaining`;
+}
+
+function postStatusMeta(post) {
+  if (post.status === 'review_required' && Number(post.remaining_quantity) < Number(post.quantity)) {
+    return { label: `Partially matched · ${post.remaining_quantity} ${post.quantity_unit || ''} needs review`, tone: 'danger' };
+  }
+  return statusMeta(post.status);
 }
 
 function statusLabel(status) {

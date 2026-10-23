@@ -5,6 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { suggestLocations } = require('../services/geocoding');
+const { convertQuantity } = require('../services/matching');
 
 const router = express.Router();
 
@@ -26,7 +27,7 @@ router.get('/overview', (req, res) => {
     const totalSurplus = db.prepare("SELECT COUNT(*) as c, COALESCE(SUM(quantity), 0) as qty FROM surplus_posts WHERE status NOT IN ('cancelled')").get();
     const activeSurplus = db.prepare("SELECT COUNT(*) as c FROM surplus_posts WHERE status = 'available'").get();
     const activeDemands = db.prepare("SELECT COUNT(*) as c FROM demand_registrations WHERE status IN ('open','partially_fulfilled')").get();
-    const activeRedist = db.prepare("SELECT COUNT(*) as c FROM matches WHERE status IN ('pending','confirmed','in_transit')").get();
+    const activeRedist = db.prepare("SELECT COUNT(*) as c FROM matches WHERE status IN ('pending','confirmed')").get();
     const totalDemand = db.prepare("SELECT COUNT(*) as c FROM demand_registrations WHERE status NOT IN ('cancelled')").get();
     const fulfilledDemand = db.prepare("SELECT COUNT(*) as c FROM demand_registrations WHERE status = 'fulfilled'").get();
     const recoveredToday = db.prepare("SELECT COALESCE(SUM(quantity), 0) as qty FROM surplus_posts WHERE status = 'completed' AND date(updated_at) = date('now')").get();
@@ -58,7 +59,8 @@ router.get('/overview', (req, res) => {
       title: s.food_name,
       foodType: s.food_type,
       donorName: s.donor_name,
-      quantity: s.quantity,
+      quantity: s.remaining_quantity != null ? s.remaining_quantity : s.quantity,
+      originalQuantity: s.quantity,
       unit: s.quantity_unit,
       address: s.location_address,
       status: s.status,
@@ -142,11 +144,14 @@ router.get('/supply-demand', (req, res) => {
       title: s.food_name,
       foodType: s.food_type,
       donorName: s.donor_name,
-      quantity: s.quantity,
+      quantity: s.remaining_quantity != null ? s.remaining_quantity : s.quantity,
+      originalQuantity: s.quantity,
       unit: s.quantity_unit,
       address: s.location_address,
       status: s.status,
-      matchId: s.status === 'matched' || s.status === 'in_transit' ? 'matched' : null,
+      reviewReason: s.review_reason || '',
+      availableUntil: s.remaining_usable_time || null,
+      matchId: s.status === 'matched' ? 'matched' : null,
       createdAt: s.created_at
     }));
 
@@ -174,13 +179,16 @@ router.get('/supply-demand', (req, res) => {
 router.get('/redistributions', (req, res) => {
   try {
     const matchesRaw = db.prepare(`
-      SELECT m.*, sp.food_name, sp.food_type, sp.quantity, sp.quantity_unit,
+      SELECT m.*, COALESCE(sp.food_name, fi.food_name) as food_name,
+        COALESCE(sp.food_type, fi.food_type) as food_type,
+        COALESCE(sp.donor_org_id, fi.org_id) as source_org_id,
         do1.name as donor_name, do2.name as recipient_name,
         do1.location_lat as lat1, do1.location_lng as lng1,
         do2.location_lat as lat2, do2.location_lng as lng2
       FROM matches m
-      JOIN surplus_posts sp ON m.surplus_id = sp.id
-      JOIN organizations do1 ON sp.donor_org_id = do1.id
+      LEFT JOIN surplus_posts sp ON m.surplus_id = sp.id
+      LEFT JOIN food_bank_inventory fi ON m.source_inventory_id = fi.id
+      LEFT JOIN organizations do1 ON do1.id = COALESCE(sp.donor_org_id, fi.org_id)
       LEFT JOIN organizations do2 ON m.demand_org_id = do2.id
       ORDER BY m.matched_at DESC LIMIT 50
     `).all();
@@ -198,8 +206,8 @@ router.get('/redistributions', (req, res) => {
         foodType: m.food_name || m.food_type,
         donorName: m.donor_name || 'Donor',
         recipientName: m.recipient_name || 'Central Reserve Hub',
-        quantity: m.quantity,
-        unit: m.quantity_unit,
+        quantity: m.allocated_quantity,
+        unit: m.allocated_unit,
         distance: dist,
         startedAt: m.matched_at,
         status: m.status
@@ -240,16 +248,18 @@ router.get('/rebalancing', (req, res) => {
     });
 
     const activeSurplus = db.prepare(`
-      SELECT donor_org_id, SUM(quantity) as qty
+      SELECT donor_org_id, SUM(COALESCE(remaining_quantity, quantity)) as qty
       FROM surplus_posts
-      WHERE status NOT IN ('cancelled', 'expired')
+      WHERE status IN ('available', 'partially_matched', 'review_required')
+        AND COALESCE(remaining_quantity, quantity) > 0
       GROUP BY donor_org_id
     `).all();
 
     const activeDemands = db.prepare(`
-      SELECT demand_org_id, SUM(quantity_needed) as qty
+      SELECT demand_org_id, SUM(COALESCE(remaining_quantity, quantity_needed)) as qty
       FROM demand_registrations
-      WHERE status NOT IN ('cancelled', 'fulfilled')
+      WHERE status IN ('open', 'partially_fulfilled')
+        AND COALESCE(remaining_quantity, quantity_needed) > 0
       GROUP BY demand_org_id
     `).all();
 
@@ -330,24 +340,40 @@ router.get('/reserve', (req, res) => {
       SELECT o.*, dp.serving_capacity, dp.storage_capacity
       FROM organizations o
       LEFT JOIN demand_org_profiles dp ON o.id = dp.org_id
-      WHERE o.type = 'food_bank' OR o.name LIKE '%reserve%' OR o.name LIKE '%bank%'
+      WHERE o.type = 'food_bank' AND o.status = 'active' AND o.verified = 1
     `).all();
 
     const reservePoints = foodBanksRaw.map(fb => {
-      const currentLoadRaw = db.prepare(`
-        SELECT COALESCE(SUM(sp.quantity), 0) as qty
+      // Inventory already received takes up reserve capacity. Add pending/accepted
+      // allocations separately so promised deliveries reserve room before arrival.
+      const inventoryRows = db.prepare(`
+        SELECT food_type, quantity_remaining, quantity_unit
+        FROM food_bank_inventory WHERE org_id = ? AND quantity_remaining > 0
+      `).all(fb.id);
+      const incomingRows = db.prepare(`
+        SELECT m.allocated_quantity, m.allocated_unit, COALESCE(sp.food_type, i.food_type, '') AS food_type
         FROM matches m
-        JOIN surplus_posts sp ON m.surplus_id = sp.id
-        WHERE m.demand_org_id = ? AND m.status IN ('matched', 'in_transit', 'confirmed')
-      `).get(fb.id);
+        LEFT JOIN surplus_posts sp ON m.source_type = 'surplus' AND sp.id = m.surplus_id
+        LEFT JOIN food_bank_inventory i ON m.source_type = 'food_bank_inventory' AND i.id = m.source_inventory_id
+        WHERE m.demand_org_id = ? AND m.status IN ('pending', 'confirmed')
+      `).all(fb.id);
+      const toServings = (quantity, unit, foodType) => {
+        const converted = convertQuantity(Number(quantity) || 0, unit || 'servings', 'servings', foodType || '');
+        return converted.success ? converted.convertedQty : 0;
+      };
+      const stockServings = inventoryRows.reduce((sum, row) => sum + toServings(row.quantity_remaining, row.quantity_unit, row.food_type), 0);
+      const incomingServings = incomingRows.reduce((sum, row) => sum + toServings(row.allocated_quantity, row.allocated_unit, row.food_type), 0);
+      const currentLoad = Math.round((stockServings + incomingServings) * 10) / 10;
 
       return {
         id: fb.id,
         name: fb.name,
         locationAddress: fb.location_address,
-        capacity: fb.serving_capacity || 1500,
-        currentLoad: Math.round(currentLoadRaw.qty || 0),
-        storageInfo: fb.storage_capacity || 'Cold & Dry multi-zone storage facility',
+        capacity: Number(fb.serving_capacity) > 0 ? Number(fb.serving_capacity) : null,
+        currentLoad,
+        inventoryLoad: Math.round(stockServings * 10) / 10,
+        incomingLoad: Math.round(incomingServings * 10) / 10,
+        storageInfo: fb.storage_capacity || 'Storage details not declared',
         status: 'operational'
       };
     });
@@ -576,7 +602,7 @@ router.get('/metrics', (req, res) => {
   try {
     const totalSurplus = db.prepare("SELECT COALESCE(SUM(quantity), 0) as q FROM surplus_posts WHERE status != 'cancelled'").get();
     const totalDemand = db.prepare("SELECT COALESCE(SUM(quantity_needed), 0) as q FROM demand_registrations WHERE status != 'cancelled'").get();
-    const recovered = db.prepare("SELECT COALESCE(SUM(quantity), 0) as q FROM surplus_posts WHERE status IN ('completed', 'in_transit', 'matched')").get();
+    const recovered = db.prepare("SELECT COALESCE(SUM(quantity), 0) as q FROM surplus_posts WHERE status IN ('completed', 'confirmed', 'matched')").get();
     const openDemand = db.prepare("SELECT COALESCE(SUM(quantity_needed), 0) as q FROM demand_registrations WHERE status IN ('open','partially_fulfilled')").get();
 
     const totalSurplusQty = Math.round(totalSurplus.q * 10) / 10;
@@ -608,7 +634,7 @@ router.get('/metrics', (req, res) => {
         SELECT COALESCE(SUM(sp.quantity), 0) as qty
         FROM matches m
         JOIN surplus_posts sp ON m.surplus_id = sp.id
-        WHERE m.status IN ('completed', 'in_transit', 'confirmed', 'matched')
+        WHERE m.status IN ('completed', 'confirmed', 'matched')
           AND (m.matched_at LIKE ? OR m.completed_at LIKE ?)
       `).get(`${dateStr}%`, `${dateStr}%`);
 
@@ -682,9 +708,14 @@ router.get('/map-data', (req, res) => {
 
     const facilitiesRaw = db.prepare(`
       SELECT id, name, location_lat, location_lng, location_address, status, verified,
-             accepted_waste_types, max_daily_intake_kg
+             accepted_waste_types, max_daily_intake_kg,
+             COALESCE(is_available, 1) AS is_available,
+             COALESCE(current_intake_kg, 0) AS current_intake_kg,
+             operator_user_id
       FROM biogas_facilities
       WHERE location_lat != 0 AND location_lng != 0
+        AND status = 'active'
+        AND verified = 1
       ORDER BY name
     `).all();
 
@@ -693,6 +724,10 @@ router.get('/map-data', (req, res) => {
       lat: f.location_lat, lng: f.location_lng,
       address: f.location_address, status: f.status,
       verified: !!f.verified,
+      isAvailable: !!f.is_available,
+      hasOperator: !!f.operator_user_id,
+      currentIntakeKg: f.current_intake_kg,
+      remainingCapacityKg: Math.max(0, (f.max_daily_intake_kg || 0) - (f.current_intake_kg || 0)),
       acceptedWasteTypes: (() => { try { return JSON.parse(f.accepted_waste_types || '[]'); } catch { return []; } })(),
       maxDailyIntakeKg: f.max_daily_intake_kg
     }));
@@ -727,17 +762,21 @@ router.get('/route-preview', async (req, res) => {
 let lastNetworkOverpassMs = 0;
 router.get('/overpass-bounds', async (req, res) => {
   try {
+    const scope = (req.query.scope || 'area').toLowerCase();
     const south = parseFloat(req.query.south);
     const west  = parseFloat(req.query.west);
     const north = parseFloat(req.query.north);
     const east  = parseFloat(req.query.east);
     const type  = (req.query.type || 'biogas').toLowerCase();
 
-    if ([south, west, north, east].some(v => isNaN(v))) {
+    if (scope !== 'india' && [south, west, north, east].some(v => isNaN(v))) {
       return res.status(400).json({ error: 'south, west, north, east are required numeric params' });
     }
-    if ((north - south) > 1 || (east - west) > 1) {
+    if (scope !== 'india' && ((north - south) > 1 || (east - west) > 1)) {
       return res.status(400).json({ error: 'Bounding box too large — zoom in further before discovering' });
+    }
+    if (!['area', 'india'].includes(scope)) {
+      return res.status(400).json({ error: 'scope must be area or india' });
     }
     const now = Date.now();
     if (now - lastNetworkOverpassMs < 2000) {
@@ -746,26 +785,28 @@ router.get('/overpass-bounds', async (req, res) => {
     lastNetworkOverpassMs = now;
 
     const bbox = `${south},${west},${north},${east}`;
+    const areaSelector = 'area["ISO3166-1"="IN"][admin_level=2]->.india;';
+    const within = scope === 'india' ? '(area.india)' : `(${bbox})`;
     let overpassQuery;
     if (type === 'biogas') {
       overpassQuery =
-        `[out:json][timeout:15];` +
+        `[out:json][timeout:${scope === 'india' ? 60 : 15}];` + (scope === 'india' ? areaSelector : '') +
         `(` +
-        `  nwr["plant:method"="anaerobic_digestion"](${bbox});` +
-        `  nwr["generator:method"="anaerobic_digestion"](${bbox});` +
-        `  nwr["power"="plant"]["plant:source"="biogas"](${bbox});` +
-        `  nwr["power"="plant"]["plant:source"="biomass"]["plant:method"="anaerobic_digestion"](${bbox});` +
-        `  nwr["amenity"="biogas"](${bbox});` +
-        `  nwr["industrial"="biogas_plant"](${bbox});` +
+        `  nwr["plant:method"="anaerobic_digestion"]${within};` +
+        `  nwr["generator:method"="anaerobic_digestion"]${within};` +
+        `  nwr["power"="plant"]["plant:source"="biogas"]${within};` +
+        `  nwr["power"="plant"]["plant:source"="biomass"]["plant:method"="anaerobic_digestion"]${within};` +
+        `  nwr["amenity"="biogas"]${within};` +
+        `  nwr["industrial"="biogas_plant"]${within};` +
         `)out center;`;
     } else {
       overpassQuery =
-        `[out:json][timeout:15];` +
+        `[out:json][timeout:${scope === 'india' ? 60 : 15}];` + (scope === 'india' ? areaSelector : '') +
         `(` +
-        `  nwr["amenity"="social_facility"]["social_facility"="food_bank"](${bbox});` +
-        `  nwr["social_facility"="food_bank"](${bbox});` +
-        `  nwr["amenity"="food_bank"](${bbox});` +
-        `  nwr["social_facility"="soup_kitchen"](${bbox});` +
+        `  nwr["amenity"="social_facility"]["social_facility"="food_bank"]${within};` +
+        `  nwr["social_facility"="food_bank"]${within};` +
+        `  nwr["amenity"="food_bank"]${within};` +
+        `  nwr["social_facility"="soup_kitchen"]${within};` +
         `)out center;`;
     }
 
@@ -795,7 +836,7 @@ router.get('/overpass-bounds', async (req, res) => {
           catch (e) { reject(new Error('Overpass JSON parse error: ' + e.message)); }
         });
       });
-      req2.setTimeout(16000, () => { req2.destroy(); reject(new Error('Overpass request timed out')); });
+      req2.setTimeout(scope === 'india' ? 65000 : 16000, () => { req2.destroy(); reject(new Error('Overpass request timed out')); });
       req2.on('error', reject);
       req2.write(postBody);
       req2.end();
@@ -819,7 +860,7 @@ router.get('/overpass-bounds', async (req, res) => {
       };
     }).filter(Boolean);
 
-    res.json({ results, count: results.length, bbox, type });
+    res.json({ results, count: results.length, bbox: scope === 'india' ? null : bbox, scope, type });
   } catch (err) {
     console.error('[Network/OverpassBounds]', err);
     res.status(500).json({ error: 'Overpass discovery unavailable: ' + err.message });

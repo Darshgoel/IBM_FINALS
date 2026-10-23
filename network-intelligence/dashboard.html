@@ -285,7 +285,7 @@
             <div class="stat-body">
               <div class="stat-label">Redistributions</div>
               <div class="stat-value" id="ov-redist">--</div>
-              <div class="stat-change">Pending, confirmed or in transit</div>
+              <div class="stat-change">Pending or accepted matches</div>
             </div>
           </div>
           <div class="stat-card green">
@@ -391,8 +391,10 @@
           <select class="select-control" id="sd-status" onchange="applySdFilters()">
             <option value="all">All statuses</option>
             <option value="available">Available</option>
+            <option value="review_required">Needs coordinator review</option>
             <option value="matched">Matched</option>
-            <option value="in_transit">In transit</option>
+            <option value="partially_matched">Partially matched</option>
+            <option value="biogas_pending">Awaiting biogas acceptance</option>
             <option value="completed">Completed</option>
             <option value="expired">Expired</option>
             <option value="open">Open demand</option>
@@ -438,7 +440,6 @@
           <button class="filter-btn active" id="rd-filter-all" type="button" onclick="setRdStatus('all', this)">All <span class="filter-count" id="rd-count-all">0</span></button>
           <button class="filter-btn" id="rd-filter-pending" type="button" onclick="setRdStatus('pending', this)">Pending <span class="filter-count" id="rd-count-pending">0</span></button>
           <button class="filter-btn" id="rd-filter-confirmed" type="button" onclick="setRdStatus('confirmed', this)">Confirmed <span class="filter-count" id="rd-count-confirmed">0</span></button>
-          <button class="filter-btn" id="rd-filter-in_transit" type="button" onclick="setRdStatus('in_transit', this)">In transit <span class="filter-count" id="rd-count-in_transit">0</span></button>
           <button class="filter-btn" id="rd-filter-completed" type="button" onclick="setRdStatus('completed', this)">Completed <span class="filter-count" id="rd-count-completed">0</span></button>
           <button class="filter-btn" id="rd-filter-declined" type="button" onclick="setRdStatus('declined', this)">Declined <span class="filter-count" id="rd-count-declined">0</span></button>
           <button class="filter-btn" id="rd-filter-cancelled" type="button" onclick="setRdStatus('cancelled', this)">Cancelled <span class="filter-count" id="rd-count-cancelled">0</span></button>
@@ -563,7 +564,7 @@
             <div class="stat-body">
               <div class="stat-label">Pending reserve routing</div>
               <div class="stat-value" id="rs-pending">--</div>
-              <div class="stat-change">Surplus closing within two hours</div>
+              <div class="stat-change">Surplus closing within three hours</div>
             </div>
           </div>
         </div>
@@ -598,10 +599,10 @@
             </div>
           </div>
           <ol class="allocation-flow">
-            <li><span class="allocation-num">1</span><div><strong>Immediate demand</strong><p>Emergency and immediate registered needs that pass distance, capacity and safety checks.</p></div></li>
-            <li><span class="allocation-num">2</span><div><strong>Regular demand</strong><p>Planned or recurring needs from verified demand organisations.</p></div></li>
-            <li><span class="allocation-num">3</span><div><strong>Reserve point</strong><p>A food bank or storage hub with enough declared capacity for the batch.</p></div></li>
-            <li><span class="allocation-num">4</span><div><strong>Recovery review</strong><p>No feasible target. The post remains available for later matching and is flagged for coordinator review.</p></div></li>
+            <li><span class="allocation-num">1</span><div><strong>Eligible demand</strong><p>Emergency, immediate, regular and recurring needs from NGOs and food banks are matched using food fit, urgency, route time and capacity.</p></div></li>
+            <li><span class="allocation-num">2</span><div><strong>Eligible supply</strong><p>Donor surplus and in-date inventory from another food bank can both meet a compatible demand; allocated bank stock is reserved.</p></div></li>
+            <li><span class="allocation-num">3</span><div><strong>Food-bank fallback</strong><p>Unmatched edible donor surplus may be allocated to nearby eligible food banks, subject to route time, storage and capacity.</p></div></li>
+            <li><span class="allocation-num">4</span><div><strong>Biogas recovery or review</strong><p>Expired or unsafe food is routed to an eligible linked biogas facility. If no facility can accept it, the stock is flagged for coordinator review.</p></div></li>
           </ol>
         </div>
       </section>
@@ -973,6 +974,7 @@
               <button class="btn btn-secondary" id="nmap-fit" type="button" title="Fit all markers"><svg class="icon" aria-hidden="true"><use href="#i-grid"></use></svg> Fit all</button>
               <button class="btn btn-secondary" id="nmap-near" type="button"><svg class="icon" aria-hidden="true"><use href="#i-pin"></use></svg> Near me</button>
               <button class="btn nmap-discover-btn" id="nmap-discover" type="button" title="Query OSM for facilities in the current view"><svg class="icon" aria-hidden="true"><use href="#i-globe"></use></svg> Discover area</button>
+              <button class="btn nmap-discover-btn" id="nmap-discover-india" type="button" title="Load food banks and biogas centres mapped across India"><svg class="icon" aria-hidden="true"><use href="#i-globe"></use></svg> Find across India</button>
               <button class="btn btn-secondary" id="nmap-clear" type="button"><svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg> Clear route</button>
             </div>
           </div>

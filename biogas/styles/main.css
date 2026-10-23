@@ -1,0 +1,124 @@
+/* Biogas Operator portal — style overrides */
+/* Inherits from /assets/css/portal.css; only biogas-specific deltas here */
+
+/* ── Portal badge tint ──────────────────────────────────────────────────── */
+.portal-biogas .portal-badge.biogas-badge {
+  background: #e8f5e9;
+  color: #1b5e20;
+  border-color: #81c784;
+}
+
+.portal-biogas .sidebar-brand .brand-subtitle {
+  color: #2e7d32;
+  font-weight: 600;
+}
+
+/* ── Availability toggle (topbar) ───────────────────────────────────────── */
+.availability-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .35rem .85rem;
+  border-radius: 999px;
+  border: 1.5px solid currentColor;
+  font-size: .8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+  background: transparent;
+}
+.availability-toggle.avail-on  { color: #16a34a; border-color: #16a34a; }
+.availability-toggle.avail-on:hover  { background: #dcfce7; }
+.availability-toggle.avail-off { color: #dc2626; border-color: #dc2626; }
+.availability-toggle.avail-off:hover { background: #fee2e2; }
+
+/* ── Capacity display block ─────────────────────────────────────────────── */
+.capacity-display {
+  background: var(--fb-workspace, #F4F7F3);
+  border: 1px solid var(--fb-border, #E1E8E1);
+  border-radius: 8px;
+  padding: 1rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: .6rem;
+  margin-bottom: 1rem;
+}
+.cap-row   { display: flex; justify-content: space-between; align-items: baseline; font-size: .875rem; }
+.cap-label { color: var(--fb-muted, #7A857D); }
+.cap-val   { font-weight: 600; color: var(--fb-text, #18211C); }
+
+/* ── Profile status row ─────────────────────────────────────────────────── */
+.profile-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+/* ── Checkbox group (waste types) ───────────────────────────────────────── */
+.checkbox-fieldset { border: none; padding: 0; margin: 0 0 .5rem; }
+.checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem 1.25rem;
+  padding: .5rem 0;
+}
+.checkbox-group label {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  font-size: .875rem;
+  cursor: pointer;
+}
+
+/* ── Badge variants (portal.css base .badge exists; add colour variants) ── */
+.badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font-size: .75rem; font-weight: 600; line-height: 1.5; }
+.badge-pending    { background: #FFF3DF; color: #B45309; }
+.badge-matched    { background: #E7F5EA; color: #166534; }
+.badge-completed, .badge-success  { background: #E7F5EA; color: #166534; }
+.badge-cancelled, .badge-danger   { background: #FDECEA; color: #991b1b; }
+.badge-neutral    { background: #f3f4f6; color: #374151; }
+
+/* ── Route / claim cards ────────────────────────────────────────────────── */
+.match-note { font-size: .8rem; color: var(--fb-muted, #7A857D); padding: 4px 0 2px; }
+
+/* ── Empty states ───────────────────────────────────────────────────────── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .6rem;
+  padding: 2.5rem 1rem;
+  color: var(--fb-muted, #7A857D);
+  font-size: .875rem;
+  text-align: center;
+}
+.empty-state-inline {
+  padding: 1.2rem;
+  color: var(--fb-muted, #7A857D);
+  font-size: .875rem;
+  text-align: center;
+}
+
+/* ── Facility status detail grid override ───────────────────────────────── */
+.fb-detail-grid { display: grid; grid-template-columns: auto 1fr; gap: .45rem 1rem; font-size: .875rem; }
+.fb-detail-label { color: var(--fb-muted, #7A857D); min-width: 140px; align-self: start; padding-top: 1px; }
+.fb-detail-value { color: var(--fb-text, #18211C); font-weight: 500; }
+
+/* ── Filter search input ────────────────────────────────────────────────── */
+.filter-search {
+  padding: .35rem .8rem;
+  border: 1px solid var(--fb-border, #E1E8E1);
+  border-radius: 8px;
+  font-size: .8rem;
+  background: #fff;
+  color: var(--fb-text, #18211C);
+  min-width: 180px;
+  margin-left: auto;
+}
+.filter-search:focus { outline: 2px solid var(--fb-primary, #16833B); outline-offset: 1px; }
+
+/* ── Weigh-in modal body spacing ────────────────────────────────────────── */
+#weighin-modal .form-grid { margin-top: .5rem; }

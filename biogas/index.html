@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FoodBridge — Biogas Centre</title>
+</head>
+<body>
+  <p>Redirecting to <a href="/?auth=signin">FoodBridge sign in</a>…</p>
+  <script>
+    (function () {
+      var session = null;
+      try {
+        var user = JSON.parse(localStorage.getItem('fb_user') || 'null');
+        if (user && localStorage.getItem('fb_token')) session = user;
+      } catch (err) {}
+
+      var routes = {
+        donor: '/donor/dashboard.html',
+        demand_org: '/demand-org/dashboard.html',
+        food_bank: '/food-bank/dashboard.html',
+        biogas_operator: '/biogas/dashboard.html',
+        recipient: '/recipient/index.html',
+        network_admin: '/network-intelligence/dashboard.html',
+        network_intelligence: '/network-intelligence/dashboard.html',
+        admin: '/admin/dashboard.html'
+      };
+
+      window.location.replace((session && routes[session.role]) || '/?auth=signin');
+    })();
+  </script>
+</body>
+</html>

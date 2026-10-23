@@ -296,15 +296,28 @@ function normalizeOrg(org) {
     name: org.name || org.orgName || 'Organization',
     role,
     type,
+    _kind: org._kind || 'org',
     locationAddress: org.locationAddress || '',
+    locationLat: org.locationLat || 0,
+    locationLng: org.locationLng || 0,
     email: org.email || org.contactEmail || '',
     contactPhone: org.contactPhone || '',
     operatingHours: org.operatingHours || '',
     servingCapacity: org.servingCapacity,
+    acceptedWasteTypes: org.acceptedWasteTypes || [],
+    maxDailyIntakeKg: org.maxDailyIntakeKg || 0,
+    operatorUserId: org.operatorUserId || null,
+    operatorName: org.operatorName || '',
     status: orgStatus(org),
     verified: !!org.verified,
     documentUrl: org.documentUrl || '',
     documentName: org.documentName || '',
+    infoRequestNotes: org.infoRequestNotes || '',
+    infoRequestAt: org.infoRequestAt || '',
+    infoResponseNotes: org.infoResponseNotes || '',
+    infoResponseDocumentName: org.infoResponseDocumentName || '',
+    infoResponseDocumentUrl: org.infoResponseDocumentUrl || '',
+    infoResponseAt: org.infoResponseAt || '',
     createdAt: org.createdAt || null
   };
 }
@@ -545,7 +558,7 @@ function renderOverviewRecords(items) {
 /* ── Organization verification ────────────────────────────────────────── */
 
 async function loadVerification() {
-  setHTML('verification-list', tableLoading('Loading pending organizations…'));
+  setHTML('verification-list', tableLoading('Loading pending registrations…'));
   try {
     const data = await apiFetch('/admin/pending');
     state.pending = (data.orgs || []).map(normalizeOrg);
@@ -557,7 +570,7 @@ async function loadVerification() {
     setLive(false);
     state.pending = [];
     setText('verification-count', '—');
-    setHTML('verification-list', tableEmpty('alert', 'Verification queue unavailable', error.message || 'The pending organizations could not be loaded.'));
+    setHTML('verification-list', tableEmpty('alert', 'Verification queue unavailable', error.message || 'The pending registrations could not be loaded.'));
   }
 }
 
@@ -566,68 +579,94 @@ function verificationFiltered() {
   return state.pending.filter(org => {
     if (state.verification.filter === 'donor' && org.role !== 'donor') return false;
     if (state.verification.filter === 'demand_org' && org.role !== 'demand_org') return false;
-    if (state.verification.filter === 'nodoc' && org.documentUrl) return false;
+    if (state.verification.filter === 'food_bank' && org.type !== 'food_bank') return false;
+    if (state.verification.filter === 'biogas_operator' && org.role !== 'biogas_operator') return false;
+    if (state.verification.filter === 'nodoc' && (org.documentUrl || org.role === 'biogas_operator')) return false;
     if (!query) return true;
-    return [org.name, org.email, org.locationAddress, org.type, org.role, org.documentName]
+    return [org.name, org.email, org.locationAddress, org.type, org.role, org.documentName, org.operatorName]
       .some(value => String(value || '').toLowerCase().includes(query));
   });
 }
 
 function renderVerification() {
   const all = state.pending;
-  const donors = all.filter(org => org.role === 'donor').length;
-  const missingDocs = all.filter(org => !org.documentUrl).length;
+  const donors   = all.filter(org => org.role === 'donor').length;
+  const foodBanks = all.filter(org => org.type === 'food_bank').length;
+  const biogas   = all.filter(org => org.role === 'biogas_operator').length;
+  const missingDocs = all.filter(org => org.role !== 'biogas_operator' && !org.documentUrl).length;
 
   setText('verification-count', formatNumber(all.length));
   renderSummaryChips('verification-summary', [
-    { value: all.length, label: 'awaiting review', tone: 'amber' },
-    { value: donors, label: 'donor organizations', tone: 'green' },
-    { value: all.length - donors, label: 'demand organizations', tone: 'blue' },
-    { value: missingDocs, label: 'missing documents', tone: missingDocs ? 'red' : 'green' }
+    { value: all.length,    label: 'awaiting review',    tone: 'amber' },
+    { value: donors,        label: 'donors',             tone: 'green' },
+    { value: foodBanks,     label: 'food banks',         tone: 'blue' },
+    { value: biogas,        label: 'biogas operators',   tone: 'violet' },
+    { value: missingDocs,   label: 'missing documents',  tone: missingDocs ? 'red' : 'green' }
   ]);
 
   const host = document.getElementById('verification-list');
   if (!host) return;
 
   if (!all.length) {
-    host.innerHTML = tableEmpty('check', 'No pending verifications', 'Every submitted organization has been reviewed.');
+    host.innerHTML = tableEmpty('check', 'No pending verifications', 'Every submitted registration has been reviewed.');
     return;
   }
 
   const items = verificationFiltered();
   if (!items.length) {
-    host.innerHTML = tableEmpty('search', 'No matching organizations', 'Adjust the search or filter to see pending organizations.');
+    host.innerHTML = tableEmpty('search', 'No matching registrations', 'Adjust the search or filter to see pending registrations.');
     return;
   }
 
   host.innerHTML = `<table>
-    <caption class="sr-only">Organizations awaiting verification</caption>
+    <caption class="sr-only">Registrations awaiting verification</caption>
     <thead><tr>
-      <th scope="col">Organization</th><th scope="col">Contact</th><th scope="col">Location</th>
-      <th scope="col">Submitted</th><th scope="col">Document</th><th scope="col">Actions</th>
+      <th scope="col">Name</th><th scope="col">Contact</th><th scope="col">Location</th>
+      <th scope="col">Submitted</th><th scope="col">Document</th><th scope="col">Information exchange</th><th scope="col">Actions</th>
     </tr></thead>
-    <tbody>${items.map(org => `<tr>
-      <td><div class="cell-title">${entityAvatar(org.name, 'amber')}<div class="cell-title-copy">
-        <strong>${esc(org.name)}</strong><small>${esc(formatRole(org.role))} · ${esc(formatOrgType(org.type))}</small>
-      </div></div></td>
-      <td><span class="cell-strong">${esc(emptyText(org.email))}</span>${org.servingCapacity ? `<br><span class="cell-muted">${esc(org.servingCapacity)} meals/day</span>` : ''}</td>
-      <td><span class="cell-wrap">${esc(emptyText(org.locationAddress))}</span></td>
-      <td><span class="cell-muted" title="${esc(absoluteTime(org.createdAt))}">${esc(timeAgo(org.createdAt))}</span></td>
-      <td>${org.documentUrl
-        ? `<a class="action-btn btn-view" href="${esc(org.documentUrl)}" target="_blank" rel="noopener">${icon('file')} View</a>`
-        : badge('Missing', 'high')}</td>
-      <td><div class="row-actions">
-        <button class="action-btn btn-approve" type="button" data-action="org-approve" data-id="${esc(org.id)}">Approve</button>
-        <button class="action-btn btn-request" type="button" data-action="org-request" data-id="${esc(org.id)}">More info</button>
-        <button class="action-btn btn-reject" type="button" data-action="org-reject" data-id="${esc(org.id)}">Reject</button>
-      </div></td>
-    </tr>`).join('')}</tbody>
+    <tbody>${items.map(org => {
+      const isBiogas = org.role === 'biogas_operator';
+      const approveAction  = isBiogas ? 'biogas-approve'  : 'org-approve';
+      const requestAction  = isBiogas ? 'biogas-request'  : 'org-request';
+      const rejectAction   = isBiogas ? 'biogas-reject'   : 'org-reject';
+      const subtitleLine   = isBiogas
+        ? `Biogas Operator${org.operatorName ? ` · ${esc(org.operatorName)}` : ''}`
+        : `${esc(formatRole(org.role))} · ${esc(formatOrgType(org.type))}`;
+      const contactDetail  = isBiogas && org.maxDailyIntakeKg
+        ? `<br><span class="cell-muted">${esc(org.maxDailyIntakeKg)} kg/day capacity</span>`
+        : (org.servingCapacity ? `<br><span class="cell-muted">${esc(org.servingCapacity)} meals/day</span>` : '');
+      const docCell = isBiogas
+        ? badge('N/A', 'gray')
+        : (org.documentUrl
+            ? `<a class="action-btn btn-view" href="${esc(org.documentUrl)}" target="_blank" rel="noopener">${icon('file')} View</a>`
+            : badge('Missing', 'high'));
+      const infoExchange = org.infoResponseAt
+        ? `<strong class="cell-strong">Partner responded</strong><br><span class="cell-muted">${esc(truncate(org.infoResponseNotes || 'Supporting information sent', 90))}</span>${org.infoResponseDocumentUrl ? `<br><a class="action-btn btn-view" href="${esc(org.infoResponseDocumentUrl)}" target="_blank" rel="noopener">${icon('file')} View response</a>` : ''}`
+        : (org.infoRequestNotes
+            ? `<strong class="cell-muted">Awaiting partner response</strong><br><span class="cell-muted">${esc(truncate(org.infoRequestNotes, 90))}</span>`
+            : '<span class="cell-muted">—</span>');
+      return `<tr>
+        <td><div class="cell-title">${entityAvatar(org.name, isBiogas ? 'violet' : 'amber')}<div class="cell-title-copy">
+          <strong>${esc(org.name)}</strong><small>${subtitleLine}</small>
+        </div></div></td>
+        <td><span class="cell-strong">${esc(emptyText(org.email))}</span>${contactDetail}</td>
+        <td><span class="cell-wrap">${esc(emptyText(org.locationAddress))}</span></td>
+        <td><span class="cell-muted" title="${esc(absoluteTime(org.createdAt))}">${esc(timeAgo(org.createdAt))}</span></td>
+        <td>${docCell}</td>
+        <td><div class="cell-wrap">${infoExchange}</div></td>
+        <td><div class="row-actions">
+          <button class="action-btn btn-approve" type="button" data-action="${approveAction}" data-id="${esc(org.id)}">Approve</button>
+          <button class="action-btn btn-request" type="button" data-action="${requestAction}" data-id="${esc(org.id)}">More info</button>
+          <button class="action-btn btn-reject"  type="button" data-action="${rejectAction}"  data-id="${esc(org.id)}">Reject</button>
+        </div></td>
+      </tr>`;
+    }).join('')}</tbody>
   </table>`;
 }
 
 function vFilter(value) {
   state.verification.filter = value;
-  updateFilterChips('vf', ['all', 'donor', 'demand_org', 'nodoc'], value);
+  updateFilterChips('vf', ['all', 'donor', 'demand_org', 'food_bank', 'biogas_operator', 'nodoc'], value);
   renderVerification();
 }
 
@@ -640,7 +679,7 @@ function resetVerificationFilters() {
   state.verification = { q: '', filter: 'all' };
   const input = document.getElementById('verification-search');
   if (input) input.value = '';
-  updateFilterChips('vf', ['all', 'donor', 'demand_org', 'nodoc'], 'all');
+  updateFilterChips('vf', ['all', 'donor', 'demand_org', 'food_bank', 'biogas_operator', 'nodoc'], 'all');
   renderVerification();
 }
 
@@ -683,7 +722,7 @@ function renderParticipants() {
   if (!host) return;
 
   if (!all.length) {
-    host.innerHTML = tableEmpty('building', 'No participants registered', 'New donor and demand organizations will appear here.');
+    host.innerHTML = tableEmpty('building', 'No partners registered', 'New donors, NGOs, food banks, and biogas centres will appear here.');
     return;
   }
   if (!items.length) {
@@ -697,7 +736,10 @@ function renderParticipants() {
       <th scope="col">Organization</th><th scope="col">Status</th><th scope="col">Location</th>
       <th scope="col">Contact</th><th scope="col">Registered</th><th scope="col">Actions</th>
     </tr></thead>
-    <tbody>${items.map(org => `<tr>
+    <tbody>${items.map(org => {
+      const isBiogas = org.role === 'biogas_operator';
+      const actionPrefix = isBiogas ? 'biogas' : 'org';
+      return `<tr>
       <td><div class="cell-title">${entityAvatar(org.name, orgAvatarTone(org.status))}<div class="cell-title-copy">
         <strong>${esc(org.name)}</strong><small>${esc(formatRole(org.role))} · ${esc(formatOrgType(org.type))}</small>
       </div></div></td>
@@ -708,13 +750,14 @@ function renderParticipants() {
       <td><div class="row-actions">
         ${org.status === 'pending' ? `<button class="action-btn btn-view" type="button" data-action="goto" data-page="verification">Review</button>` : ''}
         ${org.status === 'verified' ? `
-          <button class="action-btn btn-suspend" type="button" data-action="org-suspend" data-id="${esc(org.id)}">Suspend</button>
-          <button class="action-btn btn-restrict" type="button" data-action="org-restrict" data-id="${esc(org.id)}">Restrict</button>` : ''}
+          <button class="action-btn btn-suspend" type="button" data-action="${actionPrefix}-suspend" data-id="${esc(org.id)}">Suspend</button>
+          <button class="action-btn btn-restrict" type="button" data-action="${actionPrefix}-restrict" data-id="${esc(org.id)}">Restrict</button>` : ''}
         ${org.status === 'suspended' || org.status === 'restricted' ? `
-          <button class="action-btn btn-reinstate" type="button" data-action="org-reinstate" data-id="${esc(org.id)}">Reinstate</button>` : ''}
+          <button class="action-btn btn-reinstate" type="button" data-action="${actionPrefix}-reinstate" data-id="${esc(org.id)}">Reinstate</button>` : ''}
         ${org.status === 'rejected' ? `<span class="cell-muted">Application closed</span>` : ''}
       </div></td>
-    </tr>`).join('')}</tbody>
+    </tr>`;
+    }).join('')}</tbody>
   </table>`;
 }
 
@@ -988,13 +1031,16 @@ function renderRecords() {
     <caption class="sr-only">Administrative compliance records</caption>
     <thead><tr>
       <th scope="col">Recorded</th><th scope="col">Action</th><th scope="col">Record</th>
-      <th scope="col">Notes</th><th scope="col">Administrator</th>
+      <th scope="col">Notes</th><th scope="col">Document</th><th scope="col">Recorded by</th>
     </tr></thead>
     <tbody>${items.map(record => `<tr>
       <td><span class="cell-strong">${esc(formatDate(record.createdAt))}</span><br><span class="cell-muted" title="${esc(absoluteTime(record.createdAt))}">${esc(timeAgo(record.createdAt))}</span></td>
       <td>${badge(humanize(record.type), recordTone(record.type))}</td>
       <td><span class="cell-wrap">${esc(record.title || 'Administrative record')}</span></td>
       <td><span class="cell-wrap" title="${esc(record.detail || '')}">${esc(truncate(record.detail || '—', 110))}</span></td>
+      <td>${record.documentUrl
+        ? `<a class="action-btn btn-view" href="${esc(record.documentUrl)}" target="_blank" rel="noopener">${icon('file')} ${esc(record.documentName || 'View licence')}</a>`
+        : '<span class="cell-muted">—</span>'}</td>
       <td><span class="cell-strong">${esc(record.admin || 'Platform Administrator')}</span></td>
     </tr>`).join('')}</tbody>
   </table>`;
@@ -1058,6 +1104,45 @@ const ORG_ACTIONS = {
   }
 };
 
+const BIOGAS_ACTIONS = {
+  approve: {
+    title: 'Approve biogas operator',
+    kicker: 'Verification decision',
+    style: 'success',
+    endpoint: 'approve',
+    message: 'Biogas operator approved and facility activated.',
+    requireNotes: false
+  },
+  reject: {
+    title: 'Reject biogas application',
+    kicker: 'Verification decision',
+    style: 'danger',
+    endpoint: 'reject',
+    message: 'Biogas operator application rejected.',
+    requireNotes: true
+  },
+  request: {
+    title: 'Request more information',
+    kicker: 'Verification decision',
+    style: 'violet',
+    endpoint: 'request-info',
+    message: 'Information request logged for this biogas operator.',
+    requireNotes: true
+  },
+  suspend: {
+    title: 'Suspend biogas partner', kicker: 'Partner status', style: 'danger', endpoint: 'suspend',
+    message: 'Biogas partner suspended.', requireNotes: true
+  },
+  reinstate: {
+    title: 'Reinstate biogas partner', kicker: 'Partner status', style: 'success', endpoint: 'reinstate',
+    message: 'Biogas partner reinstated.', requireNotes: false
+  },
+  restrict: {
+    title: 'Restrict biogas partner', kicker: 'Partner status', style: 'violet', endpoint: 'restrict',
+    message: 'Restrictions applied to the biogas partner.', requireNotes: true
+  }
+};
+
 function openOrgModal(action, orgId) {
   const config = ORG_ACTIONS[action];
   if (!config) return;
@@ -1073,6 +1158,31 @@ function openOrgModal(action, orgId) {
   }[action];
 
   state.pendingAction = { type: 'org', action, id: String(orgId), config };
+  fillModal({
+    kicker: config.kicker,
+    title: config.title,
+    desc: description,
+    style: config.style,
+    requireNotes: config.requireNotes,
+    confirmLabel: config.title
+  });
+}
+
+function openBiogasModal(action, facilityId) {
+  const config = BIOGAS_ACTIONS[action];
+  if (!config) return;
+  const org = state.orgIndex.get(String(facilityId));
+  const name = org?.name || 'this biogas operator';
+  const description = {
+    approve: `Approve ${name}? The facility will be activated as a routing candidate.`,
+    reject: `Reject the application from ${name}? The decision will be recorded in the compliance log.`,
+    request: `What additional information is required from ${name}?`,
+    suspend: `Suspend ${name} pending investigation? Their facility will be removed from active operations.`,
+    reinstate: `Reinstate ${name} to active participation on the network?`,
+    restrict: `Apply restrictions to ${name}? Describe the restriction so it can be logged.`
+  }[action];
+
+  state.pendingAction = { type: 'biogas', action, id: String(facilityId), config };
   fillModal({
     kicker: config.kicker,
     title: config.title,
@@ -1172,6 +1282,9 @@ async function executePendingAction() {
         reason: notes
       });
       toast(config.message || 'Organization updated.', 'success');
+    } else if (pending.type === 'biogas') {
+      await apiFetch(`/admin/biogas/${encodeURIComponent(pending.id)}/${config.endpoint}`, 'PUT', { notes });
+      toast(config.message || 'Biogas operator updated.', 'success');
     } else if (pending.type === 'flag') {
       await apiFetch(`/admin/flags/${encodeURIComponent(pending.id)}/close`, 'PUT');
       toast('Safety flag closed.', 'success');
@@ -1255,6 +1368,12 @@ function wireDelegatedActions() {
       if (action === 'org-suspend') { openOrgModal('suspend', id); return; }
       if (action === 'org-reinstate') { openOrgModal('reinstate', id); return; }
       if (action === 'org-restrict') { openOrgModal('restrict', id); return; }
+      if (action === 'biogas-suspend') { openBiogasModal('suspend', id); return; }
+      if (action === 'biogas-reinstate') { openBiogasModal('reinstate', id); return; }
+      if (action === 'biogas-restrict') { openBiogasModal('restrict', id); return; }
+      if (action === 'biogas-approve') { openBiogasModal('approve', id); return; }
+      if (action === 'biogas-request') { openBiogasModal('request', id); return; }
+      if (action === 'biogas-reject')  { openBiogasModal('reject', id); return; }
       if (action === 'close-flag') { openFlagModal(id); return; }
       if (action === 'resolve-dispute') { openDisputeModal(id); return; }
     }
@@ -1312,6 +1431,7 @@ Object.assign(window, {
   vFilter,
   searchVerification,
   resetVerificationFilters,
+  openBiogasModal,
   loadParticipants,
   pFilter,
   searchParticipants,

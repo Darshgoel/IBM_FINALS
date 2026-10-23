@@ -1,7 +1,7 @@
 /**
  * FoodBridge — Demand-Org API Client
  */
-const API_BASE = 'http://localhost:3000/api';
+const API_BASE = '/api';
 
 async function request(method, endpoint, body = null, token = null) {
   const headers = { 'Content-Type': 'application/json' };
@@ -33,6 +33,7 @@ const api = {
     getMatches:    (t)       => request('GET',  '/demand-org/matches',            null, t),
     acceptMatch:   (t, id)   => request('PUT',  `/demand-org/matches/${id}/accept`, null, t),
     declineMatch:  (t, id)   => request('PUT',  `/demand-org/matches/${id}/decline`, null, t),
+    confirmReceipt:(t, id, body) => request('POST', `/demand-org/matches/${id}/confirm-receipt`, body, t),
 
     /* Capacity */
     updateCapacity:(t, body) => request('PUT',  '/demand-org/capacity', body, t),

@@ -284,9 +284,9 @@
     if (el) el.textContent = n ? `(${n})` : '';
   }
 
-  function discoverArea(silent) {
+  function discoverArea(silent, scope = 'area') {
     const bounds = state.map.getBounds();
-    if (state.map.getZoom() < 12) {
+    if (scope !== 'india' && state.map.getZoom() < 12) {
       if (!silent) setStatus('Zoom in to zoom level 12 or higher before discovering OSM facilities.');
       return;
     }
@@ -295,18 +295,23 @@
       south: bounds.getSouth().toFixed(5),
       west: bounds.getWest().toFixed(5),
       north: bounds.getNorth().toFixed(5),
-      east: bounds.getEast().toFixed(5)
+      east: bounds.getEast().toFixed(5),
+      scope
     });
 
     const types = ['biogas', 'food_bank'];
-    if (!silent) setStatus('Querying OpenStreetMap for facilities in this area…');
+    if (!silent) setStatus(scope === 'india' ? 'Loading OSM-mapped food banks and biogas centres across India…' : 'Querying OpenStreetMap for facilities in this area…');
 
     let newCount = 0;
 
     function fetchType(idx) {
       if (idx >= types.length) {
-        if (newCount > 0) setStatus(`Found ${newCount} new OSM location${newCount !== 1 ? 's' : ''} in this area (map-sourced, not yet verified).`);
-        else if (!silent) setStatus('No new OSM facilities found in this area.');
+        if (newCount > 0) setStatus(scope === 'india'
+          ? `Loaded ${newCount} additional OSM-mapped location${newCount !== 1 ? 's' : ''} across India.`
+          : `Found ${newCount} new OSM location${newCount !== 1 ? 's' : ''} in this area (map-sourced).`);
+        else if (!silent) setStatus(scope === 'india'
+          ? 'No additional matching facilities are mapped in OpenStreetMap across India.'
+          : 'No additional matching facilities are mapped in OpenStreetMap in this area.');
         updateOsmCountLabel();
         return;
       }
@@ -436,6 +441,10 @@
     $('nmap-clear').addEventListener('click', clearRoute);
     $('nmap-close').addEventListener('click', closePanel);
     $('nmap-discover').addEventListener('click', () => discoverArea(false));
+    $('nmap-discover-india').addEventListener('click', () => {
+      state.map.setView([22.5, 79], 5);
+      discoverArea(false, 'india');
+    });
     $('nmap-search-btn').addEventListener('click', doSearch);
     $('nmap-search-input').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
 

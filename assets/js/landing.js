@@ -8,6 +8,8 @@ const API = '/api';
 const ROLE_ROUTES = {
   donor: '/donor/dashboard.html',
   demand_org: '/demand-org/dashboard.html',
+  food_bank: '/food-bank/dashboard.html',
+  biogas_operator: '/biogas/dashboard.html',
   recipient: '/recipient/index.html',
   network_admin: '/network-intelligence/dashboard.html',
   network_intelligence: '/network-intelligence/dashboard.html',
@@ -282,6 +284,16 @@ function handleSignIn(event) {
 }
 
 /* ── Sign-up wizard ────────────────────────────────────────────────────── */
+/*
+ * New step order (role-first):
+ *   Step 1 — Role picker  (all account types)
+ *   Step 2 — Credentials  (name / email / password)  — org roles only
+ *             Recipients skip this; pressing Continue on step 1 jumps to step 3.
+ *   Step 3 — Details      (org info or city for recipient)
+ *
+ * The "Back" button on step 3 goes to step 2 for org roles and back to step 1
+ * for recipients (since they skipped step 2).
+ */
 const signupData = {
   role: null,
   documentName: '',
@@ -292,39 +304,58 @@ function goStep(step) {
   clearErrors();
   const target = Number(step);
 
+  // ── Validation when leaving step 1 ──────────────────────────────────────
   if (target === 2) {
-    const name = ($('su-name').value || '').trim();
-    const email = ($('su-email').value || '').trim();
-    const password = $('su-password').value || '';
-    if (!name) {
-      showMsg('signup-error', 'Please enter your name.');
-      $('su-name').focus();
-      return;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      showMsg('signup-error', 'Please enter a valid email address.');
-      $('su-email').focus();
-      return;
-    }
-    if (password.length < 8 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
-      showMsg('signup-error', 'Password must be at least 8 characters and include a letter and a number.');
-      $('su-password').focus();
-      return;
-    }
-  }
-
-  if (target === 3) {
     if (!signupData.role) {
       showMsg('signup-error', 'Choose how you will use FoodBridge to continue.');
       return;
     }
+  }
+
+  // ── Validation when leaving step 2 ──────────────────────────────────────
+  if (target === 3) {
+    // Called from step 2's Continue button — validate credentials
+    if (_isOnStep(2)) {
+      const name     = ($('su-name').value || '').trim();
+      const email    = ($('su-email').value || '').trim();
+      const password = $('su-password').value || '';
+      if (!name) {
+        showMsg('signup-error', 'Please enter your name.');
+        $('su-name').focus();
+        return;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showMsg('signup-error', 'Please enter a valid email address.');
+        $('su-email').focus();
+        return;
+      }
+      if (password.length < 8 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+        showMsg('signup-error', 'Password must be at least 8 characters and include a letter and a number.');
+        $('su-password').focus();
+        return;
+      }
+    }
     updateStep3();
   }
 
+  _showStep(target);
+}
+
+// Back button on step 3
+function backFromStep3() {
+  _showStep(2);
+}
+
+function _isOnStep(n) {
+  const pane = $(`step-${n}`);
+  return pane && pane.classList.contains('active');
+}
+
+function _showStep(n) {
   document.querySelectorAll('#pane-signup .step-pane').forEach(pane => {
-    pane.classList.toggle('active', pane.id === `step-${target}`);
+    pane.classList.toggle('active', pane.id === `step-${n}`);
   });
-  updateStepper(target);
+  updateStepper(n);
 }
 
 function updateStepper(step) {
@@ -339,51 +370,79 @@ function updateStepper(step) {
     const line = $(`line-${i}`);
     if (line) line.classList.toggle('done', step > i);
   }
+
+  // Update sub-heading text
+  const sub = $('signup-sub');
+  if (sub) {
+    sub.textContent = step === 1
+      ? 'Pick your role to get started.'
+      : step === 2
+        ? 'Create your account credentials.'
+        : 'Almost done — just a few more details.';
+  }
 }
 
 function selectRole(role) {
+  // Recipients don't need an account — send them straight to the food finder.
+  if (role === 'recipient') {
+    window.location.href = '/recipient/index.html';
+    return;
+  }
+
   signupData.role = role;
-  ['donor', 'demand_org', 'recipient'].forEach(name => {
+  ['donor', 'demand_org', 'food_bank', 'biogas_operator'].forEach(name => {
     const el = $(`role-${name}`);
     if (el) el.classList.toggle('selected', name === role);
   });
   const next = $('role-next-btn');
-  if (next) next.disabled = false;
+  if (next) {
+    next.disabled = false;
+    next.textContent = 'Continue';
+  }
   const hint = $('role-hint');
   if (hint) {
-    hint.textContent = role === 'donor'
-      ? 'You will be able to post surplus food once your organisation is verified.'
-      : role === 'demand_org'
-        ? 'You will be able to request matched food once your organisation is verified.'
-        : 'You can search free food points near you right away.';
+    const hints = {
+      donor: 'You will be able to post surplus food once your organisation is verified.',
+      demand_org: 'You will be able to request matched food once your organisation is verified.',
+      food_bank: 'You will manage incoming food reserves and storage once verified.',
+      biogas_operator: 'You will receive waste-food routes and manage facility capacity.'
+    };
+    hint.textContent = hints[role] || 'Choose the option that fits you best.';
   }
 }
 
 function updateStep3() {
   const role = signupData.role;
-  const donor = $('fields-donor');
-  const ngo = $('fields-demand_org');
-  const recipient = $('fields-recipient');
-  if (donor) donor.hidden = role !== 'donor';
-  if (ngo) ngo.hidden = role !== 'demand_org';
-  if (recipient) recipient.hidden = role !== 'recipient';
+  const allFields = ['fields-donor', 'fields-demand_org', 'fields-food_bank', 'fields-biogas_operator', 'fields-recipient'];
+  allFields.forEach(id => {
+    const el = $(id);
+    if (el) el.hidden = true;
+  });
+  const target = $(`fields-${role}`);
+  if (target) target.hidden = false;
+
+  // Back button on step 3: recipients go to step 1, others go to step 2
+  const backBtn = $('back-to-step2-btn');
+  if (backBtn) backBtn.onclick = backFromStep3;
 
   const title = $('step3-title');
-  const sub = $('step3-sub');
-  if (title) {
-    title.textContent = role === 'donor'
-      ? 'Tell us about your kitchen'
-      : role === 'demand_org'
-        ? 'Tell us about your organisation'
-        : 'Where can we help you find food?';
-  }
-  if (sub) {
-    sub.textContent = role === 'donor'
-      ? 'This helps community partners find and collect your surplus safely.'
-      : role === 'demand_org'
-        ? 'We use these details to verify your organisation and match nearby food.'
-        : 'We only use this to show food points near you. Your details stay private.';
-  }
+  const sub   = $('step3-sub');
+  const titles = {
+    donor:           'Tell us about your kitchen',
+    demand_org:      'Tell us about your organisation',
+    food_bank:       'Tell us about your food bank',
+    biogas_operator: 'Tell us about your biogas facility',
+    recipient:       'Where can we help you find food?'
+  };
+  const subs = {
+    donor:           'This helps community partners find and collect your surplus safely.',
+    demand_org:      'We use these details to verify your organisation and match nearby food.',
+    food_bank:       'We use these details to verify your food bank and connect it to the network.',
+    biogas_operator: 'We use these details to register your facility and start routing waste food to you.',
+    recipient:       'We only use this to show food points near you. Your details stay private.'
+  };
+  if (title) title.textContent = titles[role] || 'Your details';
+  if (sub)   sub.textContent   = subs[role]   || '';
 }
 
 function previewDocName(input, labelId) {
@@ -404,25 +463,33 @@ function readFileAsDataURL(file) {
 
 async function handleRegister() {
   clearErrors();
-  const signupError = $('signup-error');
   const button = $('register-btn');
-  const name = ($('su-name').value || '').trim();
-  const email = ($('su-email').value || '').trim();
-  const password = $('su-password').value || '';
   const role = signupData.role;
 
   if (!role) {
     showMsg('signup-error', 'Please choose an account type.');
-    goStep(2);
+    _showStep(1);
     return;
   }
+
+  const name     = ($('su-name').value   || '').trim();
+  const email    = ($('su-email').value  || '').trim();
+  const password = ($('su-password').value || '');
+
   if (!name || !email || !password) {
     showMsg('signup-error', 'Please complete your name, email and password.');
-    goStep(1);
+    _showStep(2);
     return;
   }
 
   const payload = { name, email, password, role };
+
+  // Helper: read pinned coordinates for a signup role prefix
+  function _pinCoords(prefix) {
+    const lat = parseFloat($(prefix + '-lat')?.value);
+    const lng = parseFloat($(prefix + '-lng')?.value);
+    return (!isNaN(lat) && !isNaN(lng) && lat !== 0) ? { lat, lng } : null;
+  }
 
   if (role === 'donor' || role === 'demand_org') {
     const prefix = role === 'donor' ? 'd' : 'n';
@@ -447,12 +514,52 @@ async function handleRegister() {
       ? 'Food donor registered through the FoodBridge public site.'
       : 'Community organisation registered through the FoodBridge public site.';
 
+    const coords = _pinCoords(prefix);
+    if (coords) { payload.locationLat = coords.lat; payload.locationLng = coords.lng; }
+
     if (role === 'demand_org') {
       const capacity = ($('n-capacity').value || '').trim();
       if (capacity) payload.description += ` Daily meal capacity: ${capacity}.`;
     }
 
     const docInput = $(`${prefix}-doc`);
+    const file = docInput && docInput.files && docInput.files[0];
+    if (role === 'donor' && !file) {
+      showMsg('signup-error', 'Please upload your FSSAI licence to register as a food donor.');
+      docInput?.focus();
+      return;
+    }
+    if (file) {
+      if (file.size > 4 * 1024 * 1024) {
+        showMsg('signup-error', 'Please choose a document smaller than 4 MB.');
+        return;
+      }
+      try {
+        payload.documentName = file.name;
+        payload.documentData = await readFileAsDataURL(file);
+      } catch (err) {
+        showMsg('signup-error', err.message || 'Could not read the selected document.');
+        return;
+      }
+    }
+  } else if (role === 'food_bank') {
+    const orgName = ($('fb-org-name').value || '').trim();
+    const address = ($('fb-address').value || '').trim();
+    if (!orgName || !address) {
+      showMsg('signup-error', 'Please add your food bank name and address.');
+      $('fb-org-name').focus();
+      return;
+    }
+    const capacity = ($('fb-capacity').value || '').trim();
+    payload.orgName = orgName;
+    payload.orgType = 'food_bank';
+    payload.locationAddress = address;
+    payload.contactPhone = ($('fb-phone').value || '').trim();
+    payload.operatingHours = ($('fb-hours').value || '').trim();
+    payload.description = 'Food bank registered through the FoodBridge public site.' + (capacity ? ` Storage capacity: ${capacity} kg.` : '');
+    const fbCoords = _pinCoords('fb');
+    if (fbCoords) { payload.locationLat = fbCoords.lat; payload.locationLng = fbCoords.lng; }
+    const docInput = $('fb-doc');
     const file = docInput && docInput.files && docInput.files[0];
     if (file) {
       if (file.size > 4 * 1024 * 1024) {
@@ -467,7 +574,28 @@ async function handleRegister() {
         return;
       }
     }
+  } else if (role === 'biogas_operator') {
+    const orgName = ($('bg-org-name').value || '').trim();
+    const address = ($('bg-address').value || '').trim();
+    if (!orgName || !address) {
+      showMsg('signup-error', 'Please add your facility name and address.');
+      $('bg-org-name').focus();
+      return;
+    }
+    const checkedTypes = Array.from(
+      document.querySelectorAll('#bg-waste-types input[type="checkbox"]:checked')
+    ).map(cb => cb.value);
+    payload.orgName = orgName;
+    payload.locationAddress = address;
+    payload.contactPhone = ($('bg-phone').value || '').trim();
+    payload.operatingHours = ($('bg-hours').value || '').trim();
+    payload.maxDailyIntakeKg = Number($('bg-capacity').value || 0);
+    payload.acceptedWasteTypes = checkedTypes.length ? checkedTypes : ['all_food_waste'];
+    payload.description = 'Biogas facility registered through the FoodBridge public site.';
+    const bgCoords = _pinCoords('bg');
+    if (bgCoords) { payload.locationLat = bgCoords.lat; payload.locationLng = bgCoords.lng; }
   } else {
+    // recipient
     const city = ($('r-city').value || '').trim();
     if (!city) {
       showMsg('signup-error', 'Please add your city or area so we can show nearby food.');
@@ -498,9 +626,18 @@ async function handleRegister() {
     const notice = $('pending-notice');
     if (notice) {
       notice.hidden = false;
-      notice.innerHTML = `Account created. <strong>${escapeHtml(payload.orgName)}</strong> is pending verification, so posting and requesting will unlock once a coordinator approves it.`;
+      const orgLabel = {
+        food_bank: 'Food bank',
+        biogas_operator: 'Biogas facility',
+        donor: 'Organisation',
+        demand_org: 'Organisation'
+      }[role] || 'Organisation';
+      notice.innerHTML = `Account created. <strong>${escapeHtml(payload.orgName)}</strong> is pending verification. ${orgLabel} features will unlock once a coordinator approves it. You can sign in and explore your dashboard in the meantime.`;
     }
     showMsg('signup-success', 'Your account is ready. You can sign in while verification is pending.', 'success');
+    // Show sign-in button for orgs that need admin approval
+    const signinNotice = $('pending-notice-signin');
+    if (signinNotice) signinNotice.hidden = false;
     setLoading(button, false, 'Create Account');
   } catch (err) {
     showMsg('signup-error', err.message || 'Unable to create your account right now.');
@@ -508,11 +645,178 @@ async function handleRegister() {
   }
 }
 
-/* Deep links from the shared public pages: /?auth=signin or /?auth=signup */
+/* Deep links from public partner cards can preselect a signup role. */
 document.addEventListener('DOMContentLoaded', () => {
   const params = new URLSearchParams(window.location.search);
   const mode = params.get('auth');
+  const role = params.get('role');
   if (mode === 'signin' || mode === 'signup') {
-    setTimeout(() => openAuth(mode), 80);
+    setTimeout(() => {
+      openAuth(mode);
+      if (mode === 'signup' && ['donor', 'demand_org', 'food_bank', 'biogas_operator'].includes(role)) {
+        setTimeout(() => selectRole(role), 80);
+      }
+    }, 80);
   }
 });
+
+/* ── Signup map picker ─────────────────────────────────────────────────── */
+/*
+ * One shared Leaflet map instance, shown in a full-screen modal overlay that
+ * sits above the auth dialog. Each role form has its own hidden lat/lng inputs
+ * (d-lat/d-lng, n-lat/n-lng, fb-lat/fb-lng, bg-lat/bg-lng).
+ *
+ * Flow:
+ *   openSignupMap(rolePrefix) → shows modal, inits Leaflet (once), pans to
+ *     any existing pin or Bengaluru default.
+ *   User clicks / drags marker → Nominatim reverse-geocode → shows address.
+ *   confirmSignupPin() → writes lat/lng to hidden inputs, closes modal, shows
+ *     "pinned" chip next to the address field.
+ */
+const _smap = {
+  map: null,
+  marker: null,
+  lat: null,
+  lng: null,
+  addrText: null,
+  activePrefix: null,
+  geocodeTimer: null
+};
+
+// Called when the user types in an address field — clears any existing pin
+// (coordinates might no longer match the typed address).
+window.onAddressInput = function (prefix) {
+  // Only clear if user is actually changing the address after pinning
+  const latEl = $(prefix === 'donor' ? 'd-lat' : prefix === 'ngo' ? 'n-lat' : prefix + '-lat');
+  if (latEl && latEl.value) {
+    latEl.value = '';
+    const lngId = prefix === 'donor' ? 'd-lng' : prefix === 'ngo' ? 'n-lng' : prefix + '-lng';
+    const lngEl = $(lngId); if (lngEl) lngEl.value = '';
+    const sel = $(`map-pin-selected-${prefix}`); if (sel) sel.hidden = true;
+    const tog = $(`map-pin-${prefix}`)?.querySelector('.map-pin-toggle');
+    if (tog) tog.hidden = false;
+  }
+};
+
+window.openSignupMap = function (prefix) {
+  _smap.activePrefix = prefix;
+  const modal = $('signup-map-modal');
+  if (!modal) return;
+  modal.removeAttribute('aria-hidden');
+  modal.classList.add('open');
+  document.body.classList.add('modal-open');
+
+  // Determine initial coordinates: existing pin > Bengaluru default
+  const latId = prefix === 'donor' ? 'd-lat' : prefix === 'ngo' ? 'n-lat' : prefix + '-lat';
+  const lngId = prefix === 'donor' ? 'd-lng' : prefix === 'ngo' ? 'n-lng' : prefix + '-lng';
+  const existLat = parseFloat($(latId)?.value);
+  const existLng = parseFloat($(lngId)?.value);
+  const startLat = (!isNaN(existLat) && existLat !== 0) ? existLat : 12.9716;
+  const startLng = (!isNaN(existLng) && existLng !== 0) ? existLng : 77.5946;
+
+  _smap.lat = null; _smap.lng = null; _smap.addrText = null;
+
+  // Disable confirm until pin placed
+  const confirmBtn = $('signup-map-confirm');
+  if (confirmBtn) confirmBtn.disabled = true;
+  const addrSpan = $('signup-map-addr-text');
+  if (addrSpan) addrSpan.textContent = 'Click the map to place a pin';
+
+  if (!_smap.map) {
+    // First open — initialise Leaflet
+    _smap.map = L.map('signup-map-leaflet').setView([startLat, startLng], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a> contributors',
+      maxZoom: 19
+    }).addTo(_smap.map);
+
+    _smap.map.on('click', e => _placeSignupPin(e.latlng.lat, e.latlng.lng));
+  } else {
+    _smap.map.setView([startLat, startLng], 14);
+    // Invalidate size in case the container was hidden on first render
+    setTimeout(() => _smap.map.invalidateSize(), 60);
+  }
+
+  // If there is already a saved pin, show it
+  if (!isNaN(existLat) && existLat !== 0) {
+    _placeSignupPin(existLat, existLng, /*skipGeocode=*/true);
+  } else {
+    setTimeout(() => _smap.map.invalidateSize(), 60);
+  }
+};
+
+function _placeSignupPin(lat, lng, skipGeocode) {
+  _smap.lat = lat; _smap.lng = lng;
+  if (_smap.marker) {
+    _smap.marker.setLatLng([lat, lng]);
+  } else {
+    _smap.marker = L.marker([lat, lng], { draggable: true }).addTo(_smap.map);
+    _smap.marker.on('dragend', e => {
+      const ll = e.target.getLatLng();
+      _placeSignupPin(ll.lat, ll.lng);
+    });
+  }
+  _smap.map.panTo([lat, lng]);
+
+  const confirmBtn = $('signup-map-confirm');
+  if (confirmBtn) confirmBtn.disabled = false;
+
+  const addrSpan = $('signup-map-addr-text');
+  if (addrSpan) addrSpan.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)} — fetching address…`;
+
+  if (skipGeocode) {
+    if (addrSpan) addrSpan.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    return;
+  }
+  // Nominatim reverse-geocode (rate-limited with 800 ms debounce)
+  clearTimeout(_smap.geocodeTimer);
+  _smap.geocodeTimer = setTimeout(async () => {
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`;
+      const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+      const data = await res.json();
+      const display = data.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+      _smap.addrText = display;
+      if (addrSpan) addrSpan.textContent = display;
+    } catch (_) {
+      if (addrSpan) addrSpan.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    }
+  }, 800);
+}
+
+window.confirmSignupPin = function () {
+  if (_smap.lat == null) return;
+  const prefix = _smap.activePrefix;
+  const latId = prefix === 'donor' ? 'd-lat' : prefix === 'ngo' ? 'n-lat' : prefix + '-lat';
+  const lngId = prefix === 'donor' ? 'd-lng' : prefix === 'ngo' ? 'n-lng' : prefix + '-lng';
+  const latEl = $(latId); const lngEl = $(lngId);
+  if (latEl) latEl.value = _smap.lat.toFixed(6);
+  if (lngEl) lngEl.value = _smap.lng.toFixed(6);
+
+  // Show the "pinned" chip
+  const addrLabel = $(`map-pin-addr-${prefix}`);
+  if (addrLabel) addrLabel.textContent = _smap.addrText || `${_smap.lat.toFixed(5)}, ${_smap.lng.toFixed(5)}`;
+  const sel = $(`map-pin-selected-${prefix}`); if (sel) sel.hidden = false;
+  const tog = $(`map-pin-${prefix}`)?.querySelector('.map-pin-toggle');
+  if (tog) tog.style.display = 'none';
+
+  closeSignupMap();
+};
+
+window.clearSignupPin = function (prefix) {
+  const latId = prefix === 'donor' ? 'd-lat' : prefix === 'ngo' ? 'n-lat' : prefix + '-lat';
+  const lngId = prefix === 'donor' ? 'd-lng' : prefix === 'ngo' ? 'n-lng' : prefix + '-lng';
+  const latEl = $(latId); if (latEl) latEl.value = '';
+  const lngEl = $(lngId); if (lngEl) lngEl.value = '';
+  const sel = $(`map-pin-selected-${prefix}`); if (sel) sel.hidden = true;
+  const tog = $(`map-pin-${prefix}`)?.querySelector('.map-pin-toggle');
+  if (tog) tog.style.display = '';
+};
+
+window.closeSignupMap = function () {
+  const modal = $('signup-map-modal');
+  if (!modal) return;
+  modal.setAttribute('aria-hidden', 'true');
+  modal.classList.remove('open');
+  document.body.classList.remove('modal-open');
+};

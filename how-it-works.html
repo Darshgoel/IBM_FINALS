@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>How FoodBridge Works — From surplus to a shared meal</title>
-  <meta name="description" content="See how FoodBridge moves surplus food from donor kitchens to verified community organisations — from listing and matching to pickup and completed handover." />
+  <meta name="description" content="See how FoodBridge moves surplus from donors to NGO and food-bank demand, records food-bank inventory, and routes expired food to eligible biogas partners." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
@@ -61,8 +61,8 @@
         <div>
           <nav class="breadcrumb" aria-label="Breadcrumb"><a href="/">Home</a><span aria-hidden="true">/</span><span>How It Works</span></nav>
           <p class="section-kicker">How It Works</p>
-          <h1>From surplus to a shared meal in <em>four traceable steps.</em></h1>
-          <p class="page-lead">The network handles coordination so donors can give quickly and community teams can focus on people, not paperwork. Every listing has a route, every handover has a record.</p>
+          <h1>From surplus to a shared meal — <em>with safe recovery built in.</em></h1>
+          <p class="page-lead">The network handles coordination so donors can give quickly and community teams can focus on people, not paperwork. NGOs and food banks meet demand; biogas partners handle eligible recovery routes when food cannot safely go to people.</p>
           <div class="page-hero-actions">
             <a class="btn-solid" href="/donor/">Post surplus food</a>
             <a class="btn-outline" href="/demand-org/">Register your organisation</a>
@@ -104,24 +104,24 @@
             <span class="flow-num">02</span>
             <div>
               <h3>The matching engine finds a fit</h3>
-              <p>Nearby verified organisations are ranked using dietary compatibility, urgency, receiving capacity and collection distance. Matches that cannot be collected within the safe window are not presented as viable.</p>
+              <p>Nearby verified NGO and food-bank demands are ranked using food fit, urgency, receiving capacity and route time. Unmatched edible quantities may go to food banks; matches must arrive within the safe window.</p>
               <span class="flow-note">Automatic, not a public race for food</span>
             </div>
           </article>
           <article class="flow-step">
             <span class="flow-num">03</span>
             <div>
-              <h3>The organisation confirms and collects</h3>
-              <p>The matched community organisation reviews the details, acknowledges the safety information, confirms the pickup and records when the food is collected.</p>
-              <span class="flow-note">NGO dashboard → Matches and pickups</span>
+              <h3>The receiving partner confirms</h3>
+              <p>An NGO records the completed handover. A food bank confirms receipt, which adds the received quantity to its inventory so in-date stock can meet later demand.</p>
+              <span class="flow-note">NGO or Food Bank dashboard → Matches and inventory</span>
             </div>
           </article>
           <article class="flow-step">
             <span class="flow-num">04</span>
             <div>
               <h3>The handover is completed</h3>
-              <p>Once delivered, the match is marked complete. That completed record becomes the basis for meals rescued, people served and CO₂e avoided — no projections are counted as impact.</p>
-              <span class="flow-note">Traceable, auditable, counted once</span>
+              <p>Completed human-food handovers count toward meal impact. If donor surplus or food-bank stock expires, is unsafe, or cannot reach people within its safe window, the system removes it from human-food availability and assigns it to an eligible biogas facility for separately recorded recovery.</p>
+              <span class="flow-note">Food-bank receipt and biogas intake are recorded separately</span>
             </div>
           </article>
         </div>
@@ -149,6 +149,18 @@
             <a class="card-meta" href="/demand-org/">Open NGO portal</a>
           </article>
           <article class="info-card">
+            <span class="card-icon blue"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v15H4zM8 9h8M8 13h8M8 17h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <h3>Food banks</h3>
+            <p>Accept suitable donor surplus, confirm receipt, manage stock and offer in-date inventory to other verified partners' needs.</p>
+            <a class="card-meta" href="/?auth=signup&amp;role=food_bank">Register a food bank</a>
+          </article>
+          <article class="info-card">
+            <span class="card-icon"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 10-13h-7l1-7Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></span>
+            <h3>Biogas partners</h3>
+            <p>Receive assigned routes for eligible expired or unsafe food; operators record acceptance and facility receipt.</p>
+            <a class="card-meta" href="/?auth=signup&amp;role=biogas_operator">Register a biogas facility</a>
+          </article>
+          <article class="info-card">
             <span class="card-icon orange"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-4.5 7-11a7 7 0 0 0-14 0c0 6.5 7 11 7 11Z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg></span>
             <h3>People looking for food</h3>
             <p>The public food finder shows open access points, current dishes where available, operating hours and collection instructions. No account is required.</p>
@@ -167,7 +179,7 @@
           <div class="value-list">
             <div class="value-row">
               <span class="value-icon"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.4-2.9 7.8-7 9-4.1-1.2-7-4.6-7-9V6l7-3Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-              <div><h3>Verification is not automatic</h3><p>New donor and NGO accounts are reviewed before posting or matching unlocks. The portal shows a pending state rather than pretending the account is active.</p></div>
+              <div><h3>Verification is not automatic</h3><p>Donors, NGOs, food banks and biogas operators are reviewed before their operational features are enabled. The portal shows a pending state until approval.</p></div>
             </div>
             <div class="value-row">
               <span class="value-icon"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v5M12 16h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/></svg></span>
@@ -175,7 +187,7 @@
             </div>
             <div class="value-row">
               <span class="value-icon"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-4.5 7-11a7 7 0 0 0-14 0c0 6.5 7 11 7 11Z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg></span>
-              <div><h3>Matched is not delivered</h3><p>A matched or in-transit listing is not counted as rescued food. It only becomes impact when the handover is completed.</p></div>
+              <div><h3>Accepted is not delivered</h3><p>An accepted listing is not counted as rescued food. It only becomes impact when the recipient confirms the handover.</p></div>
             </div>
           </div>
         </div>
@@ -187,16 +199,16 @@
               <div class="faq-body">No. The public food finder is open and does not require a login. You can search by area, see open access points and read current collection details.</div>
             </details>
             <details class="faq-item">
-              <summary>How is a community organisation chosen?</summary>
-              <div class="faq-body">The matching engine ranks verified organisations using dietary fit, urgency, capacity and distance. Coordinators can review and adjust allocations where the network needs it.</div>
+              <summary>How is a food recipient chosen?</summary>
+              <div class="faq-body">The matching engine ranks compatible NGO and food-bank demand using food safety, dietary fit, urgency, capacity and route time. Food banks can also supply eligible in-date inventory to another partner's demand.</div>
             </details>
             <details class="faq-item">
-              <summary>Can I choose which NGO receives my food?</summary>
-              <div class="faq-body">The standard flow matches supply automatically so food moves quickly. The network intelligence portal gives coordinators visibility to intervene when a match is not working.</div>
+              <summary>Can I choose which partner receives my food?</summary>
+              <div class="faq-body">The standard flow matches supply automatically to an eligible NGO or food bank. Unmatched edible surplus may be offered to a food bank; the network intelligence portal gives coordinators visibility when a match needs review.</div>
             </details>
             <details class="faq-item">
               <summary>What happens if food cannot be collected in time?</summary>
-              <div class="faq-body">The listing remains visible with its real status and is not counted as a completed handover. Expired or cancelled listings are shown honestly rather than hidden as successes.</div>
+              <div class="faq-body">The system checks expiry throughout the food flow. Expired or unsafe food is removed from human-food availability and routed to an eligible biogas facility. If no real eligible facility can accept it, the item is flagged for coordinator review; it is never counted as a completed meal handover.</div>
             </details>
             <details class="faq-item">
               <summary>Is my personal information shown publicly?</summary>
@@ -251,6 +263,8 @@
         <h4>Portals</h4>
         <a href="/donor/">Food donors</a>
         <a href="/demand-org/">NGOs &amp; community orgs</a>
+        <a href="/?auth=signup&amp;role=food_bank">Food bank partners</a>
+        <a href="/?auth=signup&amp;role=biogas_operator">Biogas partners</a>
         <a href="/recipient/">Food finder</a>
         <a href="/network-intelligence/">Network intelligence</a>
         <a href="/admin/">Admin</a>

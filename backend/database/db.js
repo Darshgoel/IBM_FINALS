@@ -1,17 +1,34 @@
 /**
- * Database layer using better-sqlite3 (synchronous SQLite).
- * Creates schema and seeds realistic test data.
+ * Database layer. Local development keeps better-sqlite3; deployments can use
+ * PostgreSQL while retaining the existing synchronous business-flow calls.
  */
 const Database = require('better-sqlite3');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcryptjs');
+const { createPostgresSyncDatabase } = require('./postgres-sync');
 
-const DB_FILE = path.join(__dirname, 'foodbridge.db');
+const DB_FILE = process.env.FOODBRIDGE_DB_PATH
+  ? path.resolve(process.env.FOODBRIDGE_DB_PATH)
+  : path.join(__dirname, 'foodbridge.db');
 
-const db = new Database(DB_FILE);
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+const requestedDriver = (process.env.FOODBRIDGE_DATABASE_DRIVER || '').toLowerCase();
+if (requestedDriver && !['sqlite', 'postgres'].includes(requestedDriver)) {
+  throw new Error('FOODBRIDGE_DATABASE_DRIVER must be either "sqlite" or "postgres"');
+}
+const isPostgres = requestedDriver
+  ? requestedDriver === 'postgres'
+  : Boolean(process.env.DATABASE_URL);
+if (isPostgres && !process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL is required when FOODBRIDGE_DATABASE_DRIVER=postgres');
+}
+const db = isPostgres
+  ? createPostgresSyncDatabase(process.env.DATABASE_URL)
+  : new Database(DB_FILE);
+if (!isPostgres) {
+  db.pragma('journal_mode = WAL');
+  db.pragma('foreign_keys = ON');
+}
 
 // ── Schema ──────────────────────────────────────────────────────────────────
 db.exec(`
@@ -52,6 +69,14 @@ db.exec(`
     doc_type TEXT DEFAULT 'verification_certificate',
     file_size INTEGER DEFAULT 0,
     uploaded_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS stored_documents (
+    storage_key TEXT PRIMARY KEY,
+    original_name TEXT NOT NULL,
+    mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+    data_base64 TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
   );
 
   CREATE TABLE IF NOT EXISTS donor_profiles (
@@ -159,6 +184,18 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS partner_verification_responses (
+    id TEXT PRIMARY KEY,
+    request_record_id TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    response_text TEXT DEFAULT '',
+    document_name TEXT DEFAULT '',
+    document_url TEXT DEFAULT '',
+    submitted_by TEXT NOT NULL,
+    audit_record_id TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS issue_reports (
     id TEXT PRIMARY KEY,
     reporter_org_id TEXT,
@@ -220,6 +257,10 @@ try { db.exec("ALTER TABLE matches ADD COLUMN route_distance_km REAL"); } catch(
 try { db.exec("ALTER TABLE matches ADD COLUMN route_duration_minutes REAL"); } catch(e){}
 try { db.exec("ALTER TABLE matches ADD COLUMN route_provider TEXT DEFAULT 'haversine'"); } catch(e){}
 try { db.exec("ALTER TABLE matches ADD COLUMN routing_audit TEXT DEFAULT NULL"); } catch(e){}
+// Match source metadata allows verified food-bank inventory to supply demands
+// without creating fake donor surplus rows. Existing matches remain 'surplus'.
+try { db.exec("ALTER TABLE matches ADD COLUMN source_type TEXT NOT NULL DEFAULT 'surplus'"); } catch(e){}
+try { db.exec("ALTER TABLE matches ADD COLUMN source_inventory_id TEXT DEFAULT NULL"); } catch(e){}
 try { db.exec("ALTER TABLE biogas_routes ADD COLUMN biogas_facility_id TEXT DEFAULT NULL"); } catch(e){}
 try { db.exec("ALTER TABLE biogas_routes ADD COLUMN route_distance_km REAL"); } catch(e){}
 try { db.exec("ALTER TABLE biogas_routes ADD COLUMN route_duration_minutes REAL"); } catch(e){}
@@ -231,6 +272,19 @@ try { db.exec("ALTER TABLE biogas_facilities ADD COLUMN osm_place_id TEXT DEFAUL
 try { db.exec("ALTER TABLE biogas_facilities ADD COLUMN osm_id TEXT DEFAULT NULL"); } catch(e){}
 try { db.exec("ALTER TABLE biogas_facilities ADD COLUMN osm_type TEXT DEFAULT NULL"); } catch(e){}
 try { db.exec("ALTER TABLE demand_org_profiles ADD COLUMN receiving_capacity_kg REAL DEFAULT 0"); } catch(e){}
+// Biogas operator account linkage
+try { db.exec("ALTER TABLE biogas_facilities ADD COLUMN operator_user_id TEXT DEFAULT NULL"); } catch(e){}
+try { db.exec("ALTER TABLE biogas_facilities ADD COLUMN is_available INTEGER DEFAULT 1"); } catch(e){}
+try { db.exec("ALTER TABLE biogas_facilities ADD COLUMN current_intake_kg REAL DEFAULT 0"); } catch(e){}
+try { db.exec("ALTER TABLE biogas_facilities ADD COLUMN intake_date TEXT DEFAULT NULL"); } catch(e){}
+// food_bank org type is handled by reusing demand_org_profiles; no schema change needed
+// Biogas route traceability fields
+try { db.exec("ALTER TABLE biogas_routes ADD COLUMN status TEXT DEFAULT 'pending'"); } catch(e){}
+try { db.exec("ALTER TABLE biogas_routes ADD COLUMN received_at TEXT DEFAULT NULL"); } catch(e){}
+try { db.exec("ALTER TABLE biogas_routes ADD COLUMN weigh_in_kg REAL DEFAULT NULL"); } catch(e){}
+try { db.exec("ALTER TABLE biogas_routes ADD COLUMN processing_notes TEXT DEFAULT ''"); } catch(e){}
+try { db.exec("ALTER TABLE biogas_routes ADD COLUMN source_type TEXT NOT NULL DEFAULT 'surplus'"); } catch(e){}
+try { db.exec("ALTER TABLE biogas_routes ADD COLUMN source_inventory_id TEXT DEFAULT NULL"); } catch(e){}
 
 // biogas_facilities table
 try {
@@ -255,6 +309,60 @@ try {
     )
   `);
 } catch(e){}
+
+// food_bank_inventory table
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS food_bank_inventory (
+      id TEXT PRIMARY KEY,
+      org_id TEXT NOT NULL,
+      match_id TEXT,
+      food_name TEXT NOT NULL,
+      food_type TEXT DEFAULT '',
+      quantity_received REAL NOT NULL,
+      quantity_unit TEXT DEFAULT 'kg',
+      quantity_remaining REAL,
+      expiry_date TEXT,
+      storage_location TEXT DEFAULT '',
+      notes TEXT DEFAULT '',
+      received_at TEXT DEFAULT (datetime('now')),
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_fbi_org ON food_bank_inventory(org_id)`);
+  try { db.exec("ALTER TABLE food_bank_inventory ADD COLUMN biogas_status TEXT DEFAULT 'available'"); } catch(e){}
+  try { db.exec("ALTER TABLE food_bank_inventory ADD COLUMN biogas_reason TEXT DEFAULT ''"); } catch(e){}
+  try { db.exec("ALTER TABLE food_bank_inventory ADD COLUMN dietary_tags TEXT DEFAULT '[]'"); } catch(e){}
+  try { db.exec(`UPDATE food_bank_inventory SET dietary_tags = COALESCE((
+    SELECT sp.dietary_tags FROM matches m JOIN surplus_posts sp ON sp.id = m.surplus_id
+    WHERE m.id = food_bank_inventory.match_id AND m.source_type = 'surplus'
+  ), '[]') WHERE dietary_tags IS NULL OR TRIM(dietary_tags) = '' OR dietary_tags = '[]'`); } catch(e){}
+} catch(e){}
+
+// receipt_confirmations table (food bank confirms receipt of a match)
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS receipt_confirmations (
+      id TEXT PRIMARY KEY,
+      match_id TEXT NOT NULL,
+      org_id TEXT NOT NULL,
+      quantity_confirmed REAL,
+      quantity_unit TEXT DEFAULT 'kg',
+      discrepancy_noted INTEGER DEFAULT 0,
+      discrepancy_notes TEXT DEFAULT '',
+      condition_ok INTEGER DEFAULT 1,
+      condition_notes TEXT DEFAULT '',
+      confirmed_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+} catch(e){}
+
+// Collapse the retired transit phase into the existing accepted state while
+// preserving the later receipt confirmation step.
+try { db.exec("UPDATE matches SET status = 'confirmed' WHERE status = 'in_transit'"); } catch(e){}
+try { db.exec("UPDATE surplus_posts SET status = 'matched' WHERE status = 'in_transit'"); } catch(e){}
+try { db.exec("UPDATE biogas_routes SET status = 'accepted' WHERE status = 'in_transit'"); } catch(e){}
+try { db.exec("UPDATE food_bank_inventory SET biogas_status = 'accepted' WHERE biogas_status = 'in_transit'"); } catch(e){}
 
 // route_cache table
 try {
@@ -286,6 +394,10 @@ try {
 function seedInitialData() {
   const adminExists = db.prepare("SELECT id FROM users WHERE role = 'admin' LIMIT 1").get();
   if (adminExists) return;
+  if (isPostgres && process.env.FOODBRIDGE_SEED_DEMO !== '1') {
+    console.log('[DB] PostgreSQL is empty; skipping demo seed data.');
+    return;
+  }
 
   console.log('[DB] Seeding database with initial accounts and realistic network state…');
 
@@ -373,7 +485,7 @@ function seedInitialData() {
   db.prepare(`INSERT INTO users (id, email, password_hash, role, org_id, name) VALUES (?, ?, ?, 'demand_org', ?, ?)`).run(uuidv4(), 'contact@nourishkids.org', userPasswordHash, pendingOrg2, 'Kavita Menon');
 
   // 5. Surplus Posts
-  // Post A: Matched and in-transit
+  // Post A: Matched and awaiting receipt confirmation
   const surplusA = uuidv4();
   db.prepare(`INSERT INTO surplus_posts (id, donor_org_id, food_name, food_type, quantity, remaining_quantity, quantity_unit, preparation_state, dietary_tags, availability_time, remaining_usable_time, pickup_address, special_instructions, status)
     VALUES (?, ?, 'Paneer Butter Masala & Jeera Rice', 'cooked_meals', 45, 0, 'servings', 'Freshly packed warm containers', '["veg","gluten_free"]', datetime('now', '-1 hour'), datetime('now', '+3 hours'), 'The Grand Hotel, Kitchen Dock #2', 'Enter via rear service lane', 'matched')`)
@@ -419,7 +531,7 @@ function seedInitialData() {
   // 7. Matches
   const match1 = uuidv4();
   db.prepare(`INSERT INTO matches (id, surplus_id, demand_id, demand_org_id, match_score, allocated_quantity, allocated_unit, explanation, status, notes, matched_at)
-    VALUES (?, ?, ?, ?, 92, 45, 'servings', 'Direct match: high urgency match within 3.5km, covers 100% of demand', 'in_transit', 'Direct match: high urgency match within 3.5km', datetime('now', '-45 minutes'))`)
+    VALUES (?, ?, ?, ?, 92, 45, 'servings', 'Direct match: high urgency match within 3.5km, covers 100% of demand', 'confirmed', 'Direct match: high urgency match within 3.5km', datetime('now', '-45 minutes'))`)
     .run(match1, surplusA, demand2, ngoOrg1);
 
   const match2 = uuidv4();
@@ -452,10 +564,19 @@ function seedInitialData() {
     VALUES (?, ?, NULL, 'risk', '⚠️ Food at Waste Risk', '30 servings of sandwiches approaching expiry window (90 mins remaining).')`)
     .run(uuidv4(), donorOrg2);
 
+  // 11. Food Bank operator demo account (food_bank role, reuses demand_org flow)
+  const fbOrg = uuidv4();
+  db.prepare(`INSERT INTO organizations (id, name, type, location_address, location_lat, location_lng, operating_hours, contact_phone, contact_email, description, status, verified, document_url, document_name)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', 1, '/uploads/sample_fssai_cert.pdf', 'CityCare_FoodBank_Cert.pdf')`)
+    .run(fbOrg, 'CityCare Community Food Bank', 'food_bank', 'Rajajinagar, Bengaluru', 12.9950, 77.5550, 'Mon-Sat 8am-8pm', '+91 80 2345 6789', 'ops@citycarefoodbank.org', 'Cold-chain and dry storage reserve food bank serving 600+ beneficiaries weekly.');
+  db.prepare(`INSERT INTO demand_org_profiles (org_id, population_served, serving_capacity, storage_capacity, food_requirements, dietary_restrictions)
+    VALUES (?, 'Low-income families and children', 600, '3000kg dry + 800kg cold storage', ?, ?)`).run(fbOrg, JSON.stringify(['all_types']), JSON.stringify([]));
+  db.prepare(`INSERT INTO users (id, email, password_hash, role, org_id, name) VALUES (?, ?, ?, 'food_bank', ?, ?)`).run(uuidv4(), 'ops@citycarefoodbank.org', userPasswordHash, fbOrg, 'Priya Nair');
+
   console.log('[DB] Realistic network state seeded successfully.');
 }
 
-// Seed biogas facilities (independent of main seed guard — uses its own check)
+// Seed biogas facilities on a fresh install only.
 function seedBiogasFacilities() {
   const existing = db.prepare("SELECT COUNT(*) as c FROM biogas_facilities").get();
   if (existing.c > 0) return;
@@ -495,13 +616,30 @@ function seedBiogasFacilities() {
     'Eco biogas processing unit specializing in cooked meals, dairy and produce; 300 kg/day capacity'
   );
 
+  // Biogas operator demo account linked to Green Energy Biogas Plant
+  const bioOpsExists = db.prepare("SELECT id FROM users WHERE email = 'operator@greenenergybiogas.in' LIMIT 1").get();
+  if (!bioOpsExists) {
+    const bioUserPasswordHash = bcrypt.hashSync('password123', 10);
+    const bioUserId = uuidv4();
+    const facility = db.prepare("SELECT id FROM biogas_facilities WHERE name = 'Green Energy Biogas Plant' LIMIT 1").get();
+    if (facility) {
+      db.prepare(`INSERT INTO users (id, email, password_hash, role, name) VALUES (?, ?, ?, 'biogas_operator', ?)`).run(
+        bioUserId, 'operator@greenenergybiogas.in', bioUserPasswordHash, 'Rajan Kumar'
+      );
+      db.prepare('UPDATE biogas_facilities SET operator_user_id = ?, is_available = 1, status = ? WHERE id = ?').run(bioUserId, 'active', facility.id);
+    }
+  }
+
   console.log('[DB] Biogas facilities seeded.');
 }
 
-// Seed on startup
+// Preserve a clean test database after initial setup. In particular, deleting
+// partner accounts from an existing database must not cause demo partners or
+// biogas facilities to be recreated when the backend restarts.
+const isFreshInstall = !db.prepare("SELECT id FROM users WHERE role = 'admin' LIMIT 1").get();
 seedInitialData();
-seedBiogasFacilities();
+if (isFreshInstall && (!isPostgres || process.env.FOODBRIDGE_SEED_DEMO === '1')) seedBiogasFacilities();
 
-console.log('[DB] Database ready.');
+console.log(`[DB] ${isPostgres ? 'PostgreSQL' : 'SQLite'} database ready.`);
 
 module.exports = db;

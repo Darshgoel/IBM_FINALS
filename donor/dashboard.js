@@ -615,7 +615,7 @@ function renderSurplus(filter) {
           ${post.status === 'available'
             ? `<button class="btn btn-sm btn-danger" type="button" onclick="cancelSurplus('${escapeAttr(post.id)}', this)">${fbIcon('trash')} Cancel post</button>`
             : ''}
-          ${post.status === 'matched' || post.status === 'in_transit'
+          ${post.status === 'matched'
             ? `<span class="form-help" style="margin:0 0 0 auto">A recipient has this offer. Changes are handled through the collection workflow.</span>`
             : ''}
         </div>
@@ -662,7 +662,7 @@ window.openSurplusDetail = async id => {
         <div class="fb-detail-item"><small>Created</small><span>${fmtDt(post.created_at)}</span></div>
       </div>
       ${post.status === 'completed' ? '<div class="fb-detail-note">This handover is complete and is included in your impact totals.</div>' : ''}
-      ${post.status === 'matched' || post.status === 'in_transit' ? '<div class="fb-detail-note">This listing is matched but not yet complete. It is not counted as rescued food until the recipient confirms the handover.</div>' : ''}
+      ${post.status === 'matched' ? '<div class="fb-detail-note">This listing has allocated food. Allocations count as rescued only after receipt is confirmed.</div>' : ''}
       ${post.status === 'expired' ? '<div class="fb-detail-note" style="border-color:#F3C8C4;background:var(--fb-error-soft);color:#B42D24">This offer expired before a completed handover. It does not count as recovered food.</div>' : ''}
       ${decisions && decisions.length ? `<div class="fb-detail-note"><strong>Allocation trail:</strong> ${decisions.map(decision => `${escapeHtml(decision.tier)} — ${escapeHtml(decision.reason || `score ${Math.round(decision.score || 0)}`)}`).join(' · ')}</div>` : ''}
     `;
@@ -1075,7 +1075,6 @@ function statusMeta(status) {
   const map = {
     available: { label: 'Available', tone: 'available' },
     matched: { label: 'Matched', tone: 'info' },
-    in_transit: { label: 'In transit', tone: 'info' },
     completed: { label: 'Completed', tone: 'success' },
     expired: { label: 'Expired', tone: 'danger' },
     cancelled: { label: 'Cancelled', tone: 'danger' },

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FoodBridge Impact — Live network access and reach</title>
-  <meta name="description" content="Live FoodBridge network access: verified community food points, incoming matches, areas covered and meal capacity." />
+  <meta name="description" content="Live FoodBridge food-access figures: verified NGOs and food banks, incoming human-food matches, areas covered and meal capacity. Biogas recovery is reported separately." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
@@ -62,7 +62,7 @@
           <nav class="breadcrumb" aria-label="Breadcrumb"><a href="/">Home</a><span aria-hidden="true">/</span><span>Impact</span></nav>
           <p class="section-kicker">Live Network Access</p>
           <h1>A verified route. <em>Measurable reach.</em></h1>
-          <p class="page-lead">These figures come from the live recipient directory: verified community access points and the food matches already heading their way. Completed-handover impact remains visible inside the donor and network dashboards.</p>
+          <p class="page-lead">These figures describe verified food-serving access points, including NGOs and food banks, and human-food matches heading their way. Biogas facilities are recovery partners, not public food-access points; their route intake is tracked separately. Completed-handover impact remains visible inside donor and network dashboards.</p>
           <div class="page-hero-actions">
             <a class="btn-solid" href="/donor/">Add surplus food</a>
             <a class="btn-outline" href="/how-it-works.html">How outcomes are counted</a>
@@ -90,12 +90,12 @@
           <article class="metric-card green">
             <strong data-stat="points">—</strong>
             <span>Verified access points</span>
-            <small class="metric-source">Active, verified community organisations</small>
+            <small class="metric-source">Active, verified NGOs, community organisations and food banks</small>
           </article>
           <article class="metric-card orange">
             <strong data-stat="incoming">—</strong>
             <span>Incoming food matches</span>
-            <small class="metric-source">Matches confirmed or in transit to partners</small>
+            <small class="metric-source">Matches accepted by partners</small>
           </article>
           <article class="metric-card blue">
             <strong data-stat="areas">—</strong>
@@ -126,17 +126,17 @@
           <article class="info-card">
             <span class="card-icon"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5M4 19h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M8 15l4-5 3 3 4-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
             <h3>Access points</h3>
-            <p>Only organizations with an active, verified demand profile are returned by the public recipient directory. Pending and rejected organizations are excluded.</p>
+            <p>Only active, verified food-serving organizations with a demand profile are returned by the public recipient directory. This includes food banks. Biogas facilities are not food collection points and are excluded from access counts.</p>
           </article>
           <article class="info-card">
             <span class="card-icon blue"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-4.5 7-11a7 7 0 0 0-14 0c0 6.5 7 11 7 11Z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg></span>
             <h3>Incoming matches</h3>
-            <p>Counts pending, confirmed and in-transit matches assigned to a partner. This is food on its way, not food already handed over.</p>
+            <p>Counts pending and accepted matches assigned to a partner. These are allocations awaiting confirmed receipt, not completed handovers.</p>
           </article>
           <article class="info-card">
             <span class="card-icon orange"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M5 8c4 0 7 2 7 6M19 7c-4 0-7 2-7 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
             <h3>Capacity &amp; areas</h3>
-            <p>Meal capacity comes from the partner's published serving capacity. Areas are distinct localities parsed from verified access-point addresses.</p>
+            <p>Meal capacity comes from food-serving partners' published serving capacity. Areas are distinct localities parsed from verified access-point addresses; biogas capacity is tracked separately as recovery intake.</p>
           </article>
         </div>
         <div class="data-note" style="margin-top:18px">
@@ -165,12 +165,14 @@
       <div class="shell">
         <div class="cta-band">
           <div>
-            <h2>Every verified access point starts with one listing.</h2>
-            <p>If you have surplus food, the network can route it to a verified community partner. If you run a community organisation, register to receive matched supply.</p>
+            <h2>Every partner has a clear place in the food flow.</h2>
+            <p>Donors provide surplus, NGOs and food banks meet food needs, and biogas facilities handle eligible recovery routes when food cannot safely reach people.</p>
           </div>
           <div class="cta-actions">
             <a class="btn-solid" href="/donor/">Donate food</a>
             <a class="btn-outline" href="/demand-org/">Partner as an NGO</a>
+            <a class="btn-outline" href="/?auth=signup&amp;role=food_bank">Join as a food bank</a>
+            <a class="btn-outline" href="/?auth=signup&amp;role=biogas_operator">Join as a biogas partner</a>
           </div>
         </div>
       </div>
@@ -205,6 +207,8 @@
         <h4>Portals</h4>
         <a href="/donor/">Food donors</a>
         <a href="/demand-org/">NGOs &amp; community orgs</a>
+        <a href="/?auth=signup&amp;role=food_bank">Food bank partners</a>
+        <a href="/?auth=signup&amp;role=biogas_operator">Biogas partners</a>
         <a href="/recipient/">Food finder</a>
         <a href="/network-intelligence/">Network intelligence</a>
         <a href="/admin/">Admin</a>
