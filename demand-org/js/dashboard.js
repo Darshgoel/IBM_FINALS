@@ -97,8 +97,7 @@ async function init() {
     initLiveNotifications();
   } catch (err) {
     console.error('Init error:', err);
-    // Use local data if backend unavailable
-    loadDemoData();
+    toast('Could not connect to server. Some data may be unavailable.', 'error');
   }
 }
 
@@ -188,8 +187,10 @@ async function loadDemands() {
   try {
     const data = await api.demandOrg.getDemands(token);
     allDemands = data.demands || [];
-  } catch {
-    allDemands = demoDemandsData();
+  } catch (err) {
+    console.error('loadDemands', err);
+    allDemands = [];
+    toast('Failed to load demands.', 'error');
   }
   renderDemandList('demands-list', filterDemandsArr(allDemands, demandFilter));
 }
@@ -363,8 +364,10 @@ async function loadMatches() {
   try {
     const data = await api.demandOrg.getMatches(token);
     matches = data.matches || [];
-  } catch {
-    matches = demoMatchesData();
+  } catch (err) {
+    console.error('loadMatches', err);
+    matches = [];
+    toast('Failed to load matches.', 'error');
   }
   renderMatchList('matches-list', matches);
 }
@@ -389,7 +392,9 @@ function renderMatchList(containerId, matches) {
       </div>
       <div class="match-details">
         <span>📦 ${m.quantity || '—'} ${m.unit || 'servings'}</span>
-        <span>📍 ${m.distance ? (typeof m.distance === 'number' ? m.distance + ' km away' : m.distance) : '~2km away'}</span>
+        ${m.route_distance_km != null
+          ? `<span>📍 ${Number(m.route_distance_km).toFixed(1)} km | ETA: ~${Math.round(m.route_duration_minutes || 0)} min | via ${m.route_provider || 'haversine'}</span>`
+          : `<span>📍 ${m.distance ? (typeof m.distance === 'number' ? m.distance + ' km away' : m.distance) : 'Distance TBD'}</span>`}
         <span>⏱️ Available: ${m.availableUntil ? new Date(m.availableUntil).toLocaleTimeString() : 'Now'}</span>
         <span>🚨 Your need: ${m.demandUrgency || 'regular'}</span>
       </div>
@@ -412,8 +417,8 @@ window.acceptMatch = async function (id) {
     toast('Match accepted! Supply is on its way.', 'success');
     const card = document.getElementById(`match-card-${id}`);
     if (card) card.querySelector('.match-actions').innerHTML = '<span class="demand-status-badge status-matched">Accepted</span>';
-  } catch {
-    toast('Match accepted (demo)!', 'success');
+  } catch (err) {
+    toast('❌ ' + (err.message || 'Failed to accept match'), 'error');
   }
 };
 
@@ -422,9 +427,8 @@ window.declineMatch = async function (id) {
     await api.demandOrg.declineMatch(token, id);
     document.getElementById(`match-card-${id}`)?.remove();
     toast('Match declined.', 'info');
-  } catch {
-    document.getElementById(`match-card-${id}`)?.remove();
-    toast('Match declined (demo).', 'info');
+  } catch (err) {
+    toast('❌ ' + (err.message || 'Failed to decline match'), 'error');
   }
 };
 
@@ -479,8 +483,8 @@ window.updateCapacity = async function () {
   try {
     await api.demandOrg.updateCapacity(token, body);
     toast('✅ Capacity updated!', 'success');
-  } catch {
-    toast('✅ Capacity updated (demo)!', 'success');
+  } catch (err) {
+    toast('❌ ' + (err.message || 'Failed to update capacity'), 'error');
   }
 };
 
@@ -492,6 +496,7 @@ async function loadInsights() {
   } catch (err) {
     console.error('loadInsights', err);
     ins = {};
+    toast('Failed to load insights.', 'error');
   }
 
   setText('ins-fulfillment-rate', (ins.fulfillmentRate ?? 0) + '%');
@@ -598,8 +603,10 @@ async function loadAlerts() {
   try {
     const data = await api.demandOrg.getAlerts(token);
     alerts = data.alerts || [];
-  } catch {
-    alerts = demoAlertsData();
+  } catch (err) {
+    console.error('loadAlerts', err);
+    alerts = [];
+    toast('Failed to load alerts.', 'error');
   }
   renderAlertList('alerts-full-list', alerts);
 }
@@ -661,7 +668,10 @@ async function loadProfile() {
     setValue('p-serve-cap', p.servingCapacity || '');
     setValue('p-population', p.populationServed || '');
     setValue('p-food-req', p.foodRequirements || '');
-  } catch { /* demo data already in placeholders */ }
+  } catch (err) {
+    console.error('loadProfile', err);
+    toast('Failed to load profile data.', 'error');
+  }
 }
 
 window.saveProfile = async function () {
@@ -681,8 +691,9 @@ window.saveProfile = async function () {
     hideMsg('profile-error');
     // Update sidebar
     document.getElementById('sidebar-org-name').textContent = body.orgName;
-  } catch {
-    showMsg('profile-success', '✅ Profile saved (demo mode)!');
+  } catch (err) {
+    console.error('saveProfile', err);
+    showMsg('profile-error', '❌ Failed to save profile. Please try again.');
   }
 };
 

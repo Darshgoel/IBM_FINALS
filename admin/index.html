@@ -3,86 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FoodBridge — Admin Portal</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root { --bg:#060810; --surface:#0B0E1A; --card:rgba(255,255,255,0.04); --border:rgba(255,255,255,0.08); --primary:#8B5CF6; --text:#F1F5F9; --muted:#94A3B8; --sub:#64748B; --font:'Inter',sans-serif; }
-    body { font-family:var(--font); background:var(--bg); color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
-    body::before { content:''; position:fixed; inset:0; pointer-events:none; background:radial-gradient(ellipse 70% 50% at 50% 30%, rgba(139,92,246,0.08) 0%, transparent 60%); }
-    .page { position:relative; z-index:1; width:100%; max-width:420px; }
-    .logo { text-align:center; margin-bottom:32px; }
-    .logo .mark { font-size:2.4rem; }
-    .logo h1 { font-size:1.6rem; font-weight:800; letter-spacing:-0.5px; background:linear-gradient(135deg,#8B5CF6,#7C3AED); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-top:8px; }
-    .logo p { color:var(--muted); font-size:0.85rem; margin-top:6px; }
-    .admin-chip { display:inline-block; margin-top:10px; padding:4px 12px; border-radius:20px; background:rgba(139,92,246,0.12); color:var(--primary); font-size:0.72rem; font-weight:700; border:1px solid rgba(139,92,246,0.25); }
-    .card { background:var(--card); border:1px solid var(--border); border-radius:16px; backdrop-filter:blur(20px); padding:32px; }
-    label { display:block; font-size:0.75rem; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px; }
-    input { width:100%; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:10px; padding:12px 14px; color:var(--text); font-family:var(--font); font-size:0.9rem; outline:none; margin-bottom:14px; transition:border-color 0.2s,box-shadow 0.2s; }
-    input:focus { border-color:var(--primary); box-shadow:0 0 0 3px rgba(139,92,246,0.12); }
-    .btn { width:100%; padding:13px; border:none; border-radius:10px; font-family:var(--font); font-size:0.95rem; font-weight:700; cursor:pointer; transition:all 0.2s; background:linear-gradient(135deg,#8B5CF6,#7C3AED); color:#fff; margin-top:4px; }
-    .btn:hover { transform:translateY(-1px); box-shadow:0 8px 24px rgba(139,92,246,0.35); }
-    .btn:disabled { opacity:0.5; cursor:not-allowed; transform:none; box-shadow:none; }
-    .error { background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); color:#FCA5A5; padding:10px 14px; border-radius:8px; font-size:0.82rem; margin-bottom:14px; display:none; }
-    .error.show { display:block; }
-    .spinner { width:16px; height:16px; border:2px solid rgba(255,255,255,0.2); border-top-color:#fff; border-radius:50%; animation:spin 0.6s linear infinite; display:inline-block; vertical-align:middle; margin-right:6px; }
-    @keyframes spin { to { transform:rotate(360deg); } }
-    .back { text-align:center; margin-top:18px; }
-    .back a { color:var(--sub); font-size:0.78rem; text-decoration:none; }
-    .back a:hover { color:var(--muted); }
-    .warning-box { background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.2); border-radius:10px; padding:12px 14px; margin-bottom:20px; font-size:0.78rem; color:#FCD34D; line-height:1.6; }
-  </style>
+  <title>FoodBridge — Admin</title>
+  <meta http-equiv="refresh" content="0; url=/ops/" />
 </head>
 <body>
-  <div class="page">
-    <div class="logo">
-      <div class="mark">⚙️</div>
-      <h1>FoodBridge Admin</h1>
-      <p>Verification, Trust & Governance Portal</p>
-      <div class="admin-chip">🛡️ Restricted Access</div>
-    </div>
-    <div class="card">
-      <div class="warning-box">⚠️ This portal is restricted to authorized platform administrators. Unauthorized access attempts are logged.</div>
-      <div class="error" id="login-error"></div>
-      <label for="email">Admin Email</label>
-      <input type="email" id="email" placeholder="admin@foodbridge.org" autocomplete="email" />
-      <label for="password">Password</label>
-      <input type="password" id="password" placeholder="••••••••" autocomplete="current-password" />
-      <button class="btn" id="login-btn" onclick="handleLogin()">Sign In to Admin Portal</button>
-    </div>
-    <div class="back"><a href="/">← Back to FoodBridge</a></div>
-  </div>
-  <script>
-    const API = 'http://localhost:3000/api';
-    const token = localStorage.getItem('fb_token');
-    const user  = JSON.parse(localStorage.getItem('fb_user') || 'null');
-    if (token && user && user.role === 'admin') window.location.href = '/admin/dashboard.html';
-
-    async function handleLogin() {
-      const email    = document.getElementById('email').value.trim();
-      const password = document.getElementById('password').value;
-      const errEl    = document.getElementById('login-error');
-      errEl.classList.remove('show');
-      if (!email || !password) { errEl.textContent = 'Enter email and password.'; errEl.classList.add('show'); return; }
-      const btn = document.getElementById('login-btn');
-      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Signing in…';
-      try {
-        const res  = await fetch(`${API}/auth/login`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, password }) });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
-        if (data.user.role !== 'admin') throw new Error('This portal is for platform administrators only.');
-        localStorage.setItem('fb_token', data.token);
-        localStorage.setItem('fb_user', JSON.stringify(data.user));
-        window.location.href = '/admin/dashboard.html';
-      } catch (err) {
-        errEl.textContent = err.message; errEl.classList.add('show');
-      } finally {
-        btn.disabled = false; btn.innerHTML = 'Sign In to Admin Portal';
-      }
-    }
-    document.addEventListener('keydown', e => { if (e.key === 'Enter') handleLogin(); });
-  </script>
+  <p>Redirecting to <a href="/ops/">FoodBridge Ops Portal</a>…</p>
+  <script>window.location.replace('/ops/');</script>
 </body>
 </html>

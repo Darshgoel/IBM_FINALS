@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FoodBridge Network Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, "Segoe UI", system-ui, sans-serif; background: #1a1f2e; color: #e2e8f0; height: 100vh; display: flex; flex-direction: column; }
+
+    /* ── Header ── */
+    #map-header { background: #0f1623; border-bottom: 1px solid #2d3748; padding: 10px 16px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; flex-wrap: wrap; }
+    #map-header h1 { font-size: 1rem; font-weight: 600; color: #e2e8f0; white-space: nowrap; }
+    #search-box { flex: 1; min-width: 200px; max-width: 340px; display: flex; gap: 6px; }
+    #search-input { flex: 1; background: #1e293b; border: 1px solid #334155; color: #e2e8f0; border-radius: 6px; padding: 5px 10px; font-size: 0.82rem; outline: none; }
+    #search-input:focus { border-color: #3b82f6; }
+    .hdr-btn { background: #1e293b; border: 1px solid #334155; color: #e2e8f0; border-radius: 6px; padding: 5px 11px; font-size: 0.8rem; cursor: pointer; white-space: nowrap; }
+    .hdr-btn:hover { background: #2d3748; }
+    .hdr-btn.active { background: #3b82f6; border-color: #3b82f6; }
+
+    /* ── Layer controls ── */
+    #controls { background: #0f1623; border-bottom: 1px solid #2d3748; padding: 7px 16px; display: flex; gap: 14px; flex-wrap: wrap; align-items: center; flex-shrink: 0; }
+    .layer-toggle { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.82rem; user-select: none; }
+    .layer-toggle input { cursor: pointer; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .dot-donor  { background: #3b82f6; }
+    .dot-demand { background: #10b981; }
+    .dot-foodbank { background: #f59e0b; }
+    .dot-biogas   { background: #8b5cf6; }
+    .dot-osm      { background: transparent; border: 2px solid #f97316; width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    #controls-right { margin-left: auto; display: flex; gap: 8px; }
+    .osm-badge { display: inline-block; background: #431407; color: #fb923c; font-size: 0.67rem; font-weight: 700; padding: 1px 5px; border-radius: 4px; margin-left: 4px; border: 1px solid #9a3412; }
+
+    /* ── Map container ── */
+    #map { flex: 1; }
+
+    /* ── Side panel (route / detail) ── */
+    #side-panel { position: absolute; top: 110px; right: 12px; width: 290px; background: #0f1623; border: 1px solid #2d3748; border-radius: 10px; padding: 14px; z-index: 1000; font-size: 0.82rem; display: none; }
+    #side-panel.open { display: block; }
+    #side-panel h3 { font-size: 0.9rem; font-weight: 600; margin-bottom: 8px; }
+    #side-panel .sp-row { display: flex; justify-content: space-between; margin-bottom: 5px; }
+    #side-panel .sp-label { color: #94a3b8; }
+    #side-panel .sp-value { font-weight: 500; text-align: right; max-width: 160px; word-break: break-word; }
+    #close-panel { float: right; cursor: pointer; color: #94a3b8; font-size: 1.1rem; line-height: 1; margin-top: -2px; }
+    #close-panel:hover { color: #e2e8f0; }
+    .route-loading { color: #94a3b8; font-style: italic; margin-top: 8px; }
+    .route-info { margin-top: 10px; padding-top: 10px; border-top: 1px solid #2d3748; }
+    .route-info .ri-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+    .ri-label { color: #94a3b8; }
+    .provider-badge { font-size: 0.7rem; background: #1e293b; border: 1px solid #334155; border-radius: 4px; padding: 1px 5px; color: #94a3b8; }
+    .provider-badge.approx { border-color: #d97706; color: #d97706; }
+
+    /* ── Popup overrides ── */
+    .leaflet-popup-content-wrapper { background: #1e293b; color: #e2e8f0; border: 1px solid #334155; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
+    .leaflet-popup-tip { background: #1e293b; }
+    .leaflet-popup-content { margin: 12px 16px; font-size: 0.82rem; line-height: 1.5; min-width: 180px; }
+    .popup-name { font-weight: 700; font-size: 0.9rem; margin-bottom: 3px; }
+    .popup-type { font-size: 0.73rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px; }
+    .popup-addr { font-size: 0.79rem; color: #cbd5e1; margin-bottom: 5px; }
+    .badge-v { display: inline-block; background: #059669; color: #fff; font-size: 0.67rem; padding: 1px 5px; border-radius: 4px; margin-left: 4px; }
+    .badge-p { display: inline-block; background: #d97706; color: #fff; font-size: 0.67rem; padding: 1px 5px; border-radius: 4px; margin-left: 4px; }
+    .popup-route-btn { display: block; margin-top: 8px; background: #3b82f6; color: #fff; border: none; border-radius: 5px; padding: 5px 10px; font-size: 0.79rem; cursor: pointer; width: 100%; text-align: center; }
+    .popup-route-btn:hover { background: #2563eb; }
+
+    /* ── Status bar ── */
+    #status-bar { background: #0f1623; border-top: 1px solid #2d3748; padding: 5px 16px; font-size: 0.74rem; color: #94a3b8; flex-shrink: 0; }
+  </style>
+</head>
+<body>
+
+<div id="map-header">
+  <h1>🗺️ FoodBridge Network Map</h1>
+  <div id="search-box">
+    <input id="search-input" type="text" placeholder="Search location or org name…" autocomplete="off" />
+    <button class="hdr-btn" id="btn-search">Go</button>
+  </div>
+  <button class="hdr-btn" id="btn-fit">⊞ Fit All</button>
+  <button class="hdr-btn" id="btn-near-me">📍 Near Me</button>
+  <span id="org-count" style="font-size:0.75rem;color:#94a3b8;margin-left:4px;">Loading…</span>
+</div>
+
+<div id="controls">
+  <label class="layer-toggle"><input type="checkbox" id="toggle-donor" checked /><span class="dot dot-donor"></span> Donors</label>
+  <label class="layer-toggle"><input type="checkbox" id="toggle-demand" checked /><span class="dot dot-demand"></span> NGO / Shelters</label>
+  <label class="layer-toggle"><input type="checkbox" id="toggle-foodbank" checked /><span class="dot dot-foodbank"></span> Food Banks</label>
+  <label class="layer-toggle"><input type="checkbox" id="toggle-biogas" checked /><span class="dot dot-biogas"></span> Biogas Facilities</label>
+  <label class="layer-toggle"><input type="checkbox" id="toggle-osm" checked /><span class="dot dot-osm"></span> OSM Discovered <span id="osm-count" style="font-size:0.72rem;color:#94a3b8;"></span></label>
+  <div id="controls-right">
+    <button class="hdr-btn" id="btn-discover-now" title="Query OSM for facilities in the current view">🔍 Discover area</button>
+    <button class="hdr-btn" id="btn-clear-route">✕ Clear Route</button>
+  </div>
+</div>
+
+<div id="map"></div>
+
+<!-- Side panel: marker details + road route -->
+<div id="side-panel">
+  <span id="close-panel" title="Close">✕</span>
+  <h3 id="sp-title">Details</h3>
+  <div id="sp-body"></div>
+  <div id="sp-route"></div>
+</div>
+
+<div id="status-bar">Initialising map…</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  // ── Auth guard ────────────────────────────────────────────────────────────────
+  const token = localStorage.getItem('token') || localStorage.getItem('fb_token');
+  if (!token) { window.location.href = '/admin/index.html'; return; }
+
+  // ── Map init ──────────────────────────────────────────────────────────────────
+  const map = L.map('map', { zoomControl: true }).setView([12.97, 77.59], 12);
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 19
+  }).addTo(map);
+
+  // ── Layer groups ──────────────────────────────────────────────────────────────
+  const layers = {
+    donor:    L.layerGroup().addTo(map),
+    demand:   L.layerGroup().addTo(map),
+    foodbank: L.layerGroup().addTo(map),
+    biogas:   L.layerGroup().addTo(map),
+    osm:      L.layerGroup().addTo(map)   // OSM-discovered, map-sourced only
+  };
+
+  // Deduplication registry: osmKey → true, prevents re-adding on pan/zoom
+  const osmSeen = new Set();
+  // Registry: osmKey → marker, for import updates (exposed on window for the global importOsmSite handler)
+  const osmMarkerMap = new Map();
+  window._osmMarkerMap = osmMarkerMap;
+
+  // ── Route overlay ─────────────────────────────────────────────────────────────
+  let routePolyline = null;
+  let originMarker  = null;
+
+  function clearRoute() {
+    if (routePolyline) { map.removeLayer(routePolyline); routePolyline = null; }
+    if (originMarker)  { map.removeLayer(originMarker);  originMarker  = null; }
+    document.getElementById('sp-route').innerHTML = '';
+  }
+
+  // ── Marker colours ────────────────────────────────────────────────────────────
+  function circleOpts(color, r) {
+    return { radius: r || 8, fillColor: color, color: '#fff', weight: 1.5, opacity: 0.9, fillOpacity: 0.85 };
+  }
+
+  const DONOR_TYPES = new Set(['hotel','caterer','retailer','institution','donor','other_donor']);
+  function classifyOrg(type) {
+    if (DONOR_TYPES.has(type)) return 'donor';
+    if (type === 'food_bank')  return 'foodbank';
+    return 'demand';
+  }
+  const ORG_COLORS = { donor: '#3b82f6', demand: '#10b981', foodbank: '#f59e0b' };
+
+  // ── Status bar ────────────────────────────────────────────────────────────────
+  function setStatus(msg) { document.getElementById('status-bar').textContent = msg; }
+
+  // ── Side panel helpers ────────────────────────────────────────────────────────
+  const panel = document.getElementById('side-panel');
+  function openPanel(title, bodyHtml) {
+    document.getElementById('sp-title').textContent = title;
+    document.getElementById('sp-body').innerHTML = bodyHtml;
+    document.getElementById('sp-route').innerHTML = '';
+    panel.classList.add('open');
+  }
+  document.getElementById('close-panel').addEventListener('click', () => {
+    panel.classList.remove('open');
+    clearRoute();
+  });
+  document.getElementById('btn-clear-route').addEventListener('click', () => {
+    clearRoute();
+    document.getElementById('sp-route').innerHTML = '';
+  });
+
+  function row(label, value) {
+    return `<div class="sp-row"><span class="sp-label">${label}</span><span class="sp-value">${value}</span></div>`;
+  }
+
+  // ── Route display ─────────────────────────────────────────────────────────────
+  // originLatLng = the marker location we're routing FROM (a donor)
+  // destLatLng   = the selected destination marker location
+  function showRoute(originLatLng, destLatLng, destName) {
+    clearRoute();
+    const routeDiv = document.getElementById('sp-route');
+    routeDiv.innerHTML = '<p class="route-loading">⏳ Loading road route…</p>';
+
+    const url = `/api/network/route-preview?oLat=${originLatLng[0]}&oLng=${originLatLng[1]}&dLat=${destLatLng[0]}&dLng=${destLatLng[1]}`;
+    fetch(url, { headers: { Authorization: 'Bearer ' + token } })
+      .then(r => r.json())
+      .then(data => {
+        const dist = data.distanceKm != null ? data.distanceKm.toFixed(1) + ' km' : '—';
+        const dur  = data.durationMinutes != null ? Math.round(data.durationMinutes) + ' min' : '—';
+        const isApprox = (data.provider || '').includes('haversine') || (data.provider || '').includes('approx');
+        const provClass = isApprox ? 'approx' : '';
+        const provLabel = isApprox ? '⚠ Approximate (straight-line)' : `Road route (${data.provider})`;
+
+        routeDiv.innerHTML = `
+          <div class="route-info">
+            <div style="font-size:0.78rem;font-weight:600;margin-bottom:6px;">🛣️ Route to ${escHtml(destName)}</div>
+            <div class="ri-row"><span class="ri-label">Distance</span><strong>${dist}</strong></div>
+            <div class="ri-row"><span class="ri-label">ETA</span><strong>${dur}</strong></div>
+            <div class="ri-row"><span class="ri-label">Provider</span><span class="provider-badge ${provClass}">${provLabel}</span></div>
+            ${data.error ? `<div style="font-size:0.72rem;color:#d97706;margin-top:4px;">Note: ${escHtml(data.error)}</div>` : ''}
+          </div>`;
+
+        // Draw polyline — use OSRM geometry if available, otherwise straight line
+        const coords = (data.geometry && data.geometry.length > 1)
+          ? data.geometry
+          : [originLatLng, destLatLng];
+
+        routePolyline = L.polyline(coords, {
+          color: isApprox ? '#d97706' : '#3b82f6',
+          weight: isApprox ? 2 : 3,
+          opacity: 0.8,
+          dashArray: isApprox ? '6 4' : null
+        }).addTo(map);
+
+        originMarker = L.circleMarker(originLatLng, { radius: 6, fillColor: '#fff', color: '#3b82f6', weight: 2, fillOpacity: 1 }).addTo(map);
+
+        // Fit map to the route
+        map.fitBounds(routePolyline.getBounds(), { padding: [40, 40] });
+        setStatus(`Route: ${dist} / ${dur} via ${provLabel}`);
+      })
+      .catch(err => {
+        routeDiv.innerHTML = `<p style="color:#f87171;margin-top:8px;">Route unavailable: ${err.message}</p>`;
+      });
+  }
+
+  // ── Escape HTML helper ────────────────────────────────────────────────────────
+  function escHtml(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── All markers registry (for search + fit) ───────────────────────────────────
+  const allMarkers = []; // { latlng, name, marker }
+
+  // ── Load map data ─────────────────────────────────────────────────────────────
+  fetch('/api/network/map-data', { headers: { Authorization: 'Bearer ' + token } })
+    .then(r => {
+      if (r.status === 401 || r.status === 403) { window.location.href = '/ops/'; throw new Error('Auth'); }
+      return r.json();
+    })
+    .then(data => {
+      const orgs  = data.organizations    || [];
+      const facs  = data.biogas_facilities || [];
+
+      orgs.forEach(org => {
+        if (!org.lat || !org.lng) return;
+        const cls     = classifyOrg(org.type);
+        const color   = ORG_COLORS[cls] || '#94a3b8';
+        const vBadge  = org.verified ? '<span class="badge-v">✓ Verified</span>' : '<span class="badge-p">Pending</span>';
+        const mvBadge = org.mapVerified ? ' <span class="badge-v">📍 Map OK</span>' : '';
+        const latlng  = [org.lat, org.lng];
+
+        const marker = L.circleMarker(latlng, circleOpts(color))
+          .bindPopup(`
+            <div class="popup-name">${escHtml(org.name)}${vBadge}${mvBadge}</div>
+            <div class="popup-type">${(org.type || '').replace(/_/g,' ')}</div>
+            <div class="popup-addr">📍 ${escHtml(org.address || 'Address not set')}</div>
+            <div style="font-size:0.77rem;color:#94a3b8;">Status: ${escHtml(org.status)}</div>
+            ${cls === 'donor' ? `<button class="popup-route-btn" onclick="window._showRouteFrom(${org.lat},${org.lng},'${escHtml(org.name)}')">🛣 Show routes from here</button>` : ''}
+          `);
+
+        marker.on('click', () => {
+          openPanel(org.name, `
+            ${row('Type', (org.type||'').replace(/_/g,' '))}
+            ${row('Address', escHtml(org.address || '—'))}
+            ${row('Status', escHtml(org.status))}
+            ${row('Verified', org.verified ? '✓ Yes' : '✗ No')}
+            ${row('Map verified', org.mapVerified ? '✓ Yes' : '✗ No')}
+          `);
+        });
+
+        layers[cls].addLayer(marker);
+        allMarkers.push({ latlng, name: org.name, marker });
+      });
+
+      facs.forEach(fac => {
+        if (!fac.lat || !fac.lng) return;
+        const vBadge = fac.verified ? '<span class="badge-v">✓ Verified</span>' : '<span class="badge-p">Pending</span>';
+        const waste  = Array.isArray(fac.acceptedWasteTypes) && fac.acceptedWasteTypes.length
+                       ? fac.acceptedWasteTypes.join(', ') : 'All types';
+        const latlng = [fac.lat, fac.lng];
+
+        const marker = L.circleMarker(latlng, circleOpts('#8b5cf6', 10))
+          .bindPopup(`
+            <div class="popup-name">♻️ ${escHtml(fac.name)}${vBadge}</div>
+            <div class="popup-type">Biogas Facility</div>
+            <div class="popup-addr">📍 ${escHtml(fac.address || 'Address not set')}</div>
+            <div style="font-size:0.77rem;color:#94a3b8;">Capacity: ${fac.maxDailyIntakeKg || '—'} kg/day</div>
+            <div style="font-size:0.77rem;color:#94a3b8;">Accepts: ${escHtml(waste)}</div>
+            <div style="font-size:0.77rem;color:#94a3b8;">Status: ${escHtml(fac.status)}</div>
+          `);
+
+        marker.on('click', () => {
+          openPanel('♻️ ' + fac.name, `
+            ${row('Type', 'Biogas Facility')}
+            ${row('Address', escHtml(fac.address || '—'))}
+            ${row('Status', escHtml(fac.status))}
+            ${row('Verified', fac.verified ? '✓ Yes' : '✗ No')}
+            ${row('Daily capacity', (fac.maxDailyIntakeKg || '—') + ' kg/day')}
+            ${row('Accepts', escHtml(waste))}
+          `);
+        });
+
+        layers.biogas.addLayer(marker);
+        allMarkers.push({ latlng, name: fac.name, marker });
+      });
+
+      const total = orgs.length + facs.length;
+      document.getElementById('org-count').textContent = `${total} DB locations`;
+      setStatus(`${total} markers loaded. Click a marker for details, or click a donor → "Show routes from here". Use "Discover area" to find more from OSM.`);
+
+      // Auto-fit on load
+      fitAll();
+    })
+    .catch(err => { if (err.message !== 'Auth') setStatus('Failed to load map data: ' + err.message); });
+
+  // ── "Show routes from here" — global called from popup button HTML ────────────
+  let routeOrigin = null; // { lat, lng, name }
+  window._showRouteFrom = function(lat, lng, name) {
+    routeOrigin = { lat, lng, name };
+    map.closePopup();
+    setStatus(`Route origin set: ${name}. Now click any destination marker and choose a route option, or use the side panel.`);
+    // Place a pin at origin
+    if (originMarker) map.removeLayer(originMarker);
+    originMarker = L.circleMarker([lat, lng], { radius: 9, fillColor: '#fff', color: '#3b82f6', weight: 3, fillOpacity: 0.9 }).addTo(map);
+    // Attach route-to action to all other markers
+    attachRouteListeners(lat, lng, name);
+  };
+
+  function attachRouteListeners(oLat, oLng, oName) {
+    // Show route when any non-origin marker is clicked while a route origin is active
+    allMarkers.forEach(({ latlng, name, marker }) => {
+      if (latlng[0] === oLat && latlng[1] === oLng) return;
+      marker.off('click').on('click', () => {
+        openPanel(name, `<p style="color:#94a3b8;font-size:0.8rem">Showing route from <strong>${escHtml(oName)}</strong></p>`);
+        showRoute([oLat, oLng], latlng, name);
+      });
+    });
+  }
+
+  // ── Fit all markers ───────────────────────────────────────────────────────────
+  function fitAll() {
+    const pts = allMarkers.map(m => m.latlng);
+    if (pts.length === 0) return;
+    map.fitBounds(L.latLngBounds(pts), { padding: [30, 30] });
+  }
+  document.getElementById('btn-fit').addEventListener('click', fitAll);
+
+  // ── Show near me ──────────────────────────────────────────────────────────────
+  document.getElementById('btn-near-me').addEventListener('click', () => {
+    if (!navigator.geolocation) { setStatus('Geolocation not supported by this browser.'); return; }
+    setStatus('Requesting your location…');
+    navigator.geolocation.getCurrentPosition(pos => {
+      const { latitude: lat, longitude: lng } = pos.coords;
+      map.setView([lat, lng], 14);
+      // Pulse marker
+      const me = L.circleMarker([lat, lng], { radius: 10, fillColor: '#f43f5e', color: '#fff', weight: 2, fillOpacity: 0.9 })
+        .bindPopup('<b>📍 You are here</b>').addTo(map).openPopup();
+      setTimeout(() => map.removeLayer(me), 8000);
+      setStatus(`Centred on your location (${lat.toFixed(4)}, ${lng.toFixed(4)})`);
+    }, err => {
+      setStatus('Location error: ' + err.message);
+    });
+  });
+
+  // ── Search ────────────────────────────────────────────────────────────────────
+  function doSearch() {
+    const q = document.getElementById('search-input').value.trim().toLowerCase();
+    if (!q) return;
+
+    // 1. Search local markers by name
+    const match = allMarkers.find(m => m.name.toLowerCase().includes(q));
+    if (match) {
+      map.setView(match.latlng, 15);
+      match.marker.openPopup();
+      setStatus(`Found: ${match.name}`);
+      return;
+    }
+
+    // 2. Fallback: geocode via backend (Nominatim proxy)
+    setStatus('Searching via geocoder…');
+    fetch(`/api/network/geocode-suggest?q=${encodeURIComponent(q)}`, { headers: { Authorization: 'Bearer ' + token } })
+      .then(r => r.json())
+      .then(data => {
+        const s = (data.suggestions || [])[0];
+        if (s && s.lat && s.lon) {
+          map.setView([s.lat, s.lon], 15);
+          L.popup().setLatLng([s.lat, s.lon])
+            .setContent(`<b>📍 ${escHtml(s.display_name)}</b><br><small>OSM result — not a verified facility</small>`)
+            .openOn(map);
+          setStatus(`Geocoded: ${s.display_name}`);
+        } else {
+          setStatus('No results found for "' + q + '"');
+        }
+      })
+      .catch(() => setStatus('Search error'));
+  }
+
+  document.getElementById('btn-search').addEventListener('click', doSearch);
+  document.getElementById('search-input').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+
+  // ── OSM Overpass discovery ────────────────────────────────────────────────────
+  let osmDiscoverTimer = null;
+
+  function updateOsmCountLabel() {
+    const n = osmSeen.size;
+    document.getElementById('osm-count').textContent = n ? `(${n})` : '';
+  }
+
+  function discoverArea(silent) {
+    const bounds = map.getBounds();
+    // Don't query at very low zoom — bounding box would be too large
+    if (map.getZoom() < 12) {
+      if (!silent) setStatus('Zoom in to zoom level 12 or higher before discovering OSM facilities.');
+      return;
+    }
+
+    const params = new URLSearchParams({
+      south: bounds.getSouth().toFixed(5),
+      west:  bounds.getWest().toFixed(5),
+      north: bounds.getNorth().toFixed(5),
+      east:  bounds.getEast().toFixed(5)
+    });
+
+    // Fire two requests — one for each type — in sequence so we don't slam the endpoint
+    const types = ['biogas', 'food_bank'];
+    if (!silent) setStatus('Querying OpenStreetMap for facilities in this area…');
+
+    let newCount = 0;
+
+    function fetchType(idx) {
+      if (idx >= types.length) {
+        if (newCount > 0) setStatus(`Found ${newCount} new OSM location${newCount !== 1 ? 's' : ''} in this area (map-sourced, not yet verified).`);
+        else if (!silent) setStatus('No new OSM facilities found in this area.');
+        updateOsmCountLabel();
+        return;
+      }
+      const type = types[idx];
+      params.set('type', type);
+      fetch(`/api/network/overpass-bounds?${params}`, { headers: { Authorization: 'Bearer ' + token } })
+        .then(r => {
+          if (r.status === 400) return r.json().then(d => { throw new Error(d.error); });
+          if (r.status === 429) return r.json().then(d => { throw new Error(d.error); });
+          return r.json();
+        })
+        .then(data => {
+          (data.results || []).forEach(item => {
+            const key = `${item.osmType}:${item.osmId}`;
+            if (osmSeen.has(key)) return;          // already on map
+            osmSeen.add(key);
+            newCount++;
+
+            const latlng = [item.lat, item.lng];
+            const isBiogas = type === 'biogas';
+            const typeLabel = isBiogas ? 'Biogas Plant' : 'Food Bank';
+            const color = isBiogas ? '#f97316' : '#fbbf24';
+
+            // Track import state per OSM item
+            const itemKey = key;
+            const imported = { value: false };
+
+            const buildPopup = () => `
+              <div class="popup-name">${escHtml(item.name)} <span class="osm-badge">${imported.value ? 'IN NETWORK' : 'MAP-SOURCED'}</span></div>
+              <div class="popup-type">${typeLabel} — OpenStreetMap</div>
+              <div class="popup-addr">📍 ${escHtml(item.address || 'Address unknown')}</div>
+              <div style="font-size:0.75rem;color:#94a3b8;margin-top:4px;">
+                Capacity: unknown · Hours: ${escHtml(item.openingHours || 'unknown')}<br>
+                Contact: ${escHtml(item.phone || item.email || 'unknown')}
+              </div>
+              ${imported.value
+                ? `<div style="margin-top:6px;font-size:0.75rem;color:#4ade80;">✔ Added to routing network</div>`
+                : `<button onclick="importOsmSite('${itemKey}')" style="margin-top:8px;width:100%;background:#1d4ed8;color:#fff;border:none;border-radius:5px;padding:5px 10px;font-size:0.78rem;cursor:pointer;">＋ Add to routing network</button>`
+              }
+            `;
+
+            const marker = L.circleMarker(latlng, {
+              radius: 7,
+              fillColor: color,
+              color: color,
+              weight: 2,
+              opacity: 1,
+              fillOpacity: 0.2,
+              dashArray: '4 3'
+            }).bindPopup(buildPopup());
+
+            // Store item data so the global handler can find it
+            marker._osmItem = item;
+            marker._osmImported = imported;
+            marker._buildPopup = buildPopup;
+            osmMarkerMap.set(itemKey, marker);
+
+            marker.on('click', () => {
+              const eligibility = imported.value
+                ? '✔ Yes — active in routing network'
+                : '✗ No — click "Add to routing network" on popup';
+              openPanel(item.name, `
+                ${row('Type', typeLabel)}
+                ${row('Source', 'OpenStreetMap (OSM ID ' + escHtml(String(item.osmId)) + ')')}
+                ${row('Address', escHtml(item.address || 'unknown'))}
+                ${row('Capacity', 'unknown (default 0 kg)')}
+                ${row('Hours', escHtml(item.openingHours || 'unknown'))}
+                ${row('Phone', escHtml(item.phone || 'unknown'))}
+                ${row('Email', escHtml(item.email || 'unknown'))}
+                ${row('Operator', escHtml(item.operator || 'unknown'))}
+                ${row('Routing eligible', eligibility)}
+              `);
+            });
+
+            layers.osm.addLayer(marker);
+            allMarkers.push({ latlng, name: item.name, marker });
+          });
+          // Wait 2.1s between the two type queries to respect Overpass rate limit
+          setTimeout(() => fetchType(idx + 1), 2100);
+        })
+        .catch(err => {
+          if (!silent) setStatus('OSM discovery: ' + err.message);
+          setTimeout(() => fetchType(idx + 1), 2100);
+        });
+    }
+
+    fetchType(0);
+  }
+
+  // Auto-discover when user stops panning/zooming (debounced, 1.5s)
+  map.on('moveend zoomend', () => {
+    clearTimeout(osmDiscoverTimer);
+    osmDiscoverTimer = setTimeout(() => discoverArea(true), 1500);
+  });
+
+  // Manual "Discover area" button
+  document.getElementById('btn-discover-now').addEventListener('click', () => discoverArea(false));
+
+  // ── Layer toggles ─────────────────────────────────────────────────────────────
+  function wireToggle(id, key) {
+    document.getElementById(id).addEventListener('change', function() {
+      this.checked ? map.addLayer(layers[key]) : map.removeLayer(layers[key]);
+    });
+  }
+  wireToggle('toggle-donor',    'donor');
+  wireToggle('toggle-demand',   'demand');
+  wireToggle('toggle-foodbank', 'foodbank');
+  wireToggle('toggle-biogas',   'biogas');
+  wireToggle('toggle-osm',      'osm');
+
+  setStatus('Fetching network data…');
+})();
+
+// ── OSM import handler (global, called from popup button) ────────────────────
+async function importOsmSite(itemKey) {
+  const marker = window._osmMarkerMap && window._osmMarkerMap.get(itemKey);
+  if (!marker) return;
+  const item = marker._osmItem;
+  const imported = marker._osmImported;
+  if (imported.value) return;
+
+  const btn = document.querySelector(`button[onclick="importOsmSite('${itemKey}')"]`);
+  if (btn) { btn.disabled = true; btn.textContent = 'Adding…'; }
+
+  try {
+    const token = localStorage.getItem('fb_token');
+    const res = await fetch('/api/network/osm-import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({
+        osmId: item.osmId, osmType: item.osmType,
+        name: item.name, lat: item.lat, lng: item.lng,
+        address: item.address, phone: item.phone, email: item.email,
+        openingHours: item.openingHours, operator: item.operator,
+        facilityType: item.osmType === 'biogas' ? 'biogas' : 'food_bank'
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Import failed');
+
+    imported.value = true;
+    // Refresh popup content
+    marker.setPopupContent(marker._buildPopup());
+    marker.openPopup();
+  } catch (err) {
+    if (btn) { btn.disabled = false; btn.textContent = '＋ Add to routing network'; }
+    alert('Import failed: ' + err.message);
+  }
+}
+</script>
+</body>
+</html>

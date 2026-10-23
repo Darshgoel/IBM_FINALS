@@ -134,6 +134,7 @@ window.markAlertRead = async (id, el) => {
   await api.donor.markAlertRead(token, id);
 };
 window.markAllRead = async () => {
+  try { await api.donor.markAllRead(token); } catch { /* best-effort */ }
   document.querySelectorAll('.alert-item.unread').forEach(el => el.classList.remove('unread'));
   document.getElementById('alert-dot').style.display = 'none';
 };
@@ -335,6 +336,7 @@ function renderSurplus(filter) {
         <span>📅 Available: ${fmtDt(p.availability_time)}</span>
         <span>⏰ Safe until: ${fmtDt(p.remaining_usable_time)}</span>
         ${p.matched_org_name ? `<span>🤝 Matched to: <strong>${p.matched_org_name}</strong>${p.allocated_quantity ? ` (${p.allocated_quantity} ${p.allocated_unit || p.quantity_unit})` : ''}</span>` : ''}
+        ${p.route_distance_km != null ? `<span>📍 Distance: ${Number(p.route_distance_km).toFixed(1)} km | ETA: ~${Math.round(p.route_duration_minutes || 0)} min | via ${p.route_provider || 'haversine'}</span>` : ''}
       </div>
       ${p.match_explanation || p.match_notes ? `
         <div style="font-size:0.78rem; color:#94a3b8; margin-top:6px; padding:6px 10px; background:rgba(255,255,255,0.04); border-radius:4px; border-left:3px solid #3b82f6; line-height:1.4;">

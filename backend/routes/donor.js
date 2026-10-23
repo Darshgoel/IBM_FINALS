@@ -2,7 +2,7 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
 const { authenticate, requireRole } = require('../middleware/auth');
-const { runMatching, generateSurplusPredictions, convertQuantity } = require('../services/matching');
+const { runMatching, runUnifiedMatching, precomputeRoutes, precomputeRoutesToBiogas, generateSurplusPredictions, convertQuantity } = require('../services/matching');
 
 const router = express.Router();
 
@@ -28,9 +28,17 @@ router.put('/profile', (req, res) => {
     const { name, locationAddress, locationLat, locationLng, operatingHours, contactPhone, description, foodCategories, historicalInfo } = req.body;
 
     db.prepare(`
-      UPDATE organizations SET name=?, location_address=?, location_lat=?, location_lng=?,
-      operating_hours=?, contact_phone=?, description=? WHERE id=?
-    `).run(name, locationAddress, locationLat || 0, locationLng || 0, operatingHours, contactPhone, description, req.user.orgId);
+      UPDATE organizations SET name=?,
+        location_address=?,
+        location_lat=COALESCE(?, location_lat),
+        location_lng=COALESCE(?, location_lng),
+        operating_hours=?, contact_phone=?, description=? WHERE id=?
+    `).run(
+      name, locationAddress,
+      locationLat != null ? locationLat : null,
+      locationLng != null ? locationLng : null,
+      operatingHours, contactPhone, description, req.user.orgId
+    );
 
     db.prepare(`
       UPDATE donor_profiles SET food_categories=?, historical_info=?, updated_at=CURRENT_TIMESTAMP WHERE org_id=?
@@ -43,7 +51,7 @@ router.put('/profile', (req, res) => {
 });
 
 // POST /api/donor/surplus - Post new surplus
-router.post('/surplus', (req, res) => {
+router.post('/surplus', async (req, res) => {
   try {
     const {
       foodName, foodType, quantity, quantityUnit, preparationState,
@@ -56,8 +64,8 @@ router.post('/surplus', (req, res) => {
     }
 
     const orgId = req.user.orgId;
-    const org = db.prepare('SELECT status FROM organizations WHERE id = ?').get(orgId);
-    if (!org || org.status !== 'active') {
+    const org = db.prepare('SELECT status, verified FROM organizations WHERE id = ?').get(orgId);
+    if (!org || org.status !== 'active' || !org.verified) {
       return res.status(403).json({ error: 'Your organization must be verified and active to post surplus' });
     }
 
@@ -75,8 +83,19 @@ router.post('/surplus', (req, res) => {
       unsafe ? 1 : 0
     );
 
+    // Pre-compute routes to all candidate demand orgs AND biogas facilities before the sync tx
+    const donorOrg = db.prepare('SELECT * FROM organizations WHERE id = ?').get(orgId);
+    const candidateOrgs = db.prepare(`
+      SELECT o.id, o.location_lat, o.location_lng FROM organizations o
+      WHERE o.status = 'active' AND o.type NOT IN ('hotel','caterer','retailer')
+    `).all();
+    const [routeResults, biogasRouteResults] = await Promise.all([
+      precomputeRoutes(donorOrg, candidateOrgs),
+      precomputeRoutesToBiogas(donorOrg)
+    ]);
+
     // Trigger automatic matching using unified matcher
-    const matchResult = runMatching(surplusId);
+    const matchResult = runUnifiedMatching({ surplusId, routeResults, biogasRouteResults });
 
     res.status(201).json({
       success: true,
@@ -96,7 +115,8 @@ router.get('/surplus', (req, res) => {
     const posts = db.prepare(`
       SELECT sp.*, m.status as match_status, m.id as match_id, m.match_score,
              m.allocated_quantity, m.allocated_unit, m.explanation as match_explanation,
-             m.notes as match_notes, o.name as matched_org_name
+             m.notes as match_notes, m.route_distance_km, m.route_duration_minutes, m.route_provider,
+             o.name as matched_org_name
       FROM surplus_posts sp
       LEFT JOIN matches m ON sp.id = m.surplus_id AND m.status != 'cancelled' AND m.status != 'declined'
       LEFT JOIN organizations o ON m.demand_org_id = o.id
@@ -329,7 +349,13 @@ router.get('/alerts', (req, res) => {
   }
 });
 
-// PUT /api/donor/alerts/:id/read - Mark alert as read
+// PUT /api/donor/alerts/read-all - Mark all alerts read for this org (must be before /:id route)
+router.put('/alerts/read-all', (req, res) => {
+  db.prepare('UPDATE alerts SET is_read = 1 WHERE org_id = ?').run(req.user.orgId);
+  res.json({ success: true });
+});
+
+// PUT /api/donor/alerts/:id/read - Mark single alert as read
 router.put('/alerts/:id/read', (req, res) => {
   db.prepare('UPDATE alerts SET is_read = 1 WHERE id = ? AND org_id = ?').run(req.params.id, req.user.orgId);
   res.json({ success: true });

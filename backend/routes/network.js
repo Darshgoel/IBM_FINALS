@@ -1,6 +1,10 @@
 const express = require('express');
+const http = require('http');
+const https = require('https');
+const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
 const { authenticate, requireRole } = require('../middleware/auth');
+const { suggestLocations } = require('../services/geocoding');
 
 const router = express.Router();
 
@@ -653,6 +657,243 @@ router.get('/surplus', (req, res) => {
 router.get('/demand', (req, res) => {
   const demands = db.prepare(`SELECT dr.*, o.name as org_name FROM demand_registrations dr JOIN organizations o ON dr.demand_org_id = o.id WHERE dr.status != 'cancelled'`).all();
   res.json({ demands });
+});
+
+// ── GET /api/network/map-data ─────────────────────────────────────────────
+// Same as /api/admin/map-data but accessible to network roles.
+router.get('/map-data', (req, res) => {
+  try {
+    const orgsRaw = db.prepare(`
+      SELECT id, name, type, location_lat, location_lng, location_address, status, verified,
+             COALESCE(map_verified, 0) as map_verified
+      FROM organizations
+      WHERE location_lat != 0 AND location_lng != 0
+        AND status = 'active'
+        AND verified = 1
+      ORDER BY type
+    `).all();
+
+    const organizations = orgsRaw.map(o => ({
+      id: o.id, name: o.name, type: o.type,
+      lat: o.location_lat, lng: o.location_lng,
+      address: o.location_address, status: o.status,
+      verified: !!o.verified, mapVerified: !!o.map_verified
+    }));
+
+    const facilitiesRaw = db.prepare(`
+      SELECT id, name, location_lat, location_lng, location_address, status, verified,
+             accepted_waste_types, max_daily_intake_kg
+      FROM biogas_facilities
+      WHERE location_lat != 0 AND location_lng != 0
+      ORDER BY name
+    `).all();
+
+    const biogas_facilities = facilitiesRaw.map(f => ({
+      id: f.id, name: f.name,
+      lat: f.location_lat, lng: f.location_lng,
+      address: f.location_address, status: f.status,
+      verified: !!f.verified,
+      acceptedWasteTypes: (() => { try { return JSON.parse(f.accepted_waste_types || '[]'); } catch { return []; } })(),
+      maxDailyIntakeKg: f.max_daily_intake_kg
+    }));
+
+    res.json({ organizations, biogas_facilities });
+  } catch (err) {
+    console.error('[Network/MapData]', err);
+    res.status(500).json({ error: 'Failed to fetch map data' });
+  }
+});
+
+// ── GET /api/network/route-preview ───────────────────────────────────────
+router.get('/route-preview', async (req, res) => {
+  try {
+    const oLat = parseFloat(req.query.oLat);
+    const oLng = parseFloat(req.query.oLng);
+    const dLat = parseFloat(req.query.dLat);
+    const dLng = parseFloat(req.query.dLng);
+    if ([oLat, oLng, dLat, dLng].some(v => isNaN(v))) {
+      return res.status(400).json({ error: 'oLat, oLng, dLat, dLng are required numeric query params' });
+    }
+    const { getRouteWithGeometry } = require('../services/routing');
+    const result = await getRouteWithGeometry(oLat, oLng, dLat, dLng);
+    res.json(result);
+  } catch (err) {
+    console.error('[Network/RoutePreview]', err);
+    res.status(500).json({ error: 'Route preview unavailable' });
+  }
+});
+
+// ── GET /api/network/overpass-bounds ─────────────────────────────────────
+let lastNetworkOverpassMs = 0;
+router.get('/overpass-bounds', async (req, res) => {
+  try {
+    const south = parseFloat(req.query.south);
+    const west  = parseFloat(req.query.west);
+    const north = parseFloat(req.query.north);
+    const east  = parseFloat(req.query.east);
+    const type  = (req.query.type || 'biogas').toLowerCase();
+
+    if ([south, west, north, east].some(v => isNaN(v))) {
+      return res.status(400).json({ error: 'south, west, north, east are required numeric params' });
+    }
+    if ((north - south) > 1 || (east - west) > 1) {
+      return res.status(400).json({ error: 'Bounding box too large — zoom in further before discovering' });
+    }
+    const now = Date.now();
+    if (now - lastNetworkOverpassMs < 2000) {
+      return res.status(429).json({ error: 'Rate limit: one Overpass request per 2 seconds' });
+    }
+    lastNetworkOverpassMs = now;
+
+    const bbox = `${south},${west},${north},${east}`;
+    let overpassQuery;
+    if (type === 'biogas') {
+      overpassQuery =
+        `[out:json][timeout:15];` +
+        `(` +
+        `  node["plant:method"="anaerobic_digestion"](${bbox});` +
+        `  way["plant:method"="anaerobic_digestion"](${bbox});` +
+        `  node["power"="plant"]["plant:source"="biogas"](${bbox});` +
+        `  way["power"="plant"]["plant:source"="biogas"](${bbox});` +
+        `  node["amenity"="biogas"](${bbox});` +
+        `  node["industrial"="biogas_plant"](${bbox});` +
+        `)out center;`;
+    } else {
+      overpassQuery =
+        `[out:json][timeout:15];` +
+        `(` +
+        `  node["social_facility"="food_bank"](${bbox});` +
+        `  way["social_facility"="food_bank"](${bbox});` +
+        `  node["amenity"="food_bank"](${bbox});` +
+        `  node["social_facility"="soup_kitchen"](${bbox});` +
+        `)out center;`;
+    }
+
+    const overpassBase = (process.env.OVERPASS_BASE_URL || 'https://overpass-api.de').replace(/\/$/, '');
+    const url = `${overpassBase}/api/interpreter`;
+    const postBody = `data=${encodeURIComponent(overpassQuery)}`;
+
+    const osmData = await new Promise((resolve, reject) => {
+      const mod = url.startsWith('https') ? https : http;
+      const urlObj = new URL(url);
+      const options = {
+        hostname: urlObj.hostname,
+        path: urlObj.pathname,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Length': Buffer.byteLength(postBody),
+          'User-Agent': 'FoodBridge/1.0 (food-waste-reduction)'
+        }
+      };
+      const req2 = mod.request(options, (response) => {
+        let data = '';
+        response.on('data', chunk => { data += chunk; });
+        response.on('end', () => {
+          if (response.statusCode !== 200) return reject(new Error(`Overpass HTTP ${response.statusCode}`));
+          try { resolve(JSON.parse(data)); }
+          catch (e) { reject(new Error('Overpass JSON parse error: ' + e.message)); }
+        });
+      });
+      req2.setTimeout(16000, () => { req2.destroy(); reject(new Error('Overpass request timed out')); });
+      req2.on('error', reject);
+      req2.write(postBody);
+      req2.end();
+    });
+
+    const results = (osmData.elements || []).map(el => {
+      const lat = el.type === 'node' ? el.lat : (el.center ? el.center.lat : null);
+      const lng = el.type === 'node' ? el.lon : (el.center ? el.center.lon : null);
+      if (!lat || !lng) return null;
+      const tags = el.tags || {};
+      return {
+        osmId: el.id, osmType: el.type, lat, lng,
+        name: tags.name || tags['name:en'] || (type === 'biogas' ? 'Unnamed Biogas Plant' : 'Unnamed Food Bank'),
+        address: [tags['addr:housenumber'], tags['addr:street'], tags['addr:city']].filter(Boolean).join(', ') || null,
+        phone: tags.phone || tags['contact:phone'] || null,
+        email: tags.email || tags['contact:email'] || null,
+        openingHours: tags.opening_hours || null,
+        operator: tags.operator || null,
+        source: 'openstreetmap_overpass',
+        mapSourced: true, verified: false
+      };
+    }).filter(Boolean);
+
+    res.json({ results, count: results.length, bbox, type });
+  } catch (err) {
+    console.error('[Network/OverpassBounds]', err);
+    res.status(500).json({ error: 'Overpass discovery unavailable: ' + err.message });
+  }
+});
+
+// ── GET /api/network/geocode-suggest ─────────────────────────────────────
+let lastNetworkGeocodeSuggestMs = 0;
+router.get('/geocode-suggest', async (req, res) => {
+  try {
+    const q = (req.query.q || '').trim();
+    if (!q) return res.status(400).json({ error: 'q parameter required' });
+
+    const now = Date.now();
+    if (now - lastNetworkGeocodeSuggestMs < 1100) {
+      return res.status(429).json({ error: 'Rate limit: one geocode request per second' });
+    }
+    lastNetworkGeocodeSuggestMs = now;
+
+    const suggestions = await suggestLocations(q);
+    res.json({ suggestions });
+  } catch (err) {
+    console.error('[Network/GeocodeSuggest]', err);
+    res.status(500).json({ error: 'Geocoding service unavailable' });
+  }
+});
+
+// ── POST /api/network/osm-import ─────────────────────────────────────────────
+// Upsert an OSM-discovered biogas plant or food bank directly into the DB as
+// an active facility.  Unknown capacity defaults to 0 (no gate on it for routing).
+router.post('/osm-import', (req, res) => {
+  try {
+    const { osmId, osmType, name, lat, lng, address, phone, email, openingHours, operator, facilityType } = req.body;
+    if (!name || lat == null || lng == null) {
+      return res.status(400).json({ error: 'name, lat, and lng are required' });
+    }
+
+    // Idempotent: if this OSM element was already imported, return the existing record
+    const existing = db.prepare(
+      `SELECT id FROM biogas_facilities WHERE osm_id = ? AND osm_type = ?`
+    ).get(String(osmId), osmType || 'node');
+
+    if (existing) {
+      return res.json({ success: true, id: existing.id, imported: false, message: 'Already in system' });
+    }
+
+    const id = uuidv4();
+    db.prepare(`
+      INSERT INTO biogas_facilities
+        (id, name, location_address, location_lat, location_lng,
+         contact_phone, contact_email, operating_hours,
+         accepted_waste_types, max_daily_intake_kg,
+         status, notes, osm_id, osm_type)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'active', ?, ?, ?)
+    `).run(
+      id,
+      name,
+      address || '',
+      lat,
+      lng,
+      phone || '',
+      email || '',
+      openingHours || '',
+      JSON.stringify(['food_waste', 'organic']),
+      `OSM-imported ${facilityType || 'biogas'} · operator: ${operator || 'unknown'}`,
+      String(osmId || ''),
+      osmType || 'node'
+    );
+
+    res.status(201).json({ success: true, id, imported: true });
+  } catch (err) {
+    console.error('[Network/OsmImport]', err);
+    res.status(500).json({ error: 'Failed to import OSM facility: ' + err.message });
+  }
 });
 
 module.exports = router;

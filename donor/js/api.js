@@ -29,6 +29,7 @@ const api = {
     getPredictions:(t)         => request('GET',    '/donor/predictions',  null, t),
     getAlerts:    (t)          => request('GET',    '/donor/alerts',       null, t),
     markAlertRead:(t, id)      => request('PUT',    `/donor/alerts/${id}/read`, null, t),
+    markAllRead:  (t)          => request('PUT',    '/donor/alerts/read-all',   null, t),
   }
 };
 

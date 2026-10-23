@@ -257,9 +257,12 @@ window.searchFood = async function () {
       throw new Error('API returned status ' + res.status);
     }
   } catch (err) {
-    console.info('[Recipient Search] Backend API not responding, using rich demo dataset:', err.message);
-    // Use fallback demo points
-    points = DEMO_ACCESS_POINTS.map((item) => ({ ...item }));
+    console.info('[Recipient Search] Backend API not responding, using demo dataset:', err.message);
+    // Use fallback demo points — clearly marked so the user knows these are not live results
+    points = DEMO_ACCESS_POINTS.map((item) => ({ ...item, _isDemo: true }));
+    // Show a persistent banner so the user understands the data is not live
+    const banner = document.getElementById('demo-mode-banner');
+    if (banner) banner.style.display = 'block';
   }
 
   // Ensure all points have computed distances & dietary arrays
@@ -304,6 +307,11 @@ window.searchFood = async function () {
 
   // Sort and Render
   sortResults();
+
+  // Re-render map if it was already open
+  if (recipientMap) {
+    renderMap(state.accessPoints);
+  }
 
   // Show alert opt-in banner if not yet enabled
   if (!state.alertsEnabled && alertOpt) {
@@ -430,7 +438,10 @@ function renderCards(points) {
   const container = $('access-list');
   const countLabel = $('results-count');
 
-  countLabel.textContent = `${points.length} verified access point${points.length === 1 ? '' : 's'} near you`;
+  const isDemo = points.length > 0 && points[0]._isDemo;
+  countLabel.textContent = isDemo
+    ? `${points.length} demo location${points.length === 1 ? '' : 's'} (sample data)`
+    : `${points.length} verified access point${points.length === 1 ? '' : 's'} near you`;
 
   container.innerHTML = points
     .map((ap) => {
@@ -488,6 +499,7 @@ function renderCards(points) {
               ${escapeHtml(ap.name)}
               <span class="access-type-tag ${tagClass}">${typeLabel}</span>
               ${isTopPick ? '<span class="access-type-tag" style="background:rgba(249,115,22,0.2);color:#F97316;">★ Top Pick</span>' : ''}
+              ${ap._isDemo ? '<span class="access-type-tag" style="background:rgba(124,58,237,0.18);color:#7c3aed;">DEMO</span>' : ''}
             </div>
             <div class="access-meta">
               <span>📍 ${escapeHtml(ap.location_address || 'Central Address')}</span>
@@ -703,6 +715,122 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
+
+// ── Map ──────────────────────────────────────────────────────────────────────
+let recipientMap = null;
+let userMarker   = null;
+let apMarkers    = [];
+
+function escHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function initMap(lat, lng) {
+  if (recipientMap) return;
+  recipientMap = L.map('recipient-map', { zoomControl: true }).setView([lat, lng], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 19
+  }).addTo(recipientMap);
+}
+
+function renderMap(points) {
+  const lat = state.userLat || 12.9716;
+  const lng = state.userLng || 77.5946;
+
+  initMap(lat, lng);
+
+  // Remove old markers
+  apMarkers.forEach(m => recipientMap.removeLayer(m));
+  apMarkers = [];
+  if (userMarker) { recipientMap.removeLayer(userMarker); userMarker = null; }
+
+  // User location pin
+  const userIcon = L.divIcon({
+    className: '',
+    html: `<div style="width:16px;height:16px;background:#3B82F6;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 4px rgba(59,130,246,0.3);"></div>`,
+    iconSize: [16, 16], iconAnchor: [8, 8]
+  });
+  userMarker = L.marker([lat, lng], { icon: userIcon, zIndexOffset: 1000 })
+    .addTo(recipientMap)
+    .bindPopup('<div class="rmap-popup-name">📍 Your Location</div>');
+
+  const topPickId = state.recommendedPoint ? state.recommendedPoint.id : null;
+
+  points.forEach(ap => {
+    if (!ap.location_lat || !ap.location_lng) return;
+    const isTop = ap.id === topPickId;
+    const color = isTop ? '#F59E0B' : '#F97316';
+    const ring  = isTop ? 'rgba(245,158,11,0.35)' : 'rgba(249,115,22,0.25)';
+    const size  = isTop ? 18 : 14;
+    const half  = size / 2;
+
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="width:${size}px;height:${size}px;background:${color};border:2.5px solid #fff;border-radius:50%;box-shadow:0 0 0 4px ${ring};"></div>`,
+      iconSize: [size, size], iconAnchor: [half, half]
+    });
+
+    const typeLabels = { food_bank:'Food Bank', ngo:'NGO / Community Kitchen', shelter:'Shelter & Meals', community_kitchen:'Community Kitchen' };
+    const typeLabel = typeLabels[ap.type] || 'Food Access Point';
+    const dist = ap.distance != null ? `${ap.distance} km away` : '';
+    const dest = encodeURIComponent(ap.location_address || ap.name);
+    const destCoords = `${ap.location_lat},${ap.location_lng}`;
+
+    const popup = L.popup({ maxWidth: 240, minWidth: 200 }).setContent(`
+      <div class="rmap-popup-name">${escHtml(ap.name)}${isTop ? ' ⭐' : ''}</div>
+      <div class="rmap-popup-type">${typeLabel}</div>
+      <div class="rmap-popup-row">📍 ${escHtml(ap.location_address || 'Address on arrival')}</div>
+      <div class="rmap-popup-row">⏰ ${escHtml(ap.operating_hours || 'Daily hours')}</div>
+      ${dist ? `<div class="rmap-popup-row">📏 ${escHtml(dist)}</div>` : ''}
+      <button class="rmap-popup-dir" onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=${destCoords}','_blank')">🗺️ Get Directions</button>
+      <button class="rmap-popup-detail" onclick="openDetail('${ap.id}')">View Details →</button>
+    `);
+
+    const marker = L.marker([ap.location_lat, ap.location_lng], { icon })
+      .addTo(recipientMap)
+      .bindPopup(popup);
+
+    apMarkers.push(marker);
+  });
+
+  // Fit map to show all markers + user location
+  const allLatLngs = [
+    [lat, lng],
+    ...points.filter(p => p.location_lat && p.location_lng).map(p => [p.location_lat, p.location_lng])
+  ];
+  if (allLatLngs.length > 1) {
+    recipientMap.fitBounds(L.latLngBounds(allLatLngs), { padding: [40, 40], maxZoom: 15 });
+  } else {
+    recipientMap.setView([lat, lng], 13);
+  }
+}
+
+window.switchView = function(view) {
+  const listEl = $('access-list');
+  const mapEl  = $('map-view');
+  const btnList = $('btn-view-list');
+  const btnMap  = $('btn-view-map');
+
+  if (view === 'map') {
+    listEl.style.display = 'none';
+    mapEl.style.display  = 'block';
+    btnList.classList.remove('active');
+    btnMap.classList.add('active');
+    // Initialize or resize map — must happen after element is visible
+    if (!recipientMap) {
+      renderMap(state.accessPoints || []);
+    } else {
+      recipientMap.invalidateSize();
+    }
+  } else {
+    mapEl.style.display  = 'none';
+    listEl.style.display = '';
+    btnMap.classList.remove('active');
+    btnList.classList.add('active');
+  }
+};
 
 // ── Initialization ──
 document.addEventListener('DOMContentLoaded', () => {

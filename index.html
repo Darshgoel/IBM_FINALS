@@ -581,7 +581,7 @@
       <!-- ── SIGN IN ── -->
       <div class="tab-pane active" id="pane-signin">
         <div class="form-title">Welcome back</div>
-        <div class="form-sub">Sign in to reach your dashboard.</div>
+        <div class="form-sub">Sign in to continue to your dashboard or food search.</div>
 
         <div class="msg error" id="signin-error"></div>
 
@@ -609,27 +609,10 @@
         <div class="msg error" id="signup-error"></div>
         <div class="msg success" id="signup-success"></div>
 
-        <!-- Step 1: Credentials -->
+        <!-- Step 1: Role -->
         <div class="step-pane active" id="step-1">
-          <div class="form-title">Create your account</div>
-          <div class="form-sub">Start with your name and login credentials.</div>
-
-          <label for="su-name">Your Full Name</label>
-          <input type="text" id="su-name" placeholder="e.g. Priya Sharma" autocomplete="name" />
-
-          <label for="su-email">Email Address</label>
-          <input type="email" id="su-email" placeholder="you@example.com" autocomplete="email" />
-
-          <label for="su-password">Password</label>
-          <input type="password" id="su-password" placeholder="Min. 8 characters" autocomplete="new-password" />
-
-          <button class="btn btn-primary" onclick="goStep2()">Continue →</button>
-        </div>
-
-        <!-- Step 2: Role -->
-        <div class="step-pane" id="step-2">
           <div class="form-title">Who are you?</div>
-          <div class="form-sub">Choose your role in the FoodBridge network.</div>
+          <div class="form-sub">Choose your role in the FoodBridge network to get started.</div>
 
           <div class="role-grid">
             <div class="role-card" id="role-donor" onclick="selectRole('donor')">
@@ -650,8 +633,25 @@
             Select your role to continue.
           </div>
 
+          <button class="btn btn-primary" id="role-next-btn" onclick="goStep2()" disabled>Continue →</button>
+        </div>
+
+        <!-- Step 2: Credentials -->
+        <div class="step-pane" id="step-2">
+          <div class="form-title">Create your account</div>
+          <div class="form-sub">Enter your name and login credentials.</div>
+
+          <label for="su-name">Your Full Name</label>
+          <input type="text" id="su-name" placeholder="e.g. Priya Sharma" autocomplete="name" />
+
+          <label for="su-email">Email Address</label>
+          <input type="email" id="su-email" placeholder="you@example.com" autocomplete="email" />
+
+          <label for="su-password">Password</label>
+          <input type="password" id="su-password" placeholder="Min. 8 characters" autocomplete="new-password" />
+
           <button class="btn btn-ghost" onclick="goStep1()">← Back</button>
-          <button class="btn btn-primary" id="role-next-btn" onclick="goStep3()" disabled>Continue →</button>
+          <button class="btn btn-primary" id="step2-next-btn" onclick="goStep3()">Continue →</button>
         </div>
 
         <!-- Step 3: Role-specific details -->
@@ -831,6 +831,16 @@
     function goStep1() { updateStepper(1); }
 
     function goStep2() {
+      if (!selectedRole) return;
+      if (selectedRole === 'recipient') {
+        window.location.href = ROLE_ROUTES['recipient'];
+        return;
+      }
+      clearErrors();
+      updateStepper(2);
+    }
+
+    function goStep3() {
       const name = document.getElementById('su-name').value.trim();
       const email = document.getElementById('su-email').value.trim();
       const pass = document.getElementById('su-password').value;
@@ -838,11 +848,6 @@
       if (pass.length < 8) return showMsg('signup-error', 'Password must be at least 8 characters.', 'error');
       clearErrors();
       signupData = { name, email, password: pass };
-      updateStepper(2);
-    }
-
-    function goStep3() {
-      if (!selectedRole) return;
       updateStepper(3);
       showRoleFields(selectedRole);
     }
@@ -856,7 +861,7 @@
       const hints = {
         donor: '🏪 You\'ll be posting surplus food. Your org requires admin verification before going live.',
         demand_org: '🤝 You\'ll register food needs. Your org requires admin verification before going live.',
-        recipient: '👤 You can search for food near you without verification.'
+        recipient: '👤 No account needed — click Continue to go straight to the food finder.'
       };
       document.getElementById('role-hint').textContent = hints[role];
     }

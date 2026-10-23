@@ -214,6 +214,68 @@ try { db.exec("ALTER TABLE surplus_posts ADD COLUMN unsafe INTEGER DEFAULT 0"); 
 try { db.exec("ALTER TABLE surplus_posts ADD COLUMN review_reason TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE surplus_posts ADD COLUMN biogas_reason TEXT DEFAULT ''"); } catch(e){}
 
+// ── Routing / Map migrations ─────────────────────────────────────────────────
+try { db.exec("ALTER TABLE organizations ADD COLUMN map_verified INTEGER DEFAULT 0"); } catch(e){}
+try { db.exec("ALTER TABLE matches ADD COLUMN route_distance_km REAL"); } catch(e){}
+try { db.exec("ALTER TABLE matches ADD COLUMN route_duration_minutes REAL"); } catch(e){}
+try { db.exec("ALTER TABLE matches ADD COLUMN route_provider TEXT DEFAULT 'haversine'"); } catch(e){}
+try { db.exec("ALTER TABLE matches ADD COLUMN routing_audit TEXT DEFAULT NULL"); } catch(e){}
+try { db.exec("ALTER TABLE biogas_routes ADD COLUMN biogas_facility_id TEXT DEFAULT NULL"); } catch(e){}
+try { db.exec("ALTER TABLE biogas_routes ADD COLUMN route_distance_km REAL"); } catch(e){}
+try { db.exec("ALTER TABLE biogas_routes ADD COLUMN route_duration_minutes REAL"); } catch(e){}
+try { db.exec("ALTER TABLE biogas_routes ADD COLUMN route_provider TEXT DEFAULT 'haversine'"); } catch(e){}
+// Structured capacity fields for biogas_facilities and demand_org_profiles
+try { db.exec("ALTER TABLE biogas_facilities ADD COLUMN capacity_unit TEXT DEFAULT 'kg'"); } catch(e){}
+try { db.exec("ALTER TABLE biogas_facilities ADD COLUMN osm_source INTEGER DEFAULT 0"); } catch(e){}
+try { db.exec("ALTER TABLE biogas_facilities ADD COLUMN osm_place_id TEXT DEFAULT NULL"); } catch(e){}
+try { db.exec("ALTER TABLE biogas_facilities ADD COLUMN osm_id TEXT DEFAULT NULL"); } catch(e){}
+try { db.exec("ALTER TABLE biogas_facilities ADD COLUMN osm_type TEXT DEFAULT NULL"); } catch(e){}
+try { db.exec("ALTER TABLE demand_org_profiles ADD COLUMN receiving_capacity_kg REAL DEFAULT 0"); } catch(e){}
+
+// biogas_facilities table
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS biogas_facilities (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      location_address TEXT DEFAULT '',
+      location_lat REAL DEFAULT 0,
+      location_lng REAL DEFAULT 0,
+      contact_phone TEXT DEFAULT '',
+      contact_email TEXT DEFAULT '',
+      operating_hours TEXT DEFAULT '',
+      accepted_waste_types TEXT DEFAULT '[]',
+      max_daily_intake_kg REAL DEFAULT 0,
+      status TEXT DEFAULT 'pending',
+      verified INTEGER DEFAULT 0,
+      verified_by TEXT,
+      notes TEXT DEFAULT '',
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+} catch(e){}
+
+// route_cache table
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS route_cache (
+      id TEXT PRIMARY KEY,
+      cache_key TEXT UNIQUE,
+      origin_lat REAL,
+      origin_lng REAL,
+      dest_lat REAL,
+      dest_lng REAL,
+      distance_km REAL,
+      duration_minutes REAL,
+      provider TEXT DEFAULT 'osrm',
+      result_json TEXT,
+      cached_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_route_cache_key ON route_cache(cache_key)`);
+} catch(e){}
+
 // Initialize null remaining_quantity values
 try {
   db.exec("UPDATE surplus_posts SET remaining_quantity = quantity WHERE remaining_quantity IS NULL");
@@ -393,8 +455,52 @@ function seedInitialData() {
   console.log('[DB] Realistic network state seeded successfully.');
 }
 
+// Seed biogas facilities (independent of main seed guard — uses its own check)
+function seedBiogasFacilities() {
+  const existing = db.prepare("SELECT COUNT(*) as c FROM biogas_facilities").get();
+  if (existing.c > 0) return;
+
+  const { v4: uuid } = require('uuid');
+  db.prepare(`
+    INSERT INTO biogas_facilities (id, name, location_address, location_lat, location_lng, contact_phone, contact_email,
+      operating_hours, accepted_waste_types, max_daily_intake_kg, status, verified, verified_by, notes)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', 1, 'system', ?)
+  `).run(
+    uuid(),
+    'Green Energy Biogas Plant',
+    'Peenya Industrial Area, Bengaluru',
+    13.0100, 77.5700,
+    '+91 80 2839 4400',
+    'contact@greenenergybiogas.in',
+    'Mon-Sat 6am - 8pm',
+    JSON.stringify(['cooked_meals', 'dairy', 'produce', 'bakery', 'packaged', 'all_food_waste']),
+    500,
+    'Large capacity biogas plant accepting all food waste types up to 500 kg/day'
+  );
+
+  db.prepare(`
+    INSERT INTO biogas_facilities (id, name, location_address, location_lat, location_lng, contact_phone, contact_email,
+      operating_hours, accepted_waste_types, max_daily_intake_kg, status, verified, verified_by, notes)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', 1, 'system', ?)
+  `).run(
+    uuid(),
+    'Eco Waste Solutions',
+    'Electronic City Phase 1, Bengaluru',
+    12.9200, 77.6400,
+    '+91 80 6745 2211',
+    'info@ecowastesolutions.in',
+    'Daily 7am - 7pm',
+    JSON.stringify(['cooked_meals', 'dairy', 'produce']),
+    300,
+    'Eco biogas processing unit specializing in cooked meals, dairy and produce; 300 kg/day capacity'
+  );
+
+  console.log('[DB] Biogas facilities seeded.');
+}
+
 // Seed on startup
 seedInitialData();
+seedBiogasFacilities();
 
 console.log('[DB] Database ready.');
 

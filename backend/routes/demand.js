@@ -3,7 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { dispatchNotification } = require('../services/notifications');
-const { runUnifiedMatching, convertQuantity } = require('../services/matching');
+const { runUnifiedMatching, precomputeRoutes, convertQuantity } = require('../services/matching');
 
 const router = express.Router();
 
@@ -97,7 +97,7 @@ router.put('/capacity', (req, res) => {
 });
 
 // ── POST Demand (Handles /demand and /register) ─────────────────────────────
-const handlePostDemand = (req, res) => {
+const handlePostDemand = async (req, res) => {
   try {
     const foodRequirement = req.body.foodRequirement || req.body.foodType;
     const quantityNeeded = req.body.quantityNeeded != null ? req.body.quantityNeeded : req.body.quantity;
@@ -125,9 +125,8 @@ const handlePostDemand = (req, res) => {
       return res.status(404).json({ error: 'Organization profile not found' });
     }
 
-    // If newly created org is pending verification, activate it to allow immediate demand creation
-    if (org.status !== 'active') {
-      db.prepare("UPDATE organizations SET status = 'active', verified = 1 WHERE id = ?").run(req.user.orgId);
+    if (org.status !== 'active' || !org.verified) {
+      return res.status(403).json({ error: 'Your organization must be approved and active before registering demand' });
     }
 
     const demandId = uuidv4();
@@ -141,8 +140,16 @@ const handlePostDemand = (req, res) => {
       isRecurring, recurringPattern ? JSON.stringify(recurringPattern) : null
     );
 
+    // Pre-compute routes from all active donor orgs to this demand org before sync transaction
+    const demandOrgData = db.prepare('SELECT * FROM organizations WHERE id = ?').get(req.user.orgId);
+    const candidateDonorOrgs = db.prepare(`
+      SELECT o.id, o.location_lat, o.location_lng FROM organizations o
+      WHERE o.status = 'active' AND o.type IN ('hotel','caterer','retailer')
+    `).all();
+    const routeResults = await precomputeRoutes(demandOrgData, candidateDonorOrgs);
+
     // Call shared unified matcher (considers all valid candidates, hard gates & explainable ranking)
-    const matchResult = runUnifiedMatching({ demandId });
+    const matchResult = runUnifiedMatching({ demandId, routeResults });
 
     res.status(201).json({
       success: true,
@@ -252,7 +259,8 @@ router.get('/matches', (req, res) => {
              sp.pickup_address, sp.remaining_usable_time, sp.special_instructions,
              o.name as donor_name, o.contact_phone as donor_phone, o.contact_email as donor_email,
              dr.urgency as demand_urgency, dr.quantity_needed, dr.remaining_quantity as demand_remaining_quantity,
-             dr.quantity_unit as demand_unit
+             dr.quantity_unit as demand_unit,
+             m.route_distance_km, m.route_duration_minutes, m.route_provider
       FROM matches m
       JOIN surplus_posts sp ON m.surplus_id = sp.id
       JOIN organizations o ON sp.donor_org_id = o.id

@@ -27,6 +27,18 @@ router.get(['/search', '/nearby'], (req, res) => {
       params.push(term, term, term);
     }
 
+    // Radius filter: only return orgs within 25 km when coordinates are provided
+    const radiusKm = parseFloat(req.query.radius) || 25;
+    if (lat && lng) {
+      // Bounding-box pre-filter (cheap), then exact Haversine check below
+      const latF = parseFloat(lat);
+      const lngF = parseFloat(lng);
+      const latDelta = radiusKm / 111.0;
+      const lngDelta = radiusKm / (111.0 * Math.cos((latF * Math.PI) / 180));
+      querySql += ` AND o.location_lat BETWEEN ? AND ? AND o.location_lng BETWEEN ? AND ?`;
+      params.push(latF - latDelta, latF + latDelta, lngF - lngDelta, lngF + lngDelta);
+    }
+
     querySql += ` ORDER BY o.name`;
 
     // Find active demand orgs that serve as food access points
@@ -74,14 +86,19 @@ router.get(['/search', '/nearby'], (req, res) => {
       };
     });
 
+    // Exact Haversine radius filter (removes corners of the bounding box)
+    const filtered = (lat && lng)
+      ? enriched.filter(ap => ap.distance == null || ap.distance <= (parseFloat(req.query.radius) || 25))
+      : enriched;
+
     // Sort: food-available first, then by distance (if available)
-    enriched.sort((a, b) => {
+    filtered.sort((a, b) => {
       if (a.activeIncoming !== b.activeIncoming) return b.activeIncoming - a.activeIncoming;
       if (a.distance !== null && b.distance !== null) return a.distance - b.distance;
       return 0;
     });
 
-    res.json({ accessPoints: enriched, count: enriched.length });
+    res.json({ accessPoints: filtered, count: filtered.length });
   } catch (err) {
     console.error('[Recipient/Search]', err);
     res.status(500).json({ error: 'Search failed' });
@@ -95,7 +112,7 @@ router.get('/access-point/:id', (req, res) => {
       SELECT o.*, dp.serving_capacity, dp.storage_capacity, dp.food_requirements, dp.dietary_restrictions
       FROM organizations o
       JOIN demand_org_profiles dp ON o.id = dp.org_id
-      WHERE o.id = ? AND o.status = 'active'
+      WHERE o.id = ? AND o.status = 'active' AND o.verified = 1
     `).get(req.params.id);
 
     if (!org) return res.status(404).json({ error: 'Access point not found' });

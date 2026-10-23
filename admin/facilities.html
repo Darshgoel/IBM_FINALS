@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Facility Management — FoodBridge Admin</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f172a; --surface: #1e293b; --border: #334155;
+      --text: #e2e8f0; --muted: #94a3b8; --accent: #3b82f6;
+      --green: #059669; --amber: #d97706; --red: #dc2626; --purple: #7c3aed;
+    }
+    body { font-family: -apple-system, "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+
+    /* ── Page header ── */
+    .page-header { background: #0b111f; border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; align-items: center; gap: 12px; }
+    .page-header h1 { font-size: 1rem; font-weight: 600; }
+    .page-header a { color: var(--muted); font-size: 0.82rem; text-decoration: none; }
+    .page-header a:hover { color: var(--text); }
+
+    /* ── Layout ── */
+    .layout { display: flex; flex: 1; height: calc(100vh - 50px); overflow: hidden; }
+
+    /* ── Left: facility list ── */
+    .sidebar { width: 340px; min-width: 280px; border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
+    .sidebar-header { padding: 12px 14px; border-bottom: 1px solid var(--border); display: flex; gap: 8px; align-items: center; }
+    .sidebar-header h2 { font-size: 0.9rem; font-weight: 600; flex: 1; }
+    .btn { border-radius: 6px; border: none; cursor: pointer; padding: 5px 12px; font-size: 0.8rem; font-weight: 500; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-ghost   { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+    .btn-ghost:hover { background: #2d3748; }
+    .btn-green   { background: var(--green); color: #fff; }
+    .btn-green:hover  { background: #047857; }
+    .btn-amber   { background: var(--amber); color: #fff; }
+    .btn-amber:hover  { background: #b45309; }
+    .btn-red     { background: var(--red); color: #fff; }
+    .btn-red:hover    { background: #b91c1c; }
+    .btn-sm { padding: 3px 9px; font-size: 0.75rem; }
+
+    .filter-row { padding: 8px 14px; border-bottom: 1px solid var(--border); display: flex; gap: 6px; }
+    .filter-row select, .filter-row input { flex: 1; background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 5px; padding: 5px 8px; font-size: 0.79rem; outline: none; }
+
+    .fac-list { flex: 1; overflow-y: auto; padding: 8px; }
+    .fac-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 11px 13px; margin-bottom: 8px; cursor: pointer; transition: border-color .15s; }
+    .fac-card:hover, .fac-card.active { border-color: var(--accent); }
+    .fac-card-row1 { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+    .fac-name { font-weight: 600; font-size: 0.87rem; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .badge { display: inline-block; font-size: 0.67rem; padding: 1px 6px; border-radius: 4px; font-weight: 600; }
+    .badge-active   { background: #065f46; color: #6ee7b7; }
+    .badge-pending  { background: #78350f; color: #fcd34d; }
+    .badge-inactive { background: #1e293b; color: #94a3b8; border: 1px solid #334155; }
+    .badge-biogas   { background: #3b0764; color: #c4b5fd; }
+    .badge-foodbank { background: #1c1917; color: #fcd34d; border: 1px solid #92400e; }
+    .fac-addr { font-size: 0.77rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* ── Right: detail / form panel ── */
+    .detail-panel { flex: 1; overflow-y: auto; padding: 20px; }
+    .detail-panel h2 { font-size: 1rem; font-weight: 600; margin-bottom: 14px; }
+
+    /* ── Map ── */
+    #facility-map { width: 100%; height: 240px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 16px; }
+
+    /* ── Form ── */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+    .form-grid .span2 { grid-column: span 2; }
+    .field label { display: block; font-size: 0.77rem; color: var(--muted); margin-bottom: 4px; }
+    .field input, .field select, .field textarea {
+      width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--text);
+      border-radius: 6px; padding: 6px 10px; font-size: 0.82rem; outline: none;
+    }
+    .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
+    .field textarea { resize: vertical; min-height: 60px; }
+
+    .coord-row { display: flex; gap: 8px; align-items: flex-end; }
+    .coord-row .field { flex: 1; }
+    .coord-row .btn { align-self: flex-end; padding: 6px 10px; font-size: 0.77rem; white-space: nowrap; }
+
+    /* ── Geocode suggestions ── */
+    #geo-results { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; margin-top: 6px; overflow: hidden; }
+    .geo-item { padding: 8px 12px; cursor: pointer; font-size: 0.8rem; border-bottom: 1px solid var(--border); }
+    .geo-item:last-child { border-bottom: none; }
+    .geo-item:hover { background: #2d3748; }
+    .geo-item small { display: block; color: var(--muted); font-size: 0.72rem; margin-top: 2px; }
+
+    /* ── OSM discover results ── */
+    #osm-results { background: var(--surface); border: 1px solid #7c3aed44; border-radius: 6px; margin-top: 8px; overflow: hidden; }
+    .osm-item { padding: 8px 12px; cursor: pointer; font-size: 0.79rem; border-bottom: 1px solid var(--border); }
+    .osm-item:last-child { border-bottom: none; }
+    .osm-item:hover { background: #2d3748; }
+    .osm-item small { display: block; color: var(--muted); font-size: 0.71rem; margin-top: 2px; }
+    .osm-unverified-note { font-size: 0.71rem; color: var(--amber); background: #1c1005; border: 1px solid #78350f; border-radius: 5px; padding: 6px 10px; margin-bottom: 8px; }
+
+    /* ── Action bar ── */
+    .action-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+
+    /* ── Toast ── */
+    #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 10px 20px; font-size: 0.82rem; color: var(--text); z-index: 9999; opacity: 0; transition: opacity .25s; pointer-events: none; }
+    #toast.show { opacity: 1; }
+    #toast.ok   { border-color: var(--green); color: #6ee7b7; }
+    #toast.err  { border-color: var(--red);   color: #fca5a5; }
+
+    .section-title { font-size: 0.78rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin: 16px 0 8px; }
+    .empty-state { color: var(--muted); font-size: 0.83rem; text-align: center; padding: 40px 20px; }
+  </style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>🏭 Facility Management</h1>
+  <a href="/admin/dashboard.html">← Admin Dashboard</a>
+  <a href="/network-intelligence/map.html" style="margin-left:8px;">🗺 Network Map</a>
+</div>
+
+<div class="layout">
+
+  <!-- ── Sidebar: list ── -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h2>Facilities</h2>
+      <button class="btn btn-primary" id="btn-new">+ Add New</button>
+    </div>
+    <div class="filter-row">
+      <select id="filter-type">
+        <option value="">All types</option>
+        <option value="biogas">Biogas</option>
+        <option value="food_bank">Food Banks</option>
+      </select>
+      <select id="filter-status">
+        <option value="">All status</option>
+        <option value="active">Active</option>
+        <option value="pending">Pending</option>
+        <option value="inactive">Inactive</option>
+      </select>
+    </div>
+    <div class="fac-list" id="fac-list">
+      <div class="empty-state">Loading…</div>
+    </div>
+  </div>
+
+  <!-- ── Detail / edit panel ── -->
+  <div class="detail-panel" id="detail-panel">
+    <div class="empty-state" id="no-selection">
+      <div style="font-size:2rem;margin-bottom:8px;">🏭</div>
+      Select a facility from the list, or click <strong>+ Add New</strong>.
+    </div>
+
+    <div id="form-area" style="display:none;">
+      <h2 id="form-title">New Facility</h2>
+
+      <!-- Inline map for location placement -->
+      <div id="facility-map"></div>
+      <p style="font-size:0.76rem;color:var(--muted);margin-bottom:12px;">Click the map to set/move the facility pin, or use the geocoder below.</p>
+
+      <!-- Geocode search -->
+      <div class="section-title">📍 Location Geocoder</div>
+      <div style="display:flex;gap:8px;margin-bottom:6px;">
+        <input id="geo-input" type="text" placeholder="Search address…" style="flex:1;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 10px;font-size:0.82rem;outline:none;" />
+        <button class="btn btn-ghost" id="btn-geo-search">Search</button>
+      </div>
+      <div id="geo-results" style="display:none;"></div>
+
+      <!-- OSM discover -->
+      <div class="section-title">🔍 Discover from OpenStreetMap</div>
+      <div class="osm-unverified-note">ℹ OSM results are map-sourced suggestions. Review name and coordinates before saving. Facilities saved here are set <strong>active immediately</strong> and become routing candidates — no separate verification step required.</div>
+      <div style="display:flex;gap:8px;margin-bottom:6px;">
+        <input id="osm-input" type="text" placeholder="e.g. Bengaluru" style="flex:1;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 10px;font-size:0.82rem;outline:none;" />
+        <select id="osm-type" style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 8px;font-size:0.79rem;">
+          <option value="biogas">Biogas plants</option>
+          <option value="food_bank">Food banks</option>
+        </select>
+        <button class="btn btn-ghost" id="btn-osm-discover">Discover</button>
+      </div>
+      <div id="osm-results" style="display:none;"></div>
+
+      <!-- Form fields -->
+      <div class="section-title">Facility Details</div>
+      <input type="hidden" id="f-id" />
+      <div class="form-grid">
+        <div class="field span2">
+          <label>Name *</label>
+          <input id="f-name" type="text" placeholder="e.g. Green Energy Biogas Plant" />
+        </div>
+        <div class="field span2">
+          <label>Type *</label>
+          <select id="f-type">
+            <option value="biogas">Biogas Facility</option>
+            <option value="food_bank">Food Bank</option>
+          </select>
+        </div>
+        <div class="field span2">
+          <label>Address</label>
+          <input id="f-address" type="text" placeholder="Full street address" />
+        </div>
+
+        <div class="coord-row span2">
+          <div class="field">
+            <label>Latitude</label>
+            <input id="f-lat" type="number" step="0.0001" placeholder="e.g. 12.9716" />
+          </div>
+          <div class="field">
+            <label>Longitude</label>
+            <input id="f-lng" type="number" step="0.0001" placeholder="e.g. 77.5946" />
+          </div>
+          <button class="btn btn-ghost" id="btn-pin-coords" title="Move map pin to these coords">📍 Update Pin</button>
+        </div>
+
+        <div class="field">
+          <label>Contact Phone</label>
+          <input id="f-phone" type="text" placeholder="+91 …" />
+        </div>
+        <div class="field">
+          <label>Contact Email</label>
+          <input id="f-email" type="email" placeholder="contact@facility.org" />
+        </div>
+        <div class="field span2">
+          <label>Operating Hours</label>
+          <input id="f-hours" type="text" placeholder="e.g. Mon–Fri 8am–6pm" />
+        </div>
+
+        <div class="field" id="field-waste-types">
+          <label>Accepted Waste Types <span style="color:var(--muted);font-size:0.72rem;">(comma-separated, blank = all)</span></label>
+          <input id="f-waste" type="text" placeholder="e.g. cooked_meals, dairy, produce" />
+        </div>
+        <div class="field">
+          <label>Max Daily Intake (kg/day)</label>
+          <input id="f-capacity" type="number" min="0" placeholder="e.g. 500" />
+        </div>
+
+        <div class="field span2">
+          <label>Notes</label>
+          <textarea id="f-notes" placeholder="Internal notes for admin review…"></textarea>
+        </div>
+      </div>
+
+      <div class="action-bar" id="action-bar">
+        <button class="btn btn-primary" id="btn-save">💾 Save</button>
+        <button class="btn btn-green"   id="btn-verify"     style="display:none;">✓ Activate</button>
+        <button class="btn btn-amber"   id="btn-deactivate" style="display:none;">⏸ Deactivate</button>
+        <button class="btn btn-ghost"   id="btn-cancel">Cancel</button>
+      </div>
+
+      <div id="status-msg" style="margin-top:10px;font-size:0.79rem;"></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  // ── Auth ──────────────────────────────────────────────────────────────────────
+  const token = localStorage.getItem('token') || localStorage.getItem('fb_token');
+  if (!token) { window.location.href = '/admin/index.html'; return; }
+
+  const API = (path, opts) => fetch('/api/admin' + path, {
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', ...(opts && opts.headers) },
+    ...opts
+  });
+
+  // ── Toast ─────────────────────────────────────────────────────────────────────
+  let toastTimer;
+  function toast(msg, type) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'show ' + (type || '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.className = ''; }, 3200);
+  }
+
+  // ── Escape HTML ───────────────────────────────────────────────────────────────
+  function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  // ── State ─────────────────────────────────────────────────────────────────────
+  let allFacilities = [];
+  let selectedId    = null;
+  let isNew         = false;
+
+  // ── Map setup (detail panel) ──────────────────────────────────────────────────
+  let facMap  = null;
+  let facPin  = null;
+
+  function initFacMap() {
+    if (facMap) return;
+    facMap = L.map('facility-map').setView([12.97, 77.59], 11);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: 'abcd', maxZoom: 19
+    }).addTo(facMap);
+
+    facMap.on('click', e => {
+      setPin(e.latlng.lat, e.latlng.lng);
+      document.getElementById('f-lat').value = e.latlng.lat.toFixed(6);
+      document.getElementById('f-lng').value = e.latlng.lng.toFixed(6);
+    });
+  }
+
+  function setPin(lat, lng) {
+    if (!facMap) return;
+    if (facPin) facMap.removeLayer(facPin);
+    facPin = L.marker([lat, lng], {
+      icon: L.divIcon({ className: '', html: '<div style="background:#8b5cf6;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>', iconSize: [14,14], iconAnchor: [7,7] })
+    }).addTo(facMap);
+    facMap.setView([lat, lng], Math.max(facMap.getZoom(), 14));
+  }
+
+  // ── Load facilities ────────────────────────────────────────────────────────────
+  function loadFacilities() {
+    Promise.all([
+      API('/facilities').then(r => r.json()),
+      API('/participants').then(r => r.json())
+    ]).then(([facData, orgData]) => {
+      // Merge biogas_facilities + food_bank organizations
+      const biogas = (facData.facilities || []).map(f => ({ ...f, _kind: 'biogas' }));
+      const foodBanks = (orgData.orgs || [])
+        .filter(o => o.type === 'food_bank')
+        .map(o => ({
+          id: o.id, name: o.name, _kind: 'food_bank',
+          location_address: o.locationAddress, status: o.status, verified: !!o.verified,
+          // Use actual coordinates from the org record, not hardcoded zeros
+          location_lat: o.locationLat || o.location_lat || 0,
+          location_lng: o.locationLng || o.location_lng || 0,
+          contact_phone: o.contactPhone || o.contact_phone || '',
+          contact_email: o.contactEmail || o.contact_email || '',
+          operating_hours: o.operatingHours || o.operating_hours || ''
+        }));
+      allFacilities = [...biogas, ...foodBanks];
+      renderList();
+    }).catch(() => { document.getElementById('fac-list').innerHTML = '<div class="empty-state">Failed to load</div>'; });
+  }
+
+  function renderList() {
+    const typeF   = document.getElementById('filter-type').value;
+    const statusF = document.getElementById('filter-status').value;
+
+    const items = allFacilities.filter(f => {
+      if (typeF && f._kind !== typeF) return false;
+      if (statusF && f.status !== statusF) return false;
+      return true;
+    });
+
+    if (!items.length) { document.getElementById('fac-list').innerHTML = '<div class="empty-state">No facilities match the filter.</div>'; return; }
+
+    document.getElementById('fac-list').innerHTML = items.map(f => {
+      const typeBadge = f._kind === 'biogas'
+        ? '<span class="badge badge-biogas">♻ Biogas</span>'
+        : '<span class="badge badge-foodbank">🏦 Food Bank</span>';
+      const statusCls = f.status === 'active' ? 'badge-active' : f.status === 'pending' ? 'badge-pending' : 'badge-inactive';
+      return `<div class="fac-card ${f.id === selectedId ? 'active' : ''}" data-id="${esc(f.id)}">
+        <div class="fac-card-row1">
+          <span class="fac-name">${esc(f.name)}</span>
+          ${typeBadge}
+          <span class="badge ${statusCls}">${esc(f.status || 'pending')}</span>
+        </div>
+        <div class="fac-addr">${esc(f.location_address || '—')}</div>
+      </div>`;
+    }).join('');
+
+    document.querySelectorAll('.fac-card').forEach(card => {
+      card.addEventListener('click', () => selectFacility(card.dataset.id));
+    });
+  }
+
+  document.getElementById('filter-type').addEventListener('change', renderList);
+  document.getElementById('filter-status').addEventListener('change', renderList);
+
+  // ── Select / open facility ────────────────────────────────────────────────────
+  function selectFacility(id) {
+    selectedId = id;
+    isNew = false;
+    const fac = allFacilities.find(f => f.id === id);
+    if (!fac) return;
+    showForm(fac);
+    renderList();
+  }
+
+  function showForm(fac) {
+    document.getElementById('no-selection').style.display = 'none';
+    document.getElementById('form-area').style.display = 'block';
+
+    setTimeout(() => { initFacMap(); facMap.invalidateSize(); }, 50);
+
+    const isNew_ = !fac || !fac.id || fac === 'new';
+    document.getElementById('form-title').textContent = isNew_ ? 'New Facility' : fac.name;
+    document.getElementById('f-id').value      = isNew_ ? '' : (fac.id || '');
+    document.getElementById('f-name').value    = fac.name || '';
+    document.getElementById('f-type').value    = fac._kind || fac.type || 'biogas';
+    document.getElementById('f-address').value = fac.location_address || '';
+    document.getElementById('f-lat').value     = fac.location_lat || '';
+    document.getElementById('f-lng').value     = fac.location_lng || '';
+    document.getElementById('f-phone').value   = fac.contact_phone || '';
+    document.getElementById('f-email').value   = fac.contact_email || '';
+    document.getElementById('f-hours').value   = fac.operating_hours || '';
+    document.getElementById('f-capacity').value = fac.max_daily_intake_kg || '';
+    document.getElementById('f-notes').value   = fac.notes || '';
+
+    let wasteArr = [];
+    try { wasteArr = JSON.parse(fac.accepted_waste_types || '[]'); } catch { wasteArr = []; }
+    document.getElementById('f-waste').value = wasteArr.join(', ');
+
+    if (fac.location_lat && fac.location_lng) {
+      setTimeout(() => setPin(fac.location_lat, fac.location_lng), 80);
+    }
+
+    const canVerify     = !isNew_ && fac.status !== 'active';
+    const canDeactivate = !isNew_ && fac.status === 'active';
+    document.getElementById('btn-verify').style.display     = canVerify ? 'inline-block' : 'none';
+    document.getElementById('btn-deactivate').style.display = canDeactivate ? 'inline-block' : 'none';
+    document.getElementById('status-msg').textContent = '';
+  }
+
+  // ── New facility button ───────────────────────────────────────────────────────
+  document.getElementById('btn-new').addEventListener('click', () => {
+    selectedId = null;
+    isNew = true;
+    showForm({ _kind: 'biogas', status: 'active', verified: 0 });
+    renderList();
+  });
+
+  // ── Cancel button ─────────────────────────────────────────────────────────────
+  document.getElementById('btn-cancel').addEventListener('click', () => {
+    selectedId = null;
+    isNew = false;
+    document.getElementById('no-selection').style.display = 'block';
+    document.getElementById('form-area').style.display = 'none';
+    renderList();
+  });
+
+  // ── Geocoder search ───────────────────────────────────────────────────────────
+  document.getElementById('btn-geo-search').addEventListener('click', () => {
+    const q = document.getElementById('geo-input').value.trim();
+    if (!q) return;
+    API(`/geocode-suggest?q=${encodeURIComponent(q)}`).then(r => r.json()).then(data => {
+      const results = data.suggestions || [];
+      const box = document.getElementById('geo-results');
+      if (!results.length) { box.style.display = 'none'; return; }
+      box.style.display = 'block';
+      box.innerHTML = results.map((s, i) =>
+        `<div class="geo-item" data-i="${i}">
+          ${esc(s.display_name)}
+          <small>lat: ${s.lat?.toFixed(5)}, lon: ${s.lon?.toFixed(5)}</small>
+        </div>`
+      ).join('');
+      box.querySelectorAll('.geo-item').forEach((el, i) => {
+        el.addEventListener('click', () => {
+          const s = results[i];
+          document.getElementById('f-lat').value = s.lat.toFixed(6);
+          document.getElementById('f-lng').value = s.lon.toFixed(6);
+          document.getElementById('f-address').value = s.display_name;
+          setPin(s.lat, s.lon);
+          box.style.display = 'none';
+        });
+      });
+    }).catch(() => { toast('Geocoder unavailable', 'err'); });
+  });
+
+  // ── Update pin from coords ────────────────────────────────────────────────────
+  document.getElementById('btn-pin-coords').addEventListener('click', () => {
+    const lat = parseFloat(document.getElementById('f-lat').value);
+    const lng = parseFloat(document.getElementById('f-lng').value);
+    if (!isNaN(lat) && !isNaN(lng)) setPin(lat, lng);
+  });
+
+  // ── OSM discover ──────────────────────────────────────────────────────────────
+  document.getElementById('btn-osm-discover').addEventListener('click', () => {
+    const q    = document.getElementById('osm-input').value.trim();
+    const type = document.getElementById('osm-type').value;
+    if (!q) return;
+    API(`/osm-discover?q=${encodeURIComponent(q)}&type=${type}`).then(r => r.json()).then(data => {
+      const results = data.suggestions || [];
+      const box = document.getElementById('osm-results');
+      if (!results.length) { box.style.display = 'none'; toast('No OSM results found', ''); return; }
+      box.style.display = 'block';
+      box.innerHTML = results.map((s, i) =>
+        `<div class="osm-item" data-i="${i}">
+          ${esc(s.display_name)}
+          <small>lat: ${s.lat?.toFixed(5)}, lon: ${s.lon?.toFixed(5)} • Source: OpenStreetMap</small>
+        </div>`
+      ).join('');
+      box.querySelectorAll('.osm-item').forEach((el, i) => {
+        el.addEventListener('click', () => {
+          const s = results[i];
+          document.getElementById('f-lat').value = (typeof s.lat === 'number' ? s.lat : parseFloat(s.lat)).toFixed(6);
+          document.getElementById('f-lng').value = (typeof s.lon === 'number' ? s.lon : parseFloat(s.lon)).toFixed(6);
+          document.getElementById('f-address').value = s.display_name;
+          document.getElementById('f-notes').value = 'OSM-sourced facility.';
+          setPin(parseFloat(s.lat), parseFloat(s.lon));
+          box.style.display = 'none';
+          toast('OSM location pre-filled. Save to add as an active routing candidate.', '');
+        });
+      });
+    }).catch(() => toast('OSM discovery unavailable', 'err'));
+  });
+
+  // ── Save (create or update) ───────────────────────────────────────────────────
+  document.getElementById('btn-save').addEventListener('click', () => {
+    const id   = document.getElementById('f-id').value;
+    const kind = document.getElementById('f-type').value;
+
+    const name          = document.getElementById('f-name').value.trim();
+    const locationAddress = document.getElementById('f-address').value.trim();
+    const locationLat   = parseFloat(document.getElementById('f-lat').value) || 0;
+    const locationLng   = parseFloat(document.getElementById('f-lng').value) || 0;
+    const contactPhone  = document.getElementById('f-phone').value.trim();
+    const contactEmail  = document.getElementById('f-email').value.trim();
+    const operatingHours = document.getElementById('f-hours').value.trim();
+    const notes         = document.getElementById('f-notes').value.trim();
+
+    if (!name) { toast('Name is required', 'err'); return; }
+
+    // Food banks live in the organizations table, not biogas_facilities.
+    // Route their saves to PUT /orgs/:id (update only — food banks must register
+    // themselves; admin edits location/contact details here).
+    if (kind === 'food_bank') {
+      if (!id || isNew) {
+        toast('Food banks self-register via the sign-up flow. Here you can only edit their details.', 'err');
+        return;
+      }
+      const body = { name, locationAddress, locationLat, locationLng, contactPhone, contactEmail, operatingHours };
+      API(`/orgs/${id}`, { method: 'PUT', body: JSON.stringify(body) })
+        .then(r => r.json())
+        .then(d => {
+          if (d.error) { toast(d.error, 'err'); return; }
+          toast('Food bank details saved', 'ok');
+          loadFacilities();
+        })
+        .catch(() => toast('Save failed', 'err'));
+      return;
+    }
+
+    // Biogas facilities: saved to biogas_facilities table
+    const body = {
+      name, locationAddress, locationLat, locationLng,
+      contactPhone, contactEmail, operatingHours, notes,
+      maxDailyIntakeKg:  parseFloat(document.getElementById('f-capacity').value) || 0,
+      acceptedWasteTypes: document.getElementById('f-waste').value
+        .split(',').map(s => s.trim()).filter(Boolean)
+    };
+
+    const method = (id && !isNew) ? 'PUT' : 'POST';
+    const url    = (id && !isNew) ? `/facilities/${id}` : '/facilities';
+
+    API(url, { method, body: JSON.stringify(body) })
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) { toast(d.error, 'err'); return; }
+        toast('Saved successfully', 'ok');
+        if (!id || isNew) {
+          selectedId = d.id;
+          isNew = false;
+          document.getElementById('f-id').value = d.id || '';
+        }
+        loadFacilities();
+      })
+      .catch(() => toast('Save failed', 'err'));
+  });
+
+  // ── Verify ────────────────────────────────────────────────────────────────────
+  document.getElementById('btn-verify').addEventListener('click', () => {
+    const id = document.getElementById('f-id').value;
+    if (!id) return;
+    API(`/facilities/${id}/verify`, { method: 'PUT', body: '{}' })
+      .then(r => r.json())
+      .then(() => { toast('Facility verified and activated', 'ok'); loadFacilities(); selectFacility(id); })
+      .catch(() => toast('Verification failed', 'err'));
+  });
+
+  // ── Deactivate ────────────────────────────────────────────────────────────────
+  document.getElementById('btn-deactivate').addEventListener('click', () => {
+    const id = document.getElementById('f-id').value;
+    if (!id) return;
+    if (!confirm('Deactivate this facility? It will no longer receive food or waste allocations.')) return;
+    API(`/facilities/${id}/deactivate`, { method: 'PUT', body: '{}' })
+      .then(r => r.json())
+      .then(() => { toast('Facility deactivated', 'ok'); loadFacilities(); selectFacility(id); })
+      .catch(() => toast('Deactivation failed', 'err'));
+  });
+
+  // ── Initial load ──────────────────────────────────────────────────────────────
+  loadFacilities();
+})();
+</script>
+</body>
+</html>

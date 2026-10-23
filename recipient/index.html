@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="./styles/main.css" />
 </head>
 <body>
@@ -94,6 +95,11 @@
   </div>
 </div>
 
+<!-- ── Demo mode banner (hidden until API is unreachable) ── -->
+<div id="demo-mode-banner" style="display:none; background:#7c3aed; color:#fff; text-align:center; padding:8px 16px; font-size:0.82rem; font-weight:600; letter-spacing:0.02em;">
+  ⚠️ Live data unavailable — showing sample demo locations only. Start the backend server to see real results.
+</div>
+
 <!-- ── Results ── -->
 <section class="results-section" id="results-section">
 
@@ -108,11 +114,15 @@
     </div>
   </div>
 
-  <!-- List header -->
+  <!-- List / Map toggle header -->
   <div class="results-header">
     <div>
       <h3>Nearby Food Access Points</h3>
       <div class="results-count" id="results-count">Searching…</div>
+    </div>
+    <div class="view-toggle-group">
+      <button class="view-toggle-btn active" id="btn-view-list" onclick="switchView('list')">☰ List</button>
+      <button class="view-toggle-btn" id="btn-view-map" onclick="switchView('map')">🗺 Map</button>
     </div>
     <select class="sort-select" id="sort-select" onchange="sortResults()">
       <option value="distance">Sort: Nearest</option>
@@ -129,6 +139,16 @@
   <!-- Access points list -->
   <div class="access-list" id="access-list">
     <!-- Rendered by JS -->
+  </div>
+
+  <!-- Map view -->
+  <div id="map-view" style="display:none;">
+    <div id="recipient-map"></div>
+    <div class="map-legend">
+      <span><span class="map-leg-dot" style="background:#F97316;"></span> Food access point</span>
+      <span><span class="map-leg-dot" style="background:#3B82F6;"></span> Your location</span>
+      <span><span class="map-leg-dot" style="background:#F59E0B;"></span> Top pick</span>
+    </div>
   </div>
 </section>
 
@@ -203,6 +223,7 @@
   <a href="/donor/">Donate Food</a>
 </footer>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="./js/app.js"></script>
 </body>
 </html>
