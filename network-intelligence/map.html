@@ -649,7 +649,7 @@
     const bounds = map.getBounds();
     // Don't query at very low zoom — bounding box would be too large
     if (map.getZoom() < 12) {
-      if (!silent) setStatus('Zoom in to zoom level 12 or higher before discovering OSM facilities.');
+      setStatus('Zoom in closer (level 12+) to discover map-sourced food banks and biogas centres. Database markers remain available at this zoom.');
       return;
     }
 
@@ -662,14 +662,20 @@
 
     // Fire two requests — one for each type — in sequence so we don't slam the endpoint
     const types = ['biogas', 'food_bank'];
-    if (!silent) setStatus('Querying OpenStreetMap for facilities in this area…');
+    setStatus('Searching this map area for food banks and biogas centres…');
 
     let newCount = 0;
+    const searchErrors = [];
 
     function fetchType(idx) {
       if (idx >= types.length) {
-        if (newCount > 0) setStatus(`Found ${newCount} new OSM location${newCount !== 1 ? 's' : ''} in this area (map-sourced, not yet verified).`);
-        else if (!silent) setStatus('No new OSM facilities found in this area.');
+        if (searchErrors.length) {
+          setStatus(`Area search was incomplete (${searchErrors.join('; ')}). Try Discover area again in a moment.`);
+        } else if (newCount > 0) {
+          setStatus(`Found ${newCount} new OSM location${newCount !== 1 ? 's' : ''} in this area (map-sourced, not yet verified).`);
+        } else {
+          setStatus('Search complete: no additional food banks or biogas centres are mapped in this area. Try zooming or panning to another area.');
+        }
         updateOsmCountLabel();
         return;
       }
@@ -751,7 +757,7 @@
           setTimeout(() => fetchType(idx + 1), 2100);
         })
         .catch(err => {
-          if (!silent) setStatus('OSM discovery: ' + err.message);
+          searchErrors.push(err.message);
           setTimeout(() => fetchType(idx + 1), 2100);
         });
     }
