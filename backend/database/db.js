@@ -79,6 +79,7 @@ db.exec(`
     food_name TEXT NOT NULL,
     food_type TEXT NOT NULL,
     quantity REAL NOT NULL,
+    remaining_quantity REAL,
     quantity_unit TEXT DEFAULT 'kg',
     preparation_state TEXT DEFAULT '',
     dietary_tags TEXT DEFAULT '[]',
@@ -96,6 +97,7 @@ db.exec(`
     demand_org_id TEXT NOT NULL,
     food_requirement TEXT NOT NULL,
     quantity_needed REAL DEFAULT 0,
+    remaining_quantity REAL,
     quantity_unit TEXT DEFAULT 'kg',
     required_by TEXT,
     urgency TEXT DEFAULT 'regular',
@@ -113,6 +115,9 @@ db.exec(`
     demand_id TEXT,
     demand_org_id TEXT,
     match_score REAL DEFAULT 0,
+    allocated_quantity REAL,
+    allocated_unit TEXT,
+    explanation TEXT,
     status TEXT DEFAULT 'pending',
     matched_by TEXT DEFAULT 'system',
     notes TEXT DEFAULT '',
@@ -179,6 +184,19 @@ db.exec(`
     actual_quantity REAL,
     created_at TEXT DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS biogas_routes (
+    id TEXT PRIMARY KEY,
+    surplus_id TEXT NOT NULL,
+    donor_org_id TEXT,
+    food_name TEXT,
+    food_type TEXT,
+    quantity REAL,
+    quantity_unit TEXT,
+    reason TEXT,
+    destination_name TEXT DEFAULT 'Biogas Centre',
+    created_at TEXT DEFAULT (datetime('now'))
+  );
 `);
 
 // Safe migrations in case table already existed
@@ -186,6 +204,21 @@ try { db.exec("ALTER TABLE organizations ADD COLUMN document_url TEXT DEFAULT ''
 try { db.exec("ALTER TABLE organizations ADD COLUMN document_name TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE issue_reports ADD COLUMN title TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE issue_reports ADD COLUMN severity TEXT DEFAULT 'medium'"); } catch(e){}
+try { db.exec("ALTER TABLE surplus_posts ADD COLUMN remaining_quantity REAL"); } catch(e){}
+try { db.exec("ALTER TABLE demand_registrations ADD COLUMN remaining_quantity REAL"); } catch(e){}
+try { db.exec("ALTER TABLE matches ADD COLUMN allocated_quantity REAL"); } catch(e){}
+try { db.exec("ALTER TABLE matches ADD COLUMN allocated_unit TEXT"); } catch(e){}
+try { db.exec("ALTER TABLE matches ADD COLUMN explanation TEXT"); } catch(e){}
+// Lifecycle routing fields
+try { db.exec("ALTER TABLE surplus_posts ADD COLUMN unsafe INTEGER DEFAULT 0"); } catch(e){}
+try { db.exec("ALTER TABLE surplus_posts ADD COLUMN review_reason TEXT DEFAULT ''"); } catch(e){}
+try { db.exec("ALTER TABLE surplus_posts ADD COLUMN biogas_reason TEXT DEFAULT ''"); } catch(e){}
+
+// Initialize null remaining_quantity values
+try {
+  db.exec("UPDATE surplus_posts SET remaining_quantity = quantity WHERE remaining_quantity IS NULL");
+  db.exec("UPDATE demand_registrations SET remaining_quantity = quantity_needed WHERE remaining_quantity IS NULL");
+} catch(e){}
 
 // ── Seed Accounts & Demo Data ────────────────────────────────────────────────
 function seedInitialData() {
@@ -280,56 +313,56 @@ function seedInitialData() {
   // 5. Surplus Posts
   // Post A: Matched and in-transit
   const surplusA = uuidv4();
-  db.prepare(`INSERT INTO surplus_posts (id, donor_org_id, food_name, food_type, quantity, quantity_unit, preparation_state, dietary_tags, availability_time, remaining_usable_time, pickup_address, special_instructions, status)
-    VALUES (?, ?, 'Paneer Butter Masala & Jeera Rice', 'cooked_meals', 45, 'servings', 'Freshly packed warm containers', '["veg","gluten_free"]', datetime('now', '-1 hour'), datetime('now', '+3 hours'), 'The Grand Hotel, Kitchen Dock #2', 'Enter via rear service lane', 'matched')`)
+  db.prepare(`INSERT INTO surplus_posts (id, donor_org_id, food_name, food_type, quantity, remaining_quantity, quantity_unit, preparation_state, dietary_tags, availability_time, remaining_usable_time, pickup_address, special_instructions, status)
+    VALUES (?, ?, 'Paneer Butter Masala & Jeera Rice', 'cooked_meals', 45, 0, 'servings', 'Freshly packed warm containers', '["veg","gluten_free"]', datetime('now', '-1 hour'), datetime('now', '+3 hours'), 'The Grand Hotel, Kitchen Dock #2', 'Enter via rear service lane', 'matched')`)
     .run(surplusA, donorOrg1);
 
   // Post B: Available, near expiry (Waste Risk!)
   const surplusB = uuidv4();
-  db.prepare(`INSERT INTO surplus_posts (id, donor_org_id, food_name, food_type, quantity, quantity_unit, preparation_state, dietary_tags, availability_time, remaining_usable_time, pickup_address, special_instructions, status)
-    VALUES (?, ?, 'Assorted Sandwiches & Fruit Bowls', 'sandwiches', 30, 'servings', 'Chilled grab-and-go boxes', '["vegetarian"]', datetime('now', '-2 hours'), datetime('now', '+90 minutes'), 'FreshBites Indiranagar Outlet', 'Needs immediate pickup before 5pm', 'available')`)
+  db.prepare(`INSERT INTO surplus_posts (id, donor_org_id, food_name, food_type, quantity, remaining_quantity, quantity_unit, preparation_state, dietary_tags, availability_time, remaining_usable_time, pickup_address, special_instructions, status)
+    VALUES (?, ?, 'Assorted Sandwiches & Fruit Bowls', 'sandwiches', 30, 30, 'servings', 'Chilled grab-and-go boxes', '["vegetarian"]', datetime('now', '-2 hours'), datetime('now', '+90 minutes'), 'FreshBites Indiranagar Outlet', 'Needs immediate pickup before 5pm', 'available')`)
     .run(surplusB, donorOrg2);
 
   // Post C: Available surplus
   const surplusC = uuidv4();
-  db.prepare(`INSERT INTO surplus_posts (id, donor_org_id, food_name, food_type, quantity, quantity_unit, preparation_state, dietary_tags, availability_time, remaining_usable_time, pickup_address, special_instructions, status)
-    VALUES (?, ?, 'Fresh Pasteurized Whole Milk & Yogurt', 'dairy', 25, 'liters', 'Refrigerated crates at 4°C', '["dairy"]', datetime('now'), datetime('now', '+8 hours'), 'GreenLeaf Supermarket Loading Bay', 'Cold chain vehicle recommended', 'available')`)
+  db.prepare(`INSERT INTO surplus_posts (id, donor_org_id, food_name, food_type, quantity, remaining_quantity, quantity_unit, preparation_state, dietary_tags, availability_time, remaining_usable_time, pickup_address, special_instructions, status)
+    VALUES (?, ?, 'Fresh Pasteurized Whole Milk & Yogurt', 'dairy', 25, 25, 'liters', 'Refrigerated crates at 4°C', '["dairy"]', datetime('now'), datetime('now', '+8 hours'), 'GreenLeaf Supermarket Loading Bay', 'Cold chain vehicle recommended', 'available')`)
     .run(surplusC, donorOrg3);
 
   // Post D: Completed earlier today
   const surplusD = uuidv4();
-  db.prepare(`INSERT INTO surplus_posts (id, donor_org_id, food_name, food_type, quantity, quantity_unit, preparation_state, dietary_tags, availability_time, remaining_usable_time, pickup_address, special_instructions, status)
-    VALUES (?, ?, 'Vegetable Biryani with Raita', 'cooked_meals', 70, 'servings', 'Thermal transport boxes', '["veg"]', datetime('now', '-5 hours'), datetime('now', '-1 hour'), 'The Grand Hotel Dock', 'Delivered cleanly', 'completed')`)
+  db.prepare(`INSERT INTO surplus_posts (id, donor_org_id, food_name, food_type, quantity, remaining_quantity, quantity_unit, preparation_state, dietary_tags, availability_time, remaining_usable_time, pickup_address, special_instructions, status)
+    VALUES (?, ?, 'Vegetable Biryani with Raita', 'cooked_meals', 70, 0, 'servings', 'Thermal transport boxes', '["veg"]', datetime('now', '-5 hours'), datetime('now', '-1 hour'), 'The Grand Hotel Dock', 'Delivered cleanly', 'completed')`)
     .run(surplusD, donorOrg1);
 
   // 6. Demand Registrations
   // Demand 1: Emergency hot meals
   const demand1 = uuidv4();
-  db.prepare(`INSERT INTO demand_registrations (id, demand_org_id, food_requirement, quantity_needed, quantity_unit, required_by, urgency, dietary_requirements, status)
-    VALUES (?, ?, 'Cooked Dinner Meals for Shelter Residents', 50, 'servings', datetime('now', '+2 hours'), 'emergency', '["hot_meal","hygienic"]', 'open')`)
+  db.prepare(`INSERT INTO demand_registrations (id, demand_org_id, food_requirement, quantity_needed, remaining_quantity, quantity_unit, required_by, urgency, dietary_requirements, status)
+    VALUES (?, ?, 'Cooked Dinner Meals for Shelter Residents', 50, 50, 'servings', datetime('now', '+2 hours'), 'emergency', '["hot_meal","hygienic"]', 'open')`)
     .run(demand1, ngoOrg2);
 
   // Demand 2: Matched demand
   const demand2 = uuidv4();
-  db.prepare(`INSERT INTO demand_registrations (id, demand_org_id, food_requirement, quantity_needed, quantity_unit, required_by, urgency, dietary_requirements, status)
-    VALUES (?, ?, 'Lunch distribution for community dining hall', 45, 'servings', datetime('now', '+3 hours'), 'immediate', '["veg"]', 'partially_fulfilled')`)
+  db.prepare(`INSERT INTO demand_registrations (id, demand_org_id, food_requirement, quantity_needed, remaining_quantity, quantity_unit, required_by, urgency, dietary_requirements, status)
+    VALUES (?, ?, 'Lunch distribution for community dining hall', 45, 0, 'servings', datetime('now', '+3 hours'), 'immediate', '["veg"]', 'fulfilled')`)
     .run(demand2, ngoOrg1);
 
   // Demand 3: Regular breakfast staples
   const demand3 = uuidv4();
-  db.prepare(`INSERT INTO demand_registrations (id, demand_org_id, food_requirement, quantity_needed, quantity_unit, required_by, urgency, dietary_requirements, status)
-    VALUES (?, ?, 'Dairy or nutritious breakfast beverages', 20, 'liters', datetime('now', '+6 hours'), 'regular', '["dairy"]', 'open')`)
+  db.prepare(`INSERT INTO demand_registrations (id, demand_org_id, food_requirement, quantity_needed, remaining_quantity, quantity_unit, required_by, urgency, dietary_requirements, status)
+    VALUES (?, ?, 'Dairy or nutritious breakfast beverages', 20, 20, 'liters', datetime('now', '+6 hours'), 'regular', '["dairy"]', 'open')`)
     .run(demand3, ngoOrg2);
 
   // 7. Matches
   const match1 = uuidv4();
-  db.prepare(`INSERT INTO matches (id, surplus_id, demand_id, demand_org_id, match_score, status, notes, matched_at)
-    VALUES (?, ?, ?, ?, 92, 'in_transit', 'Direct match: high urgency match within 3.5km', datetime('now', '-45 minutes'))`)
+  db.prepare(`INSERT INTO matches (id, surplus_id, demand_id, demand_org_id, match_score, allocated_quantity, allocated_unit, explanation, status, notes, matched_at)
+    VALUES (?, ?, ?, ?, 92, 45, 'servings', 'Direct match: high urgency match within 3.5km, covers 100% of demand', 'in_transit', 'Direct match: high urgency match within 3.5km', datetime('now', '-45 minutes'))`)
     .run(match1, surplusA, demand2, ngoOrg1);
 
   const match2 = uuidv4();
-  db.prepare(`INSERT INTO matches (id, surplus_id, demand_id, demand_org_id, match_score, status, notes, matched_at, completed_at)
-    VALUES (?, ?, NULL, ?, 96, 'completed', 'Delivered 70 portions to Shanthi Nagar center', datetime('now', '-5 hours'), datetime('now', '-3 hours'))`)
+  db.prepare(`INSERT INTO matches (id, surplus_id, demand_id, demand_org_id, match_score, allocated_quantity, allocated_unit, explanation, status, notes, matched_at, completed_at)
+    VALUES (?, ?, NULL, ?, 96, 70, 'servings', 'Delivered 70 portions to Shanthi Nagar center', 'completed', 'Delivered 70 portions to Shanthi Nagar center', datetime('now', '-5 hours'), datetime('now', '-3 hours'))`)
     .run(match2, surplusD, ngoOrg1);
 
   // 8. Safety Flags & Disputes

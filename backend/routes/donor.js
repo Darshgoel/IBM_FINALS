@@ -2,7 +2,7 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
 const { authenticate, requireRole } = require('../middleware/auth');
-const { runMatching, generateSurplusPredictions } = require('../services/matching');
+const { runMatching, generateSurplusPredictions, convertQuantity } = require('../services/matching');
 
 const router = express.Router();
 
@@ -47,7 +47,8 @@ router.post('/surplus', (req, res) => {
   try {
     const {
       foodName, foodType, quantity, quantityUnit, preparationState,
-      dietaryTags, availabilityTime, remainingUsableTime, pickupAddress, specialInstructions
+      dietaryTags, availabilityTime, remainingUsableTime, pickupAddress, specialInstructions,
+      unsafe
     } = req.body;
 
     if (!foodName || !foodType || !quantity) {
@@ -62,18 +63,19 @@ router.post('/surplus', (req, res) => {
 
     const surplusId = uuidv4();
     db.prepare(`
-      INSERT INTO surplus_posts (id, donor_org_id, food_name, food_type, quantity, quantity_unit,
-        preparation_state, dietary_tags, availability_time, remaining_usable_time, pickup_address, special_instructions)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO surplus_posts (id, donor_org_id, food_name, food_type, quantity, remaining_quantity, quantity_unit,
+        preparation_state, dietary_tags, availability_time, remaining_usable_time, pickup_address, special_instructions, unsafe)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      surplusId, orgId, foodName, foodType, quantity, quantityUnit || 'kg',
+      surplusId, orgId, foodName, foodType, quantity, quantity, quantityUnit || 'kg',
       preparationState || '', JSON.stringify(dietaryTags || []),
       availabilityTime || new Date().toISOString(),
       remainingUsableTime || new Date(Date.now() + 4 * 3600000).toISOString(),
-      pickupAddress || '', specialInstructions || ''
+      pickupAddress || '', specialInstructions || '',
+      unsafe ? 1 : 0
     );
 
-    // Trigger automatic matching (async-like, runs synchronously here)
+    // Trigger automatic matching using unified matcher
     const matchResult = runMatching(surplusId);
 
     res.status(201).json({
@@ -92,9 +94,11 @@ router.post('/surplus', (req, res) => {
 router.get('/surplus', (req, res) => {
   try {
     const posts = db.prepare(`
-      SELECT sp.*, m.status as match_status, m.id as match_id, o.name as matched_org_name
+      SELECT sp.*, m.status as match_status, m.id as match_id, m.match_score,
+             m.allocated_quantity, m.allocated_unit, m.explanation as match_explanation,
+             m.notes as match_notes, o.name as matched_org_name
       FROM surplus_posts sp
-      LEFT JOIN matches m ON sp.id = m.surplus_id
+      LEFT JOIN matches m ON sp.id = m.surplus_id AND m.status != 'cancelled' AND m.status != 'declined'
       LEFT JOIN organizations o ON m.demand_org_id = o.id
       WHERE sp.donor_org_id = ?
       ORDER BY sp.created_at DESC
@@ -110,10 +114,11 @@ router.get('/surplus', (req, res) => {
 router.get('/surplus/:id', (req, res) => {
   try {
     const post = db.prepare(`
-      SELECT sp.*, m.status as match_status, m.id as match_id, m.matched_at,
+      SELECT sp.*, m.status as match_status, m.id as match_id, m.matched_at, m.match_score,
+             m.allocated_quantity, m.allocated_unit, m.explanation as match_explanation,
              o.name as matched_org_name, o.location_address as matched_org_address
       FROM surplus_posts sp
-      LEFT JOIN matches m ON sp.id = m.surplus_id
+      LEFT JOIN matches m ON sp.id = m.surplus_id AND m.status != 'cancelled' AND m.status != 'declined'
       LEFT JOIN organizations o ON m.demand_org_id = o.id
       WHERE sp.id = ? AND sp.donor_org_id = ?
     `).get(req.params.id, req.user.orgId);
@@ -133,7 +138,30 @@ router.delete('/surplus/:id', (req, res) => {
     if (['completed', 'in_transit'].includes(post.status)) {
       return res.status(400).json({ error: 'Cannot cancel a post that is in transit or completed' });
     }
-    db.prepare("UPDATE surplus_posts SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(req.params.id);
+
+    db.transaction(() => {
+      // Find pending matches and release reserved demand quantities
+      const pendingMatches = db.prepare("SELECT * FROM matches WHERE surplus_id = ? AND status = 'pending'").all(req.params.id);
+      const surplus = db.prepare('SELECT * FROM surplus_posts WHERE id = ?').get(req.params.id);
+      for (const m of pendingMatches) {
+        db.prepare("UPDATE matches SET status = 'cancelled', notes = 'Surplus was cancelled by donor', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(m.id);
+        const alloc = m.allocated_quantity || 0;
+        if (m.demand_id && alloc > 0) {
+          // allocated_quantity is in the demand's unit; restore demand balance directly.
+          db.prepare(`
+            UPDATE demand_registrations
+            SET remaining_quantity = MIN(quantity_needed, remaining_quantity + ?),
+                status = CASE WHEN remaining_quantity + ? >= quantity_needed THEN 'open' ELSE 'partially_fulfilled' END,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `).run(alloc, alloc, m.demand_id);
+        }
+        // Note: surplus is being cancelled entirely so there is no need to restore
+        // its remaining_quantity; the status update below closes the record.
+      }
+      db.prepare("UPDATE surplus_posts SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(req.params.id);
+    })();
+
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to cancel post' });
@@ -145,16 +173,51 @@ router.get('/impact', (req, res) => {
   try {
     const orgId = req.user.orgId;
 
+    // totalSurplus: post counts and originally posted quantities (what was offered)
     const totalSurplus = db.prepare('SELECT COUNT(*) as count, COALESCE(SUM(quantity),0) as total FROM surplus_posts WHERE donor_org_id = ?').get(orgId);
-    
-    // Rescued / recovered includes matched, in_transit, and completed donations
-    const recovered = db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(quantity),0) as total FROM surplus_posts WHERE donor_org_id = ? AND status IN ('matched','in_transit','completed')").get(orgId);
-    const completed = db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(quantity),0) as total FROM surplus_posts WHERE donor_org_id = ? AND status = 'completed'").get(orgId);
-    const matched = db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(quantity),0) as total FROM surplus_posts WHERE donor_org_id = ? AND status IN ('matched','in_transit')").get(orgId);
-    const available = db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(quantity),0) as total FROM surplus_posts WHERE donor_org_id = ? AND status = 'available'").get(orgId);
+    const available = db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(remaining_quantity),0) as total FROM surplus_posts WHERE donor_org_id = ? AND status = 'available'").get(orgId);
     const wasted = db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(quantity),0) as total FROM surplus_posts WHERE donor_org_id = ? AND status = 'expired'").get(orgId);
 
-    // Build timeline for last 6 calendar months
+    // Recovered / completed quantities are derived from match allocations, not surplus post totals,
+    // because a single post may be split across multiple partial allocations.
+    const recoveredMatches = db.prepare(`
+      SELECT COUNT(DISTINCT sp.id) as count,
+             COALESCE(SUM(m.allocated_quantity), 0) as total,
+             m.allocated_unit as unit
+      FROM matches m
+      JOIN surplus_posts sp ON m.surplus_id = sp.id
+      WHERE sp.donor_org_id = ? AND m.status IN ('pending','in_transit','matched','completed')
+        AND m.notes != 'fallback_food_bank'
+      GROUP BY m.allocated_unit
+    `).all(orgId);
+
+    const completedMatches = db.prepare(`
+      SELECT COALESCE(SUM(m.allocated_quantity), 0) as total, m.allocated_unit as unit
+      FROM matches m
+      JOIN surplus_posts sp ON m.surplus_id = sp.id
+      WHERE sp.donor_org_id = ? AND m.status = 'completed'
+      GROUP BY m.allocated_unit
+    `).all(orgId);
+
+    // Aggregate totals (convert to kg-equivalent for CO₂/meal calculations)
+    // Conversion factors: 1 serving ≈ 0.4 kg, 1 liter ≈ 1 kg
+    function toKgEquivalent(qty, unit) {
+      const u = (unit || 'kg').toLowerCase();
+      if (u === 'servings' || u === 'serving' || u === 'portions' || u === 'portion') return qty * 0.4;
+      if (u === 'liters' || u === 'liter' || u === 'litres' || u === 'litre') return qty;
+      if (u === 'g' || u === 'gram' || u === 'grams') return qty / 1000;
+      return qty; // kg
+    }
+
+    const recoveredKg = recoveredMatches.reduce((s, r) => s + toKgEquivalent(r.total, r.unit), 0);
+    const completedKg = completedMatches.reduce((s, r) => s + toKgEquivalent(r.total, r.unit), 0);
+
+    const recoveredQty = Math.round(recoveredKg * 10) / 10;
+    const mealsEquivalent = Math.round(recoveredKg * 3.5); // ~1 kg ≈ 3.5 meals
+    const co2Saved = Math.round(recoveredKg * 2.5 * 10) / 10; // ~2.5 kg CO₂e per kg food diverted
+    const wasteAvoided = recoveredQty;
+
+    // Build timeline for last 6 calendar months using allocated match quantities
     const monthlyMap = {};
     const months = [];
     const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -169,38 +232,41 @@ router.get('/impact', (req, res) => {
     }
 
     const dbMonthly = db.prepare(`
-      SELECT strftime('%Y-%m', created_at) as month, COUNT(*) as posts, SUM(quantity) as quantity
-      FROM surplus_posts WHERE donor_org_id = ?
-      GROUP BY month
+      SELECT strftime('%Y-%m', sp.created_at) as month, COUNT(DISTINCT sp.id) as posts,
+             SUM(m.allocated_quantity) as quantity, m.allocated_unit as unit
+      FROM surplus_posts sp
+      JOIN matches m ON sp.id = m.surplus_id
+      WHERE sp.donor_org_id = ? AND m.status NOT IN ('cancelled','declined')
+      GROUP BY month, m.allocated_unit
     `).all(orgId);
 
     dbMonthly.forEach(row => {
       if (monthlyMap[row.month]) {
-        monthlyMap[row.month].quantity = Math.round((row.quantity || 0) * 10) / 10;
+        monthlyMap[row.month].quantity = Math.round(
+          ((monthlyMap[row.month].quantity || 0) + toKgEquivalent(row.quantity || 0, row.unit)) * 10
+        ) / 10;
         monthlyMap[row.month].posts = row.posts;
       }
     });
 
     const monthlyTrend = months.map(m => monthlyMap[m]);
 
-    const recoveredQty = Math.round((recovered.total || 0) * 10) / 10;
-    const mealsEquivalent = Math.round(recoveredQty * 3.5); // ~1 kg ≈ 3.5 meals
-    const co2Saved = Math.round(recoveredQty * 2.5 * 10) / 10; // ~2.5 kg CO2e per kg food diverted
-    const wasteAvoided = recoveredQty;
-
-    // Category breakdown
+    // Category breakdown using allocated quantities from matches
     const categoryBreakdown = db.prepare(`
-      SELECT food_type, COUNT(*) as count, SUM(quantity) as quantity
-      FROM surplus_posts WHERE donor_org_id = ?
-      GROUP BY food_type
+      SELECT sp.food_type, COUNT(DISTINCT sp.id) as count,
+             SUM(m.allocated_quantity) as quantity, m.allocated_unit as unit
+      FROM surplus_posts sp
+      JOIN matches m ON sp.id = m.surplus_id
+      WHERE sp.donor_org_id = ? AND m.status NOT IN ('cancelled','declined')
+      GROUP BY sp.food_type, m.allocated_unit
     `).all(orgId);
 
     res.json({
       totalPosts: totalSurplus.count || 0,
       totalQuantityPosted: Math.round((totalSurplus.total || 0) * 10) / 10,
-      recovered: { count: recovered.count || 0, quantity: recoveredQty },
-      completed: { count: completed.count || 0, quantity: Math.round((completed.total || 0) * 10) / 10 },
-      matched: matched.count || 0,
+      recovered: { count: recoveredMatches.reduce((s, r) => s + r.count, 0), quantity: recoveredQty },
+      completed: { count: completedMatches.length, quantity: Math.round(completedKg * 10) / 10 },
+      matched: recoveredMatches.length,
       available: available.count || 0,
       wasted: { count: wasted.count || 0, quantity: Math.round((wasted.total || 0) * 10) / 10 },
       mealsEquivalent,

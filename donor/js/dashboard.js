@@ -331,13 +331,18 @@ function renderSurplus(filter) {
         <span class="badge badge-${p.status}">${p.status.replace('_',' ')}</span>
       </div>
       <div class="surplus-meta">
-        <span>⚖️ ${p.quantity} ${p.quantity_unit}</span>
+        <span>⚖️ ${p.remaining_quantity != null && p.remaining_quantity < p.quantity ? `${p.remaining_quantity} / ${p.quantity} ${p.quantity_unit} remaining` : `${p.quantity} ${p.quantity_unit}`}</span>
         <span>📅 Available: ${fmtDt(p.availability_time)}</span>
         <span>⏰ Safe until: ${fmtDt(p.remaining_usable_time)}</span>
-        ${p.matched_org_name ? `<span>🤝 Matched to: <strong>${p.matched_org_name}</strong></span>` : ''}
+        ${p.matched_org_name ? `<span>🤝 Matched to: <strong>${p.matched_org_name}</strong>${p.allocated_quantity ? ` (${p.allocated_quantity} ${p.allocated_unit || p.quantity_unit})` : ''}</span>` : ''}
       </div>
+      ${p.match_explanation || p.match_notes ? `
+        <div style="font-size:0.78rem; color:#94a3b8; margin-top:6px; padding:6px 10px; background:rgba(255,255,255,0.04); border-radius:4px; border-left:3px solid #3b82f6; line-height:1.4;">
+          <strong>💡 Match reason:</strong> ${p.match_explanation || p.match_notes}
+        </div>
+      ` : ''}
       ${['available'].includes(p.status) ? `
-        <div class="surplus-actions">
+        <div class="surplus-actions" style="margin-top:10px;">
           <button class="btn-sm btn-sm-danger" onclick="cancelSurplus('${p.id}', this)">Cancel</button>
         </div>
       ` : ''}

@@ -389,15 +389,19 @@ function renderMatchList(containerId, matches) {
       </div>
       <div class="match-details">
         <span>📦 ${m.quantity || '—'} ${m.unit || 'servings'}</span>
-        <span>📍 ${m.distance || '~2km away'}</span>
+        <span>📍 ${m.distance ? (typeof m.distance === 'number' ? m.distance + ' km away' : m.distance) : '~2km away'}</span>
         <span>⏱️ Available: ${m.availableUntil ? new Date(m.availableUntil).toLocaleTimeString() : 'Now'}</span>
         <span>🚨 Your need: ${m.demandUrgency || 'regular'}</span>
       </div>
+      ${m.explanation || m.notes ? `
+      <div class="match-explanation" style="margin-top:8px; padding:7px 10px; background:rgba(16,185,129,0.08); border-left:3px solid #10b981; border-radius:4px; font-size:0.79rem; color:var(--text-primary, #e2e8f0); line-height:1.4;">
+        <strong>💡 Why matched:</strong> ${m.explanation || m.notes}
+      </div>` : ''}
       ${m.status === 'pending' ? `
-      <div class="match-actions">
+      <div class="match-actions" style="margin-top:10px;">
         <button class="match-btn accept"  onclick="acceptMatch('${m.id}')">✅ Accept</button>
         <button class="match-btn decline" onclick="declineMatch('${m.id}')">✗ Decline</button>
-      </div>` : `<span class="demand-status-badge status-${m.status}">${m.status}</span>`}
+      </div>` : `<span class="demand-status-badge status-${m.status}" style="margin-top:8px; display:inline-block;">${m.status}</span>`}
     </div>
   `).join('');
 }

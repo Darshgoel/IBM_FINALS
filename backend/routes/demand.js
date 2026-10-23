@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { dispatchNotification } = require('../services/notifications');
+const { runUnifiedMatching, convertQuantity } = require('../services/matching');
 
 const router = express.Router();
 
@@ -131,41 +132,24 @@ const handlePostDemand = (req, res) => {
 
     const demandId = uuidv4();
     db.prepare(`
-      INSERT INTO demand_registrations (id, demand_org_id, food_requirement, quantity_needed, quantity_unit,
+      INSERT INTO demand_registrations (id, demand_org_id, food_requirement, quantity_needed, remaining_quantity, quantity_unit,
         required_by, urgency, dietary_requirements, is_recurring, recurring_pattern, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open')
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open')
     `).run(
-      demandId, req.user.orgId, foodRequirement, quantityNeeded, quantityUnit,
+      demandId, req.user.orgId, foodRequirement, quantityNeeded, quantityNeeded, quantityUnit,
       requiredBy, urgency, JSON.stringify(dietaryRequirements),
       isRecurring, recurringPattern ? JSON.stringify(recurringPattern) : null
     );
 
-    // Check if there is already an available surplus that fits!
-    const matchingSurplus = db.prepare(`
-      SELECT sp.* FROM surplus_posts sp
-      WHERE sp.status = 'available'
-      ORDER BY sp.remaining_usable_time ASC LIMIT 1
-    `).get();
+    // Call shared unified matcher (considers all valid candidates, hard gates & explainable ranking)
+    const matchResult = runUnifiedMatching({ demandId });
 
-    if (matchingSurplus) {
-      const matchId = uuidv4();
-      db.prepare(`
-        INSERT INTO matches (id, surplus_id, demand_id, demand_org_id, match_score, status)
-        VALUES (?, ?, ?, ?, 88, 'pending')
-      `).run(matchId, matchingSurplus.id, demandId, req.user.orgId);
-
-      db.prepare("UPDATE surplus_posts SET status = 'matched', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(matchingSurplus.id);
-      db.prepare("UPDATE demand_registrations SET status = 'partially_fulfilled', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(demandId);
-
-      dispatchNotification({
-        orgId: req.user.orgId,
-        type: 'match',
-        title: '🍱 Immediate Match Found!',
-        message: `Surplus ${matchingSurplus.food_name} matched with your demand. View matches tab to accept.`
-      });
-    }
-
-    res.status(201).json({ success: true, demandId, message: 'Demand registered successfully' });
+    res.status(201).json({
+      success: true,
+      demandId,
+      message: 'Demand registered successfully',
+      matchResult
+    });
   } catch (err) {
     console.error('[Demand/Post Error]', err);
     res.status(500).json({ error: 'Failed to register demand: ' + err.message });
@@ -179,9 +163,10 @@ router.post('/register', handlePostDemand);
 const handleGetDemands = (req, res) => {
   try {
     const demands = db.prepare(`
-      SELECT dr.*, m.id as match_id, m.status as match_status, o.name as matched_donor_name, sp.food_name as matched_food_name
+      SELECT dr.*, m.id as match_id, m.status as match_status, m.allocated_quantity, m.allocated_unit,
+             m.match_score, m.explanation as match_explanation, o.name as matched_donor_name, sp.food_name as matched_food_name
       FROM demand_registrations dr
-      LEFT JOIN matches m ON dr.id = m.demand_id
+      LEFT JOIN matches m ON dr.id = m.demand_id AND m.status != 'cancelled' AND m.status != 'declined'
       LEFT JOIN surplus_posts sp ON m.surplus_id = sp.id
       LEFT JOIN organizations o ON sp.donor_org_id = o.id
       WHERE dr.demand_org_id = ?
@@ -193,6 +178,8 @@ const handleGetDemands = (req, res) => {
       ...d,
       foodType: d.food_requirement,
       quantity: d.quantity_needed,
+      remainingQuantity: d.remaining_quantity != null ? d.remaining_quantity : d.quantity_needed,
+      allocatedQuantity: d.allocated_quantity,
       unit: d.quantity_unit,
       neededBy: d.required_by,
       dietary: (() => {
@@ -219,8 +206,37 @@ router.get('/registrations', handleGetDemands);
 // ── DELETE Demand ──────────────────────────────────────────────────────────
 router.delete('/demand/:id', (req, res) => {
   try {
-    db.prepare("UPDATE demand_registrations SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND demand_org_id = ?")
-      .run(req.params.id, req.user.orgId);
+    const demand = db.prepare('SELECT * FROM demand_registrations WHERE id = ? AND demand_org_id = ?').get(req.params.id, req.user.orgId);
+    if (!demand) return res.status(404).json({ error: 'Demand not found' });
+
+    db.transaction(() => {
+      // Find pending matches and release reserved surplus quantities
+      const pendingMatches = db.prepare("SELECT * FROM matches WHERE demand_id = ? AND status = 'pending'").all(req.params.id);
+      for (const m of pendingMatches) {
+        db.prepare("UPDATE matches SET status = 'cancelled', notes = 'Demand was cancelled by recipient', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(m.id);
+        const alloc = m.allocated_quantity || 0;
+        if (alloc > 0) {
+          // allocated_quantity is stored in the demand's unit (allocated_unit).
+          // The surplus post tracks its balance in its own unit. Convert before restoring.
+          const surplus = db.prepare('SELECT * FROM surplus_posts WHERE id = ?').get(m.surplus_id);
+          if (surplus) {
+            const conv = convertQuantity(alloc, m.allocated_unit || demand.quantity_unit, surplus.quantity_unit, surplus.food_type);
+            const restoreInSurplusUnit = conv.success ? conv.convertedQty : alloc;
+            db.prepare(`
+              UPDATE surplus_posts
+              SET remaining_quantity = MIN(quantity, remaining_quantity + ?),
+                  status = 'available',
+                  updated_at = CURRENT_TIMESTAMP
+              WHERE id = ?
+            `).run(Math.round(restoreInSurplusUnit * 100) / 100, m.surplus_id);
+          }
+        } else {
+          db.prepare("UPDATE surplus_posts SET status = 'available', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(m.surplus_id);
+        }
+      }
+      db.prepare("UPDATE demand_registrations SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(req.params.id);
+    })();
+
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to cancel demand' });
@@ -230,16 +246,33 @@ router.delete('/demand/:id', (req, res) => {
 // ── GET Matches ────────────────────────────────────────────────────────────
 router.get('/matches', (req, res) => {
   try {
-    const matches = db.prepare(`
-      SELECT m.*, sp.food_name, sp.food_type, sp.quantity, sp.quantity_unit,
+    const rawMatches = db.prepare(`
+      SELECT m.*, sp.food_name, sp.food_type, sp.quantity as surplus_total_quantity,
+             sp.remaining_quantity as surplus_remaining_quantity, sp.quantity_unit as surplus_unit,
              sp.pickup_address, sp.remaining_usable_time, sp.special_instructions,
-             o.name as donor_name, o.contact_phone as donor_phone, o.contact_email as donor_email
+             o.name as donor_name, o.contact_phone as donor_phone, o.contact_email as donor_email,
+             dr.urgency as demand_urgency, dr.quantity_needed, dr.remaining_quantity as demand_remaining_quantity,
+             dr.quantity_unit as demand_unit
       FROM matches m
       JOIN surplus_posts sp ON m.surplus_id = sp.id
       JOIN organizations o ON sp.donor_org_id = o.id
+      LEFT JOIN demand_registrations dr ON m.demand_id = dr.id
       WHERE m.demand_org_id = ?
       ORDER BY m.matched_at DESC
     `).all(req.user.orgId);
+
+    const matches = rawMatches.map(m => ({
+      ...m,
+      quantity: m.allocated_quantity != null ? m.allocated_quantity : m.surplus_total_quantity,
+      unit: m.allocated_unit || m.demand_unit || m.surplus_unit || 'servings',
+      donorName: m.donor_name,
+      foodType: m.food_type,
+      foodName: m.food_name,
+      matchScore: m.match_score,
+      availableUntil: m.remaining_usable_time,
+      demandUrgency: m.demand_urgency || 'regular',
+      explanation: m.explanation || m.notes
+    }));
 
     res.json({ matches });
   } catch (err) {
@@ -250,20 +283,48 @@ router.get('/matches', (req, res) => {
 // ── PUT Match Accept ───────────────────────────────────────────────────────
 router.put('/matches/:id/accept', (req, res) => {
   try {
-    const match = db.prepare('SELECT * FROM matches WHERE id = ? AND demand_org_id = ?').get(req.params.id, req.user.orgId);
-    if (!match) return res.status(404).json({ error: 'Match not found' });
+    const result = db.transaction(() => {
+      // Re-read inside transaction and require status === 'pending' to prevent double-accepts
+      const match = db.prepare('SELECT * FROM matches WHERE id = ? AND demand_org_id = ?').get(req.params.id, req.user.orgId);
+      if (!match) return { status: 404, error: 'Match not found' };
+      if (match.status !== 'pending') {
+        return { status: 400, error: `Match cannot be accepted (current status: ${match.status})` };
+      }
 
-    db.prepare("UPDATE matches SET status = 'in_transit', confirmed_at = CURRENT_TIMESTAMP WHERE id = ?").run(req.params.id);
-    db.prepare("UPDATE surplus_posts SET status = 'in_transit', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(match.surplus_id);
+      db.prepare("UPDATE matches SET status = 'in_transit', confirmed_at = CURRENT_TIMESTAMP WHERE id = ?").run(req.params.id);
 
-    // Notify donor
-    const surplus = db.prepare('SELECT donor_org_id, food_name FROM surplus_posts WHERE id = ?').get(match.surplus_id);
-    if (surplus) {
+      // Derive surplus post status from all its allocations, not just this one.
+      // Only mark the whole post in_transit when every non-cancelled/declined match on it
+      // is now in_transit (i.e. no remaining 'pending' allocations and remaining qty is 0).
+      const surplus = db.prepare('SELECT * FROM surplus_posts WHERE id = ?').get(match.surplus_id);
+      if (surplus) {
+        const pendingCount = db.prepare(
+          "SELECT COUNT(*) as c FROM matches WHERE surplus_id = ? AND status = 'pending'"
+        ).get(surplus.id).c;
+
+        // Only flip the post to in_transit when there is no available remainder AND
+        // no other pending allocation exists. If the post still has unallocated quantity
+        // (remaining_quantity > 0) it should stay 'available' so new matches can form.
+        const hasRemainder = (surplus.remaining_quantity == null ? surplus.quantity : surplus.remaining_quantity) > 0.001;
+        if (!hasRemainder && pendingCount === 0) {
+          db.prepare("UPDATE surplus_posts SET status = 'in_transit', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(surplus.id);
+        }
+        // else: leave the post status as-is (available / partially_matched) so the
+        // unallocated remainder stays visible to the matching engine.
+
+        return { donorOrgId: surplus.donor_org_id, foodName: surplus.food_name };
+      }
+      return {};
+    })();
+
+    if (result.status) return res.status(result.status).json({ error: result.error });
+
+    if (result.donorOrgId) {
       dispatchNotification({
-        orgId: surplus.donor_org_id,
+        orgId: result.donorOrgId,
         type: 'match',
         title: '🚚 Pickup Confirmed by Recipient',
-        message: `Recipient has accepted and confirmed transfer of ${surplus.food_name}.`
+        message: `Recipient has accepted and confirmed transfer of ${result.foodName}.`
       });
     }
 
@@ -276,14 +337,54 @@ router.put('/matches/:id/accept', (req, res) => {
 // ── PUT Match Decline ──────────────────────────────────────────────────────
 router.put('/matches/:id/decline', (req, res) => {
   try {
-    const match = db.prepare('SELECT * FROM matches WHERE id = ? AND demand_org_id = ?').get(req.params.id, req.user.orgId);
-    if (!match) return res.status(404).json({ error: 'Match not found' });
+    const result = db.transaction(() => {
+      // Re-read inside transaction and require status === 'pending' to prevent invalid transitions
+      const match = db.prepare('SELECT * FROM matches WHERE id = ? AND demand_org_id = ?').get(req.params.id, req.user.orgId);
+      if (!match) return { status: 404, error: 'Match not found' };
+      if (match.status !== 'pending') {
+        return { status: 400, error: `Match cannot be declined (current status: ${match.status})` };
+      }
 
-    db.prepare("UPDATE matches SET status = 'declined', notes = 'Declined by recipient', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(req.params.id);
-    // Return surplus to available
-    db.prepare("UPDATE surplus_posts SET status = 'available', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(match.surplus_id);
+      db.prepare("UPDATE matches SET status = 'declined', notes = 'Declined by recipient', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(req.params.id);
 
-    res.json({ success: true, message: 'Match declined and surplus returned to pool' });
+      // Restore quantities using the correct units.
+      // allocated_quantity is always stored in the demand's unit (allocated_unit).
+      // The surplus post tracks its balance in its own unit (surplus_posts.quantity_unit).
+      // We must convert before restoring.
+      const allocQty = match.allocated_quantity || 0;
+      if (allocQty > 0) {
+        const surplus = db.prepare('SELECT * FROM surplus_posts WHERE id = ?').get(match.surplus_id);
+        if (surplus) {
+          // Convert allocated (demand unit) → surplus unit for the surplus balance restore
+          const conv = convertQuantity(allocQty, match.allocated_unit || 'servings', surplus.quantity_unit, surplus.food_type);
+          const restoreInSurplusUnit = conv.success ? conv.convertedQty : allocQty;
+
+          db.prepare(`
+            UPDATE surplus_posts
+            SET remaining_quantity = MIN(quantity, remaining_quantity + ?),
+                status = 'available',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `).run(Math.round(restoreInSurplusUnit * 100) / 100, match.surplus_id);
+        }
+
+        // Restore demand balance in the demand's own unit (no conversion needed)
+        if (match.demand_id) {
+          db.prepare(`
+            UPDATE demand_registrations
+            SET remaining_quantity = MIN(quantity_needed, remaining_quantity + ?),
+                status = CASE WHEN remaining_quantity + ? >= quantity_needed THEN 'open' ELSE 'partially_fulfilled' END,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `).run(allocQty, allocQty, match.demand_id);
+        }
+      }
+      return {};
+    })();
+
+    if (result.status) return res.status(result.status).json({ error: result.error });
+
+    res.json({ success: true, message: 'Match declined and reserved surplus restored to pool' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to decline match' });
   }
@@ -312,39 +413,23 @@ router.get('/insights', (req, res) => {
       if (fulfillmentRate > 100) fulfillmentRate = 100;
     }
 
-    // People served calculation:
-    // 1. From matched / completed surplus posts
+    // People served calculation — use allocated_quantity from each match record,
+    // which reflects only the portion actually committed, not the full surplus post total.
     const receivedFromMatches = db.prepare(`
       SELECT COALESCE(SUM(
-        CASE 
-          WHEN sp.quantity_unit = 'servings' THEN sp.quantity
-          WHEN sp.quantity_unit = 'kg' THEN sp.quantity * 3.5
-          WHEN sp.quantity_unit = 'boxes' THEN sp.quantity * 10
-          WHEN sp.quantity_unit = 'liters' THEN sp.quantity * 2.5
-          ELSE sp.quantity * 3
+        CASE
+          WHEN m.allocated_unit = 'servings' THEN m.allocated_quantity
+          WHEN m.allocated_unit = 'kg'       THEN m.allocated_quantity * 3.5
+          WHEN m.allocated_unit = 'boxes'    THEN m.allocated_quantity * 10
+          WHEN m.allocated_unit = 'liters'   THEN m.allocated_quantity * 2.5
+          ELSE m.allocated_quantity * 3
         END
       ), 0) as people
       FROM matches m
-      JOIN surplus_posts sp ON m.surplus_id = sp.id
       WHERE m.demand_org_id = ? AND m.status IN ('completed', 'in_transit', 'confirmed', 'matched')
     `).get(orgId);
 
-    // 2. From fulfilled demands
-    const receivedFromDemands = db.prepare(`
-      SELECT COALESCE(SUM(
-        CASE 
-          WHEN quantity_unit = 'servings' THEN quantity_needed
-          WHEN quantity_unit = 'kg' THEN quantity_needed * 3.5
-          WHEN quantity_unit = 'boxes' THEN quantity_needed * 10
-          WHEN quantity_unit = 'liters' THEN quantity_needed * 2.5
-          ELSE quantity_needed * 3
-        END
-      ), 0) as people
-      FROM demand_registrations
-      WHERE demand_org_id = ? AND status IN ('fulfilled', 'partially_fulfilled')
-    `).get(orgId);
-
-    const peopleTotalServed = Math.round(Math.max(receivedFromMatches.people || 0, receivedFromDemands.people || 0));
+    const peopleTotalServed = Math.round(receivedFromMatches.people || 0);
 
     // People served this month
     const thisMonthStart = new Date();
@@ -354,34 +439,20 @@ router.get('/insights', (req, res) => {
 
     const monthFromMatches = db.prepare(`
       SELECT COALESCE(SUM(
-        CASE 
-          WHEN sp.quantity_unit = 'servings' THEN sp.quantity
-          WHEN sp.quantity_unit = 'kg' THEN sp.quantity * 3.5
-          WHEN sp.quantity_unit = 'boxes' THEN sp.quantity * 10
-          WHEN sp.quantity_unit = 'liters' THEN sp.quantity * 2.5
-          ELSE sp.quantity * 3
+        CASE
+          WHEN m.allocated_unit = 'servings' THEN m.allocated_quantity
+          WHEN m.allocated_unit = 'kg'       THEN m.allocated_quantity * 3.5
+          WHEN m.allocated_unit = 'boxes'    THEN m.allocated_quantity * 10
+          WHEN m.allocated_unit = 'liters'   THEN m.allocated_quantity * 2.5
+          ELSE m.allocated_quantity * 3
         END
       ), 0) as people
       FROM matches m
-      JOIN surplus_posts sp ON m.surplus_id = sp.id
       WHERE m.demand_org_id = ? AND m.status IN ('completed', 'in_transit', 'confirmed', 'matched')
         AND (m.matched_at LIKE ? OR m.completed_at LIKE ?)
     `).get(orgId, `${monthPrefix}%`, `${monthPrefix}%`);
 
-    const monthFromDemands = db.prepare(`
-      SELECT COALESCE(SUM(
-        CASE 
-          WHEN quantity_unit = 'servings' THEN quantity_needed
-          WHEN quantity_unit = 'kg' THEN quantity_needed * 3.5
-          ELSE quantity_needed * 3
-        END
-      ), 0) as people
-      FROM demand_registrations
-      WHERE demand_org_id = ? AND status IN ('fulfilled', 'partially_fulfilled')
-        AND created_at LIKE ?
-    `).get(orgId, `${monthPrefix}%`);
-
-    const peopleServedMonth = Math.round(Math.max(monthFromMatches.people || 0, monthFromDemands.people || 0));
+    const peopleServedMonth = Math.round(monthFromMatches.people || 0);
 
     // Weekly Data (last 7 days demand vs fulfilled)
     const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -399,9 +470,8 @@ router.get('/insights', (req, res) => {
       `).get(orgId, `${dateStr}%`);
 
       const dayFulfilled = db.prepare(`
-        SELECT COALESCE(SUM(sp.quantity), 0) as qty, COUNT(*) as count
+        SELECT COALESCE(SUM(m.allocated_quantity), 0) as qty, COUNT(*) as count
         FROM matches m
-        JOIN surplus_posts sp ON m.surplus_id = sp.id
         WHERE m.demand_org_id = ? AND m.status IN ('completed', 'in_transit', 'confirmed', 'matched')
           AND (m.matched_at LIKE ? OR m.completed_at LIKE ?)
       `).get(orgId, `${dateStr}%`, `${dateStr}%`);
@@ -428,11 +498,12 @@ router.get('/insights', (req, res) => {
     };
 
     let foodBreakdown = db.prepare(`
-      SELECT sp.food_type as type, COUNT(*) as count, SUM(sp.quantity) as quantity, sp.quantity_unit as unit
+      SELECT sp.food_type as type, COUNT(*) as count,
+             SUM(m.allocated_quantity) as quantity, m.allocated_unit as unit
       FROM matches m
       JOIN surplus_posts sp ON m.surplus_id = sp.id
       WHERE m.demand_org_id = ? AND m.status IN ('completed', 'in_transit', 'confirmed', 'matched')
-      GROUP BY sp.food_type
+      GROUP BY sp.food_type, m.allocated_unit
     `).all(orgId).map(b => ({
       icon: foodTypeEmoji[b.type] || '🍱',
       type: (b.type || 'Other').replace(/_/g, ' '),
