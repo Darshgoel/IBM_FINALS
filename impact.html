@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FoodBridge Impact — Live network access and reach</title>
+  <meta name="description" content="Live FoodBridge network access: verified community food points, incoming matches, areas covered and meal capacity." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/css/landing.css" />
+  <link rel="stylesheet" href="/assets/css/public.css" />
+  <script src="/assets/js/public.js" defer></script>
+</head>
+<body>
+  <header class="site-header" id="siteHeader">
+    <div class="shell nav-shell">
+      <a class="brand" href="/" aria-label="FoodBridge home">
+        <svg class="brand-mark" viewBox="0 0 44 44" aria-hidden="true">
+          <path d="M22 40C10.4 40 4.5 31.7 4.5 19.5 4.5 8.8 11 3.5 22 3.5s17.5 5.3 17.5 16C39.5 31.7 33.6 40 22 40Z" fill="#13833B" />
+          <path d="M22 39V18.5" stroke="#fff" stroke-width="2.4" stroke-linecap="round" />
+          <path d="M22 27.5c-7.2 0-11.3-4.1-11.3-10.3 7.2 0 11.3 4.1 11.3 10.3Z" fill="#FF781F" />
+          <path d="M22 23c6 0 9.5-3.6 9.5-9.1-6 0-9.5 3.6-9.5 9.1Z" fill="#9AF2A8" />
+        </svg>
+        <span class="brand-copy">
+          <span class="brand-name"><span class="brand-food">Food</span><span class="brand-bridge">Bridge</span></span>
+          <span class="brand-tag">Rescue Food. Feed People. Build a Greener Tomorrow.</span>
+        </span>
+      </a>
+      <nav class="nav-links" aria-label="Primary">
+        <a class="nav-link" href="/">Home</a>
+        <a class="nav-link" href="/about.html">About</a>
+        <a class="nav-link" href="/how-it-works.html">How It Works</a>
+        <a class="nav-link is-active" href="/impact.html" aria-current="page">Impact</a>
+        <a class="nav-link" href="/get-involved.html">Get Involved</a>
+        <a class="nav-link" href="/contact.html">Contact</a>
+      </nav>
+      <div class="nav-actions">
+        <a class="btn-login" id="publicLogin" href="/?auth=signin">Login</a>
+        <a class="btn-signup" id="publicSignup" href="/?auth=signup">Sign Up</a>
+      </div>
+      <button class="menu-toggle" id="publicMenuToggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="publicMobileMenu">☰</button>
+    </div>
+    <div class="mobile-menu" id="publicMobileMenu">
+      <a class="mobile-link" href="/">Home</a>
+      <a class="mobile-link" href="/about.html">About</a>
+      <a class="mobile-link" href="/how-it-works.html">How It Works</a>
+      <a class="mobile-link" href="/impact.html">Impact</a>
+      <a class="mobile-link" href="/get-involved.html">Get Involved</a>
+      <a class="mobile-link" href="/contact.html">Contact</a>
+      <div class="mobile-auth" id="publicMobileAuth">
+        <a class="btn-login" href="/?auth=signin">Login</a>
+        <a class="btn-signup" href="/?auth=signup">Sign Up</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-main">
+    <section class="page-hero">
+      <div class="shell">
+        <div>
+          <nav class="breadcrumb" aria-label="Breadcrumb"><a href="/">Home</a><span aria-hidden="true">/</span><span>Impact</span></nav>
+          <p class="section-kicker">Live Network Access</p>
+          <h1>A verified route. <em>Measurable reach.</em></h1>
+          <p class="page-lead">These figures come from the live recipient directory: verified community access points and the food matches already heading their way. Completed-handover impact remains visible inside the donor and network dashboards.</p>
+          <div class="page-hero-actions">
+            <a class="btn-solid" href="/donor/">Add surplus food</a>
+            <a class="btn-outline" href="/how-it-works.html">How outcomes are counted</a>
+          </div>
+        </div>
+        <aside class="page-hero-art" aria-label="Impact basis">
+          <div>
+            <p class="art-kicker">The counting rule</p>
+            <p class="art-title">Only coordinator-approved partners appear here.</p>
+            <p class="art-copy">No forecasts and no invented impact. Public access figures are read directly from the live recipient directory.</p>
+          </div>
+          <div class="art-chips">
+            <span class="art-chip">Verified partners</span>
+            <span class="art-chip">Live directory</span>
+            <span class="art-chip" id="impactUpdated">Connecting…</span>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="page-section">
+      <div class="shell">
+        <div id="impactError" class="form-status error" hidden></div>
+        <div class="metric-grid">
+          <article class="metric-card green">
+            <strong data-stat="points">—</strong>
+            <span>Verified access points</span>
+            <small class="metric-source">Active, verified community organisations</small>
+          </article>
+          <article class="metric-card orange">
+            <strong data-stat="incoming">—</strong>
+            <span>Incoming food matches</span>
+            <small class="metric-source">Matches confirmed or in transit to partners</small>
+          </article>
+          <article class="metric-card blue">
+            <strong data-stat="areas">—</strong>
+            <span>Areas covered</span>
+            <small class="metric-source">Distinct published access-point locations</small>
+          </article>
+          <article class="metric-card purple">
+            <strong data-stat="servings">—</strong>
+            <span>Meal capacity / day</span>
+            <small class="metric-source">Published serving capacity across partners</small>
+          </article>
+        </div>
+        <div class="data-note">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 11v5M12 8h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <span id="impactBasis">Access figures are read from the live recipient directory. Completed-handover impact is shown only inside authenticated dashboards.</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="page-section soft">
+      <div class="shell">
+        <div class="content-head">
+          <p class="section-kicker">How we calculate</p>
+          <h2 class="section-heading">Transparent directory inputs, honest labels.</h2>
+          <p>Each figure below maps to a field the network actually stores. Nothing is projected to look larger than the live directory supports.</p>
+        </div>
+        <div class="card-grid">
+          <article class="info-card">
+            <span class="card-icon"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5M4 19h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M8 15l4-5 3 3 4-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <h3>Access points</h3>
+            <p>Only organizations with an active, verified demand profile are returned by the public recipient directory. Pending and rejected organizations are excluded.</p>
+          </article>
+          <article class="info-card">
+            <span class="card-icon blue"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-4.5 7-11a7 7 0 0 0-14 0c0 6.5 7 11 7 11Z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg></span>
+            <h3>Incoming matches</h3>
+            <p>Counts pending, confirmed and in-transit matches assigned to a partner. This is food on its way, not food already handed over.</p>
+          </article>
+          <article class="info-card">
+            <span class="card-icon orange"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M5 8c4 0 7 2 7 6M19 7c-4 0-7 2-7 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+            <h3>Capacity &amp; areas</h3>
+            <p>Meal capacity comes from the partner's published serving capacity. Areas are distinct localities parsed from verified access-point addresses.</p>
+          </article>
+        </div>
+        <div class="data-note" style="margin-top:18px">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v5M12 16h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+          <span>These are access and capacity figures, not completed-handover totals. Do not read them as meals already rescued.</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="page-section">
+      <div class="shell">
+        <div class="content-head">
+          <p class="section-kicker">Live access directory</p>
+          <h2 class="section-heading">What has entered the network lately.</h2>
+          <p>These are real, non-test surplus entries. Status reflects the listing record — not a promise that food is still available.</p>
+        </div>
+        <div class="impact-ledger" id="impactActivity" aria-live="polite">
+          <div class="ledger-row head"><span>Verified access point</span><span>Capacity</span><span>Incoming</span></div>
+          <div class="ledger-row"><span>Loading recent activity…</span><span>—</span><span>—</span></div>
+        </div>
+        <p style="margin:14px 0 0;color:var(--muted-soft);font-size:11.5px;line-height:1.6">Access points are shown only after coordinator approval. Incoming matches are labelled as food on its way, not as completed handovers.</p>
+      </div>
+    </section>
+
+    <section class="page-section tight">
+      <div class="shell">
+        <div class="cta-band">
+          <div>
+            <h2>Every verified access point starts with one listing.</h2>
+            <p>If you have surplus food, the network can route it to a verified community partner. If you run a community organisation, register to receive matched supply.</p>
+          </div>
+          <div class="cta-actions">
+            <a class="btn-solid" href="/donor/">Donate food</a>
+            <a class="btn-outline" href="/demand-org/">Partner as an NGO</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell footer-grid">
+      <div class="footer-brand">
+        <a class="brand footer-logo" href="/" aria-label="FoodBridge home">
+          <svg class="brand-mark" viewBox="0 0 44 44" aria-hidden="true">
+            <path d="M22 40C10.4 40 4.5 31.7 4.5 19.5 4.5 8.8 11 3.5 22 3.5s17.5 5.3 17.5 16C39.5 31.7 33.6 40 22 40Z" fill="#fff" opacity=".14" />
+            <path d="M22 39V18.5" stroke="#fff" stroke-width="2.4" stroke-linecap="round" />
+            <path d="M22 27.5c-7.2 0-11.3-4.1-11.3-10.3 7.2 0 11.3 4.1 11.3 10.3Z" fill="#FF781F" />
+            <path d="M22 23c6 0 9.5-3.6 9.5-9.1-6 0-9.5 3.6-9.5 9.1Z" fill="#9AF2A8" />
+          </svg>
+          <span class="brand-copy">
+            <span class="brand-name brand-name-light"><span>Food</span><span class="brand-bridge">Bridge</span></span>
+            <span class="brand-tag brand-tag-light">Rescue Food. Feed People. Build a Greener Tomorrow.</span>
+          </span>
+        </a>
+        <p>A community food-rescue network connecting surplus with need across Bengaluru.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Network</h4>
+        <a href="/about.html">About</a>
+        <a href="/how-it-works.html">How it works</a>
+        <a href="/impact.html">Impact</a>
+        <a href="/get-involved.html">Get involved</a>
+      </div>
+      <div class="footer-col">
+        <h4>Portals</h4>
+        <a href="/donor/">Food donors</a>
+        <a href="/demand-org/">NGOs &amp; community orgs</a>
+        <a href="/recipient/">Food finder</a>
+        <a href="/network-intelligence/">Network intelligence</a>
+        <a href="/admin/">Admin</a>
+      </div>
+      <div class="footer-col footer-contact">
+        <h4>Contact</h4>
+        <a href="mailto:hello@foodbridge.org">hello@foodbridge.org</a>
+        <a href="tel:+918041234567">+91 80 4123 4567</a>
+        <span>Bengaluru, Karnataka</span>
+      </div>
+    </div>
+    <div class="shell footer-bottom">
+      <span>© <span data-year>2026</span> FoodBridge. Built for good food and better days.</span>
+      <span class="footer-note">Access figures come from the live verified-partner directory.</span>
+    </div>
+  </footer>
+</body>
+</html>

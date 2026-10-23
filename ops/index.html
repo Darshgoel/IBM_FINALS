@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FoodBridge — Ops Portal</title>
+  <meta name="description" content="Single FoodBridge operations sign in for network coordinators and platform administrators. Routes you to the right operations dashboard." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/css/auth.css" />
+  <script src="/assets/js/auth-page.js" defer></script>
+</head>
+<body data-portal="Ops" data-roles="network_intelligence,network_admin,admin" data-redirect="auto">
+  <main class="auth-shell">
+    <aside class="auth-aside">
+      <div>
+        <a class="auth-brand" href="/" aria-label="FoodBridge home">
+          <svg viewBox="0 0 44 44" aria-hidden="true">
+            <path d="M22 40C10.4 40 4.5 31.7 4.5 19.5 4.5 8.8 11 3.5 22 3.5s17.5 5.3 17.5 16C39.5 31.7 33.6 40 22 40Z" fill="#fff" />
+            <path d="M22 39V18.5" stroke="#0A6E32" stroke-width="2.4" stroke-linecap="round" />
+            <path d="M22 27.5c-7.2 0-11.3-4.1-11.3-10.3 7.2 0 11.3 4.1 11.3 10.3Z" fill="#FF781F" />
+            <path d="M22 23c6 0 9.5-3.6 9.5-9.1-6 0-9.5 3.6-9.5 9.1Z" fill="#0A6E32" opacity=".55" />
+          </svg>
+          <span>
+            <span class="auth-brand-name">Food<span>Bridge</span></span>
+            <span class="auth-brand-sub">Operations — single sign-in</span>
+          </span>
+        </a>
+      </div>
+
+      <div>
+        <p class="auth-kicker" style="color:#9AF2A8">Ops access</p>
+        <h1>One door for <em>operations.</em></h1>
+        <p class="auth-aside-lead">Coordinators and administrators sign in once and are routed to the dashboard their role actually uses. No role switching and no shared credentials.</p>
+        <div class="auth-points">
+          <div class="auth-point"><span class="auth-dot">1</span><span>Network coordinators go to Network Intelligence.</span></div>
+          <div class="auth-point"><span class="auth-dot">2</span><span>Platform administrators go to Admin &amp; Verification.</span></div>
+          <div class="auth-point"><span class="auth-dot">3</span><span>Donor and demand organization accounts are rejected here and sent to their own portals.</span></div>
+        </div>
+      </div>
+
+      <div class="auth-aside-foot">
+        <a href="/">← Back to FoodBridge</a>
+        <a href="/network-intelligence/">Network portal</a>
+        <a href="/admin/">Admin portal</a>
+      </div>
+    </aside>
+
+    <section class="auth-panel" aria-labelledby="authTitle">
+      <div class="auth-panel-head">
+        <div>
+          <p class="auth-kicker">Operations sign in</p>
+          <h2 id="authTitle">FoodBridge Ops</h2>
+          <p>Enter your authorized credentials. Your role determines the destination.</p>
+        </div>
+        <a class="auth-home-link" href="/">Home →</a>
+      </div>
+
+      <div class="auth-security-note"><span>⚠️</span><span><strong>Access is restricted.</strong> Unauthorized attempts and role mismatches are rejected. Admin and network sessions share the same secure token store as the rest of the app.</span></div>
+      <div class="auth-alert" id="authLoginError" role="alert"></div>
+      <div class="auth-role-pill" id="rolePill"><span class="spinner" aria-hidden="true"></span><span id="rolePillLabel">Signing you in…</span></div>
+
+      <form id="loginForm" novalidate>
+        <div class="auth-field">
+          <label for="loginEmail">Email address</label>
+          <input type="email" id="loginEmail" name="email" autocomplete="email" placeholder="ops@foodbridge.org" required />
+        </div>
+        <div class="auth-field">
+          <label for="loginPassword">Password</label>
+          <div class="auth-password-wrap">
+            <input type="password" id="loginPassword" name="password" autocomplete="current-password" placeholder="••••••••" required />
+            <button class="auth-password-toggle" type="button" data-password-toggle data-target="loginPassword" aria-label="Show password">Show</button>
+          </div>
+        </div>
+        <button class="auth-submit" id="loginButton" type="submit">Sign in to ops</button>
+      </form>
+
+      <p class="auth-foot">Looking for the public food finder? <a href="/recipient/">Open it without signing in</a>.</p>
+      <p class="auth-foot">Donor or demand organization? <a href="/">Use the participant sign-in</a>.</p>
+    </section>
+  </main>
+</body>
+</html>

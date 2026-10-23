@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>How FoodBridge Works — From surplus to a shared meal</title>
+  <meta name="description" content="See how FoodBridge moves surplus food from donor kitchens to verified community organisations — from listing and matching to pickup and completed handover." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/css/landing.css" />
+  <link rel="stylesheet" href="/assets/css/public.css" />
+  <script src="/assets/js/public.js" defer></script>
+</head>
+<body>
+  <header class="site-header" id="siteHeader">
+    <div class="shell nav-shell">
+      <a class="brand" href="/" aria-label="FoodBridge home">
+        <svg class="brand-mark" viewBox="0 0 44 44" aria-hidden="true">
+          <path d="M22 40C10.4 40 4.5 31.7 4.5 19.5 4.5 8.8 11 3.5 22 3.5s17.5 5.3 17.5 16C39.5 31.7 33.6 40 22 40Z" fill="#13833B" />
+          <path d="M22 39V18.5" stroke="#fff" stroke-width="2.4" stroke-linecap="round" />
+          <path d="M22 27.5c-7.2 0-11.3-4.1-11.3-10.3 7.2 0 11.3 4.1 11.3 10.3Z" fill="#FF781F" />
+          <path d="M22 23c6 0 9.5-3.6 9.5-9.1-6 0-9.5 3.6-9.5 9.1Z" fill="#9AF2A8" />
+        </svg>
+        <span class="brand-copy">
+          <span class="brand-name"><span class="brand-food">Food</span><span class="brand-bridge">Bridge</span></span>
+          <span class="brand-tag">Rescue Food. Feed People. Build a Greener Tomorrow.</span>
+        </span>
+      </a>
+      <nav class="nav-links" aria-label="Primary">
+        <a class="nav-link" href="/">Home</a>
+        <a class="nav-link" href="/about.html">About</a>
+        <a class="nav-link is-active" href="/how-it-works.html" aria-current="page">How It Works</a>
+        <a class="nav-link" href="/impact.html">Impact</a>
+        <a class="nav-link" href="/get-involved.html">Get Involved</a>
+        <a class="nav-link" href="/contact.html">Contact</a>
+      </nav>
+      <div class="nav-actions">
+        <a class="btn-login" id="publicLogin" href="/?auth=signin">Login</a>
+        <a class="btn-signup" id="publicSignup" href="/?auth=signup">Sign Up</a>
+      </div>
+      <button class="menu-toggle" id="publicMenuToggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="publicMobileMenu">☰</button>
+    </div>
+    <div class="mobile-menu" id="publicMobileMenu">
+      <a class="mobile-link" href="/">Home</a>
+      <a class="mobile-link" href="/about.html">About</a>
+      <a class="mobile-link" href="/how-it-works.html">How It Works</a>
+      <a class="mobile-link" href="/impact.html">Impact</a>
+      <a class="mobile-link" href="/get-involved.html">Get Involved</a>
+      <a class="mobile-link" href="/contact.html">Contact</a>
+      <div class="mobile-auth" id="publicMobileAuth">
+        <a class="btn-login" href="/?auth=signin">Login</a>
+        <a class="btn-signup" href="/?auth=signup">Sign Up</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-main">
+    <section class="page-hero">
+      <div class="shell">
+        <div>
+          <nav class="breadcrumb" aria-label="Breadcrumb"><a href="/">Home</a><span aria-hidden="true">/</span><span>How It Works</span></nav>
+          <p class="section-kicker">How It Works</p>
+          <h1>From surplus to a shared meal in <em>four traceable steps.</em></h1>
+          <p class="page-lead">The network handles coordination so donors can give quickly and community teams can focus on people, not paperwork. Every listing has a route, every handover has a record.</p>
+          <div class="page-hero-actions">
+            <a class="btn-solid" href="/donor/">Post surplus food</a>
+            <a class="btn-outline" href="/demand-org/">Register your organisation</a>
+          </div>
+        </div>
+        <aside class="page-hero-art" aria-label="What makes a safe handover">
+          <div>
+            <p class="art-kicker">Built into every match</p>
+            <p class="art-title">Safety, distance and capacity are checked together.</p>
+            <p class="art-copy">No single factor decides where food goes. The network looks at the whole handover.</p>
+          </div>
+          <div class="art-chips">
+            <span class="art-chip">Dietary fit</span>
+            <span class="art-chip">Safe-to-eat window</span>
+            <span class="art-chip">Pickup distance</span>
+            <span class="art-chip">Receiving capacity</span>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="page-section">
+      <div class="shell">
+        <div class="content-head center">
+          <p class="section-kicker">The journey</p>
+          <h2 class="section-heading">One continuous record from kitchen to community.</h2>
+          <p>Each step is visible to the people who need it — and to nobody who doesn't.</p>
+        </div>
+        <div class="flow-grid">
+          <article class="flow-step">
+            <span class="flow-num">01</span>
+            <div>
+              <h3>A donor posts surplus</h3>
+              <p>The donor adds the food name, quantity, preparation state, dietary tags, pickup window, storage needs and a safe-until time. A listing can be created in under a minute.</p>
+              <span class="flow-note">Donor dashboard → Post Surplus</span>
+            </div>
+          </article>
+          <article class="flow-step">
+            <span class="flow-num">02</span>
+            <div>
+              <h3>The matching engine finds a fit</h3>
+              <p>Nearby verified organisations are ranked using dietary compatibility, urgency, receiving capacity and collection distance. Matches that cannot be collected within the safe window are not presented as viable.</p>
+              <span class="flow-note">Automatic, not a public race for food</span>
+            </div>
+          </article>
+          <article class="flow-step">
+            <span class="flow-num">03</span>
+            <div>
+              <h3>The organisation confirms and collects</h3>
+              <p>The matched community organisation reviews the details, acknowledges the safety information, confirms the pickup and records when the food is collected.</p>
+              <span class="flow-note">NGO dashboard → Matches and pickups</span>
+            </div>
+          </article>
+          <article class="flow-step">
+            <span class="flow-num">04</span>
+            <div>
+              <h3>The handover is completed</h3>
+              <p>Once delivered, the match is marked complete. That completed record becomes the basis for meals rescued, people served and CO₂e avoided — no projections are counted as impact.</p>
+              <span class="flow-note">Traceable, auditable, counted once</span>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="page-section soft">
+      <div class="shell">
+        <div class="content-head">
+          <p class="section-kicker">For each role</p>
+          <h2 class="section-heading">What you actually do inside FoodBridge.</h2>
+          <p>The portal is different for each participant because the work is different. Here is the honest version.</p>
+        </div>
+        <div class="card-grid">
+          <article class="info-card">
+            <span class="card-icon"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10h16v10H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M3 10l2-5h14l2 5M9 20v-5h6v5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></span>
+            <h3>Food donors</h3>
+            <p>Post surplus, track its status, view predictions based on your own history, and see the impact of completed handovers. Verification unlocks posting.</p>
+            <a class="card-meta" href="/donor/">Open donor portal</a>
+          </article>
+          <article class="info-card">
+            <span class="card-icon blue"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 20v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="9.5" cy="7" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M17 11a3 3 0 1 0 0-6M21 20v-1.5a4 4 0 0 0-3-3.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+            <h3>NGOs &amp; community organisations</h3>
+            <p>Register recurring or one-off food needs, review matched supply, confirm pickups, complete handovers and keep a history of what your community received.</p>
+            <a class="card-meta" href="/demand-org/">Open NGO portal</a>
+          </article>
+          <article class="info-card">
+            <span class="card-icon orange"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-4.5 7-11a7 7 0 0 0-14 0c0 6.5 7 11 7 11Z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg></span>
+            <h3>People looking for food</h3>
+            <p>The public food finder shows open access points, current dishes where available, operating hours and collection instructions. No account is required.</p>
+            <a class="card-meta" href="/recipient/">Open food finder</a>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="page-section">
+      <div class="shell contact-layout">
+        <div class="prose">
+          <p class="section-kicker">Safety &amp; trust</p>
+          <h2 class="section-heading">What the network will not pretend.</h2>
+          <p>Food rescue only works if the food is safe and the impact is real. FoodBridge is deliberately conservative about both.</p>
+          <div class="value-list">
+            <div class="value-row">
+              <span class="value-icon"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.4-2.9 7.8-7 9-4.1-1.2-7-4.6-7-9V6l7-3Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+              <div><h3>Verification is not automatic</h3><p>New donor and NGO accounts are reviewed before posting or matching unlocks. The portal shows a pending state rather than pretending the account is active.</p></div>
+            </div>
+            <div class="value-row">
+              <span class="value-icon"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v5M12 16h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/></svg></span>
+              <div><h3>Impact excludes test data</h3><p>Public totals are calculated from completed handovers and filtered to exclude test/QA records. They are not projections or marketing estimates.</p></div>
+            </div>
+            <div class="value-row">
+              <span class="value-icon"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-4.5 7-11a7 7 0 0 0-14 0c0 6.5 7 11 7 11Z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg></span>
+              <div><h3>Matched is not delivered</h3><p>A matched or in-transit listing is not counted as rescued food. It only becomes impact when the handover is completed.</p></div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <h2 class="section-heading" style="font-size:24px;margin-bottom:16px">Common questions</h2>
+          <div class="faq-list">
+            <details class="faq-item" open>
+              <summary>Do I need an account to find food?</summary>
+              <div class="faq-body">No. The public food finder is open and does not require a login. You can search by area, see open access points and read current collection details.</div>
+            </details>
+            <details class="faq-item">
+              <summary>How is a community organisation chosen?</summary>
+              <div class="faq-body">The matching engine ranks verified organisations using dietary fit, urgency, capacity and distance. Coordinators can review and adjust allocations where the network needs it.</div>
+            </details>
+            <details class="faq-item">
+              <summary>Can I choose which NGO receives my food?</summary>
+              <div class="faq-body">The standard flow matches supply automatically so food moves quickly. The network intelligence portal gives coordinators visibility to intervene when a match is not working.</div>
+            </details>
+            <details class="faq-item">
+              <summary>What happens if food cannot be collected in time?</summary>
+              <div class="faq-body">The listing remains visible with its real status and is not counted as a completed handover. Expired or cancelled listings are shown honestly rather than hidden as successes.</div>
+            </details>
+            <details class="faq-item">
+              <summary>Is my personal information shown publicly?</summary>
+              <div class="faq-body">No. Public endpoints expose aggregate impact and open access-point details, not donor contact records, tokens or internal allocation data.</div>
+            </details>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page-section tight">
+      <div class="shell">
+        <div class="cta-band">
+          <div>
+            <h2>Ready to move good food to the right place?</h2>
+            <p>Post surplus, register your organisation or find food near you. Each portal is built for a different part of the journey.</p>
+          </div>
+          <div class="cta-actions">
+            <a class="btn-solid" href="/get-involved.html">Choose your role</a>
+            <a class="btn-outline" href="/contact.html">Ask a question</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell footer-grid">
+      <div class="footer-brand">
+        <a class="brand footer-logo" href="/" aria-label="FoodBridge home">
+          <svg class="brand-mark" viewBox="0 0 44 44" aria-hidden="true">
+            <path d="M22 40C10.4 40 4.5 31.7 4.5 19.5 4.5 8.8 11 3.5 22 3.5s17.5 5.3 17.5 16C39.5 31.7 33.6 40 22 40Z" fill="#fff" opacity=".14" />
+            <path d="M22 39V18.5" stroke="#fff" stroke-width="2.4" stroke-linecap="round" />
+            <path d="M22 27.5c-7.2 0-11.3-4.1-11.3-10.3 7.2 0 11.3 4.1 11.3 10.3Z" fill="#FF781F" />
+            <path d="M22 23c6 0 9.5-3.6 9.5-9.1-6 0-9.5 3.6-9.5 9.1Z" fill="#9AF2A8" />
+          </svg>
+          <span class="brand-copy">
+            <span class="brand-name brand-name-light"><span>Food</span><span class="brand-bridge">Bridge</span></span>
+            <span class="brand-tag brand-tag-light">Rescue Food. Feed People. Build a Greener Tomorrow.</span>
+          </span>
+        </a>
+        <p>A community food-rescue network connecting surplus with need across Bengaluru.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Network</h4>
+        <a href="/about.html">About</a>
+        <a href="/how-it-works.html">How it works</a>
+        <a href="/impact.html">Impact</a>
+        <a href="/get-involved.html">Get involved</a>
+      </div>
+      <div class="footer-col">
+        <h4>Portals</h4>
+        <a href="/donor/">Food donors</a>
+        <a href="/demand-org/">NGOs &amp; community orgs</a>
+        <a href="/recipient/">Food finder</a>
+        <a href="/network-intelligence/">Network intelligence</a>
+        <a href="/admin/">Admin</a>
+      </div>
+      <div class="footer-col footer-contact">
+        <h4>Contact</h4>
+        <a href="mailto:hello@foodbridge.org">hello@foodbridge.org</a>
+        <a href="tel:+918041234567">+91 80 4123 4567</a>
+        <span>Bengaluru, Karnataka</span>
+      </div>
+    </div>
+    <div class="shell footer-bottom">
+      <span>© <span data-year>2026</span> FoodBridge. Built for good food and better days.</span>
+      <span class="footer-note">Impact figures come from completed handovers recorded in this network.</span>
+    </div>
+  </footer>
+</body>
+</html>

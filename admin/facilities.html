@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FoodBridge — Facility Manager</title>
+  <meta name="description" content="FoodBridge Admin Facility Manager — manage biogas facilities and food banks, set map pins, and activate routing candidates." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles/main.css" />
+  <link rel="stylesheet" href="/assets/css/dashboard.css" />
+  <link rel="stylesheet" href="./styles/admin.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="/assets/js/dashboard-shell.js" defer></script>
+  <style>
+    /* ── Facility Manager page-specific layout. Reuses the shared admin tokens
+          (--primary, --card, --border, --fb-*) plus shared components (.card,
+          .status-badge, .action-btn, .toast, .main, .page-content). ─────── */
+
+    @keyframes fm-spin { to { transform: rotate(360deg); } }
+    .fm-spinner {
+      width: 15px; height: 15px; border-radius: 50%;
+      border: 2px solid #D6E4DA; border-top-color: var(--primary);
+      animation: fm-spin 0.8s linear infinite;
+    }
+
+    /* Toolbar */
+    .fac-toolbar {
+      display: flex;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 14px 16px;
+    }
+    .fac-toolbar .fm-field { display: flex; flex-direction: column; gap: 4px; }
+    .fac-toolbar .fm-field:first-child { flex: 1 1 220px; }
+    .fac-toolbar .fm-label {
+      font-size: 9px;
+      font-weight: 750;
+      letter-spacing: .09em;
+      text-transform: uppercase;
+      color: var(--sub);
+    }
+    .fac-toolbar .fm-spacer { flex: 1; }
+
+    .fm-input, .fm-select, .fm-label-input {
+      font-family: inherit;
+      font-size: 11.5px;
+      color: var(--text);
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 8px 10px;
+      min-height: 34px;
+      outline: none;
+      transition: border-color .15s, box-shadow .15s;
+      width: 100%;
+    }
+    .fm-input:focus, .fm-select:focus, .fm-label-input:focus, .fm-input:focus-visible, .fm-select:focus-visible {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(22, 131, 59, .12);
+    }
+    .fm-select { width: auto; min-width: 120px; }
+
+    /* Two-pane workspace */
+    .fac-grid {
+      display: grid;
+      grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+      gap: 16px;
+      align-items: start;
+    }
+    @media (max-width: 1080px) {
+      .fac-grid { grid-template-columns: 1fr; }
+    }
+
+    .fac-list-card .fm-list { display: grid; gap: 8px; padding: 12px; max-height: 66vh; overflow-y: auto; }
+
+    .fac-row {
+      position: relative;
+      border: 1px solid var(--border);
+      border-radius: var(--fb-radius-sm);
+      background: #fff;
+      padding: 11px 13px;
+      cursor: pointer;
+      transition: border-color .15s, background .15s, box-shadow .15s;
+    }
+    .fac-row:hover { border-color: var(--border-h); background: var(--card-h); }
+    .fac-row.active {
+      border-color: var(--primary);
+      background: var(--fb-green-soft);
+      box-shadow: 0 0 0 3px rgba(22, 131, 59, .10);
+    }
+    .fac-row-top { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+    .fac-row-name {
+      flex: 1; min-width: 0;
+      font-weight: 700; font-size: 12px; color: var(--text);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .fac-row-addr {
+      font-size: 10.5px; color: var(--sub);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .fm-badge-biogas {
+      border-color: #E3D7F8;
+      background: var(--fb-purple-soft);
+      color: var(--fb-purple);
+    }
+    .fm-badge-foodbank {
+      border-color: #CDDDFB;
+      background: var(--fb-blue-soft);
+      color: var(--fb-blue);
+    }
+
+    /* Detail panel */
+    .fac-detail { padding: 18px 20px 22px; }
+    .fac-detail-head {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; flex-wrap: wrap; margin-bottom: 12px;
+    }
+    .fac-detail-head h2 { font-size: 14.5px; font-weight: 750; color: var(--text); display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .fac-detail-head h2 .icon { color: var(--primary); width: 17px; height: 17px; }
+    .fac-detail-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+
+    #facility-map {
+      width: 100%; height: 270px;
+      border-radius: var(--fb-radius);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      z-index: 0;
+    }
+    .map-hint { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--sub); margin: 8px 2px 16px; }
+    .map-hint .icon { width: 13px; height: 13px; color: var(--primary); }
+
+    .fm-section-title {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 9.5px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase;
+      color: var(--sub); margin: 18px 0 10px;
+    }
+    .fm-section-title .icon { width: 13px; height: 13px; color: var(--primary); }
+
+    .fm-inline-row { display: flex; gap: 8px; align-items: stretch; }
+    .fm-inline-row .fm-input { flex: 1; }
+
+    .fm-hintbox {
+      display: flex; gap: 8px; align-items: flex-start;
+      background: var(--fb-amber-soft);
+      border: 1px solid #F0D49B;
+      color: var(--fb-amber-text);
+      border-radius: var(--fb-radius-sm);
+      padding: 9px 12px;
+      font-size: 10.5px; font-weight: 600; line-height: 1.5;
+      margin: 10px 0;
+    }
+    .fm-hintbox .icon { width: 14px; height: 14px; flex: 0 0 auto; margin-top: 1px; }
+
+    .result-box {
+      border: 1px solid var(--border);
+      border-radius: var(--fb-radius-sm);
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .result-item {
+      padding: 9px 12px;
+      font-size: 11.5px; color: var(--text);
+      cursor: pointer;
+      border-bottom: 1px solid var(--border);
+      background: #fff;
+      transition: background .12s;
+    }
+    .result-item:last-child { border-bottom: none; }
+    .result-item:hover { background: var(--fb-green-soft); }
+    .result-item .icon { width: 13px; height: 13px; color: var(--primary); margin-right: 6px; vertical-align: -2px; }
+    .result-item small { display: block; color: var(--sub); font-size: 9.5px; margin-top: 2px; padding-left: 19px; }
+
+    #osm-results { border-color: #E3D7F8; }
+    #osm-results .result-item:hover { background: var(--fb-purple-soft); }
+    #osm-results .result-item .icon { color: var(--fb-purple); }
+
+    .fac-form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px 16px;
+    }
+    @media (max-width: 760px) {
+      .fac-form-grid { grid-template-columns: 1fr; }
+      .fac-form-grid .span2 { grid-column: span 1; }
+    }
+    .fac-form-grid .span2 { grid-column: span 2; }
+    .form-field { display: flex; flex-direction: column; gap: 4px; }
+    .form-field > label {
+      font-size: 9px; font-weight: 750; letter-spacing: .09em;
+      text-transform: uppercase; color: var(--sub);
+    }
+    .form-field > label .fm-req { color: var(--red); }
+    .form-field > .fm-label-input { width: 100%; font-size: 11.5px; }
+    .form-field textarea.fm-label-input { resize: vertical; min-height: 66px; font-family: inherit; line-height: 1.5; }
+    .form-field > .fm-note { font-size: 9px; color: var(--sub); font-weight: 500; letter-spacing: 0; text-transform: none; }
+
+    .coord-row { display: flex; gap: 8px; align-items: flex-end; }
+    .coord-row .form-field { flex: 1; }
+    .coord-row .action-btn { min-height: 34px; padding: 0 12px; font-size: 10.5px; display: inline-flex; }
+
+    .fac-action-bar {
+      display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+      margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border);
+    }
+    .fac-action-bar .action-btn {
+      min-height: 32px; padding: 0 14px; font-size: 10.5px;
+    }
+    .fac-action-bar .icon { width: 13px; height: 13px; }
+
+    .fac-status-msg { margin-top: 10px; font-size: 10.5px; color: var(--sub); }
+    .fac-status-msg.err { color: var(--red); font-weight: 600; }
+    .fac-status-msg.ok { color: var(--primary-d); font-weight: 600; }
+
+    /* Buttons used on this page (scoped additions to .action-btn base styles) */
+    .portal-admin .fm-btn-primary {
+      background: var(--primary);
+      border: 1px solid var(--primary);
+      color: #fff;
+      min-height: 32px;
+      padding: 0 14px;
+      font-size: 10.5px;
+    }
+    .portal-admin .fm-btn-primary:hover { background: var(--primary-d); border-color: var(--primary-d); }
+    .portal-admin .fm-btn-primary[disabled] { opacity: .6; cursor: default; }
+    .portal-admin .fm-btn-ghost {
+      background: #fff;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      min-height: 32px;
+      padding: 0 14px;
+      font-size: 10.5px;
+    }
+    .portal-admin .fm-btn-ghost:hover { background: #F8FBF8; border-color: var(--border-h); color: var(--primary-d); }
+    .portal-admin .fm-btn-deactivate {
+      background: var(--fb-orange-soft);
+      border: 1px solid #F0D49B;
+      color: var(--fb-amber-text);
+    }
+    .portal-admin .fm-btn-deactivate:hover { background: #FFE8C9; border-color: #E8C684; }
+
+    /* Empty state inside list */
+    .fac-list-card .fm-empty { padding: 40px 18px; text-align: center; color: var(--sub); font-size: 11.5px; }
+    .fac-list-card .fm-empty strong { display: block; color: var(--text); font-size: 12.5px; margin-bottom: 4px; }
+    .fac-list-card .fm-list-loading { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 40px 18px; color: var(--sub); font-size: 11.5px; }
+
+    /* Confirmation modal (replaces window.confirm) */
+    .fm-modal-overlay {
+      position: fixed; inset: 0; z-index: 70;
+      display: none; align-items: center; justify-content: center;
+      background: rgba(15, 32, 22, .45);
+      padding: 20px;
+    }
+    .fm-modal-overlay.show { display: flex; }
+    .fm-modal {
+      width: 100%; max-width: 420px;
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: var(--fb-shadow);
+      padding: 22px 24px;
+    }
+    .fm-modal .fm-modal-kicker {
+      font-size: 9px; font-weight: 750; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--sub); margin-bottom: 6px;
+    }
+    .fm-modal h3 { font-size: 14.5px; font-weight: 750; color: var(--text); margin-bottom: 8px; }
+    .fm-modal p { font-size: 11.5px; color: var(--muted); line-height: 1.6; margin-bottom: 18px; }
+    .fm-modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  </style>
+</head>
+<body class="portal-admin">
+
+<!-- ── Shared outline icon sprite ─────────────────────────────────────────── -->
+<svg class="fb-sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.6"/></symbol>
+  <symbol id="i-building" viewBox="0 0 24 24"><path d="M4 21V5.8A1.8 1.8 0 0 1 5.8 4h8.4A1.8 1.8 0 0 1 16 5.8V21"/><path d="M16 9h2.2A1.8 1.8 0 0 1 20 10.8V21"/><path d="M8 8h4M8 12h4M8 16h4M2 21h20"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/><path d="M16 5.4a3 3 0 0 1 0 5.2"/><path d="M18 14.4a5 5 0 0 1 2.5 4.3"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 5 6v5.2c0 4.5 2.9 8.1 7 9.8 4.1-1.7 7-5.3 7-9.8V6l-7-3Z"/><path d="m9.2 12 1.9 1.9 3.8-4.1"/></symbol>
+  <symbol id="i-scale" viewBox="0 0 24 24"><path d="M12 3v18M5 7h14M6.5 7 3 15h7L6.5 7ZM17.5 7 14 15h7l-3.5-8Z"/><path d="M8 21h8"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H6.8A1.8 1.8 0 0 0 5 4.8v14.4A1.8 1.8 0 0 0 6.8 21h10.4a1.8 1.8 0 0 0 1.8-1.8V8l-5-5Z"/><path d="M14 3v5h5M8.5 13h7M8.5 17h5"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.3"/><path d="m15.5 15.5 4 4"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5"/><path d="M19.2 12a7.4 7.4 0 1 0-1.9 6.4"/></symbol>
+  <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24"><path d="M10 5H5.8A1.8 1.8 0 0 0 4 6.8v10.4A1.8 1.8 0 0 0 5.8 19H10"/><path d="M14 8l4 4-4 4M8 12h10"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m4.5 12.5 5 5 10-11"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3 2.8 20h18.4L12 3Z"/><path d="M12 9v4.5M12 17h.01"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M20 10c0 5.2-8 11-8 11S4 15.2 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+  <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8"/><path d="M18 14v4.2A1.8 1.8 0 0 1 16.2 20H5.8A1.8 1.8 0 0 1 4 18.2V7.8A1.8 1.8 0 0 1 5.8 6H10"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M4 12h16M14 6l6 6-6 6"/></symbol>
+  <symbol id="i-map" viewBox="0 0 24 24"><path d="m3 6 5.5-2 7 2L21 4v14l-5.5 2-7-2L3 20V6Z"/><path d="M8.5 4v14M15.5 6v14"/></symbol>
+  <symbol id="i-grid-view" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.4 3.9 5.2 3.9 8.5s-1.3 6.1-3.9 8.5c-2.6-2.4-3.9-5.2-3.9-8.5s1.3-6.1 3.9-8.5Z"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 4 2.3 5 5.7.6-4.3 3.7 1.3 5.4-5-3-5 3 1.3-5.4L4 9.6 9.7 9 12 4Z"/></symbol>
+</svg>
+
+<!-- ══════════════════ SIDEBAR ══════════════════ -->
+<aside class="sidebar" id="sidebar" aria-label="Administrator navigation">
+  <div class="sidebar-brand">
+    <div class="brand-lockup">
+      <div class="mark" aria-hidden="true"></div>
+      <div class="brand-copy">
+        <h2 class="brand-wordmark">Food<span>Bridge</span></h2>
+        <p class="brand-subtitle">Admin &amp; Verification</p>
+      </div>
+    </div>
+    <p class="brand-descriptor">Platform Administration</p>
+    <div class="admin-badge"><svg class="icon" aria-hidden="true"><use href="#i-shield"></use></svg> Admin access</div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <span class="nav-section-label">Dashboard</span>
+    <a class="nav-item" href="./dashboard.html">
+      <svg class="nav-icon" aria-hidden="true"><use href="#i-grid"></use></svg><span>Overview</span>
+    </a>
+
+    <span class="nav-section-label">Verification</span>
+    <a class="nav-item" href="./dashboard.html">
+      <svg class="nav-icon" aria-hidden="true"><use href="#i-building"></use></svg><span>Org Verification</span>
+    </a>
+    <a class="nav-item" href="./dashboard.html">
+      <svg class="nav-icon" aria-hidden="true"><use href="#i-users"></use></svg><span>All Participants</span>
+    </a>
+
+    <span class="nav-section-label">Trust &amp; Safety</span>
+    <a class="nav-item" href="./dashboard.html">
+      <svg class="nav-icon" aria-hidden="true"><use href="#i-shield"></use></svg><span>Safety Review</span>
+    </a>
+    <a class="nav-item" href="./dashboard.html">
+      <svg class="nav-icon" aria-hidden="true"><use href="#i-scale"></use></svg><span>Disputes</span>
+    </a>
+
+    <span class="nav-section-label">Records</span>
+    <a class="nav-item" href="./dashboard.html">
+      <svg class="nav-icon" aria-hidden="true"><use href="#i-file"></use></svg><span>Compliance Records</span>
+    </a>
+
+    <span class="nav-section-label">Operations</span>
+    <a class="nav-item active" href="./facilities.html" aria-current="page">
+      <svg class="nav-icon" aria-hidden="true"><use href="#i-grid-view"></use></svg><span>Facility Verification</span>
+    </a>
+    <a class="nav-item" href="../network-intelligence/map.html">
+      <svg class="nav-icon" aria-hidden="true"><use href="#i-map"></use></svg><span>Network Map</span>
+      <svg class="nav-icon nav-external" aria-hidden="true" style="margin-left:auto;opacity:.6"><use href="#i-external"></use></svg>
+    </a>
+    <a class="nav-item" href="../ops/index.html">
+      <svg class="nav-icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg><span>Operations Portal</span>
+    </a>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="user-card">
+      <div class="user-avatar" id="sidebar-avatar">AD</div>
+      <div class="user-info">
+        <div class="user-name" id="sidebar-name">Administrator</div>
+        <div class="user-role" id="sidebar-role">Platform Administrator</div>
+      </div>
+      <button class="logout-btn" onclick="fmLogout()" aria-label="Sign out" title="Sign out">
+        <svg class="icon" aria-hidden="true"><use href="#i-logout"></use></svg>
+      </button>
+    </div>
+  </div>
+</aside>
+
+<div class="sidebar-backdrop" id="sidebar-backdrop" aria-hidden="true"></div>
+
+<!-- ══════════════════ MAIN ══════════════════ -->
+<div class="main">
+
+  <header class="topbar">
+    <div class="topbar-left">
+      <button class="nav-toggle" id="nav-toggle" aria-label="Open navigation menu"
+              aria-controls="sidebar" aria-expanded="false">
+        <svg class="icon" aria-hidden="true"><use href="#i-menu"></use></svg>
+      </button>
+      <div class="topbar-copy">
+        <div class="topbar-kicker">FoodBridge Admin</div>
+        <div class="topbar-title">Facility Manager</div>
+        <div class="topbar-sub">Biogas plants, food banks, and routing readiness across the network</div>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <a class="action-btn btn-view" href="./dashboard.html" style="min-height:32px;padding:0 12px;font-size:10.5px;">
+        <svg class="icon" aria-hidden="true"><use href="#i-grid"></use></svg> Admin Dashboard
+      </a>
+    </div>
+  </header>
+
+  <div class="page-content active" id="fac-content-root">
+
+  <!-- Toolbar -->
+  <div class="card fac-toolbar">
+    <div class="fm-field">
+      <label class="fm-label" for="fac-search">Search</label>
+      <input type="text" class="fm-input" id="fac-search" placeholder="Search facility name or address…" autocomplete="off" />
+    </div>
+    <div class="fm-field">
+      <label class="fm-label" for="filter-type">Type</label>
+      <select class="fm-select" id="filter-type">
+        <option value="">All types</option>
+        <option value="biogas">Biogas</option>
+        <option value="food_bank">Food Banks</option>
+      </select>
+    </div>
+    <div class="fm-field">
+      <label class="fm-label" for="filter-status">Status</label>
+      <select class="fm-select" id="filter-status">
+        <option value="">All status</option>
+        <option value="active">Active</option>
+        <option value="pending">Pending</option>
+        <option value="inactive">Inactive</option>
+      </select>
+    </div>
+    <div class="fm-spacer"></div>
+    <button class="action-btn fm-btn-primary" id="btn-new">
+      <svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg> Add New Facility
+    </button>
+  </div>
+
+  <!-- Workspace -->
+  <div class="fac-grid">
+
+    <!-- Left: facility list -->
+    <div class="card fac-list-card">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Facilities <span class="count-pill" id="fac-count">0</span></div>
+          <div class="card-sub">Biogas facilities and registered food banks</div>
+        </div>
+        <button class="action-btn btn-view" id="btn-refresh" title="Reload from the live API">
+          <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg>
+        </button>
+      </div>
+      <div class="fm-list" id="fac-list">
+        <div class="fm-list-loading"><span class="fm-spinner" aria-hidden="true"></span>Loading facilities…</div>
+      </div>
+    </div>
+
+    <!-- Right: detail / form panel -->
+    <div class="card fac-detail" id="detail-panel">
+
+      <div class="empty-state" id="no-selection">
+        <span class="empty-icon"><svg class="icon" aria-hidden="true" style="width:30px;height:30px;"><use href="#i-building"></use></svg></span>
+        <strong>No facility selected</strong>
+        <p>Select a facility from the list, or click <strong>Add New Facility</strong>.</p>
+      </div>
+
+      <div id="form-area" style="display:none;">
+        <div class="fac-detail-head">
+          <h2 id="form-title"><svg class="icon" aria-hidden="true"><use href="#i-grid-view"></use></svg><span>New Facility</span></h2>
+          <div class="fac-detail-chips" id="fac-detail-chips"></div>
+        </div>
+
+        <!-- Inline map for location placement -->
+        <div id="facility-map"></div>
+        <p class="map-hint"><svg class="icon" aria-hidden="true"><use href="#i-pin"></use></svg> Click the map to set or move the facility pin, or use the geocoder below.</p>
+
+        <!-- Geocode search -->
+        <div class="fm-section-title"><svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg> Location Geocoder</div>
+        <div class="fm-inline-row">
+          <input id="geo-input" type="text" class="fm-input" placeholder="Search address…" autocomplete="off" />
+          <button class="action-btn fm-btn-ghost" id="btn-geo-search">Search</button>
+        </div>
+        <div id="geo-results" class="result-box" style="display:none;"></div>
+
+        <!-- OSM discover -->
+        <div class="fm-section-title"><svg class="icon" aria-hidden="true"><use href="#i-globe"></use></svg> Discover from OpenStreetMap</div>
+        <div class="fm-hintbox">
+          <svg class="icon" aria-hidden="true"><use href="#i-alert"></use></svg>
+          <span>OSM results are map-sourced suggestions. Review the name and coordinates before saving. Facilities saved here are set <strong>active immediately</strong> and become routing candidates — no separate verification step required.</span>
+        </div>
+        <div class="fm-inline-row">
+          <input id="osm-input" type="text" class="fm-input" placeholder="e.g. Bengaluru" autocomplete="off" />
+          <select id="osm-type" class="fm-select">
+            <option value="biogas">Biogas plants</option>
+            <option value="food_bank">Food banks</option>
+          </select>
+          <button class="action-btn fm-btn-ghost" id="btn-osm-discover">Discover</button>
+        </div>
+        <div id="osm-results" class="result-box" style="display:none;"></div>
+
+        <!-- Form fields -->
+        <div class="fm-section-title"><svg class="icon" aria-hidden="true"><use href="#i-file"></use></svg> Facility Details</div>
+        <input type="hidden" id="f-id" />
+        <div class="fac-form-grid">
+          <div class="form-field span2">
+            <label for="f-name">Name <span class="fm-req">*</span></label>
+            <input id="f-name" type="text" class="fm-label-input" placeholder="e.g. Green Energy Biogas Plant" />
+          </div>
+          <div class="form-field span2">
+            <label for="f-type">Type <span class="fm-req">*</span></label>
+            <select id="f-type" class="fm-label-input">
+              <option value="biogas">Biogas Facility</option>
+              <option value="food_bank">Food Bank</option>
+            </select>
+          </div>
+          <div class="form-field span2">
+            <label for="f-address">Address</label>
+            <input id="f-address" type="text" class="fm-label-input" placeholder="Full street address" />
+          </div>
+
+          <div class="coord-row span2">
+            <div class="form-field">
+              <label for="f-lat">Latitude</label>
+              <input id="f-lat" type="number" step="0.0001" class="fm-label-input" placeholder="e.g. 12.9716" />
+            </div>
+            <div class="form-field">
+              <label for="f-lng">Longitude</label>
+              <input id="f-lng" type="number" step="0.0001" class="fm-label-input" placeholder="e.g. 77.5946" />
+            </div>
+            <button class="action-btn fm-btn-ghost" id="btn-pin-coords" title="Move map pin to these coords">
+              <svg class="icon" aria-hidden="true"><use href="#i-pin"></use></svg> Update Pin
+            </button>
+          </div>
+
+          <div class="form-field">
+            <label for="f-phone">Contact Phone</label>
+            <input id="f-phone" type="text" class="fm-label-input" placeholder="+91 …" />
+          </div>
+          <div class="form-field">
+            <label for="f-email">Contact Email</label>
+            <input id="f-email" type="email" class="fm-label-input" placeholder="contact@facility.org" />
+          </div>
+          <div class="form-field span2">
+            <label for="f-hours">Operating Hours</label>
+            <input id="f-hours" type="text" class="fm-label-input" placeholder="e.g. Mon–Fri 8am–6pm" />
+          </div>
+
+          <div class="form-field" id="field-waste-types">
+            <label for="f-waste">Accepted Waste Types</label>
+            <input id="f-waste" type="text" class="fm-label-input" placeholder="e.g. cooked_meals, dairy, produce" />
+            <span class="fm-note">Comma-separated — leave blank to accept all types.</span>
+          </div>
+          <div class="form-field">
+            <label for="f-capacity">Max Daily Intake (kg/day)</label>
+            <input id="f-capacity" type="number" min="0" class="fm-label-input" placeholder="e.g. 500" />
+          </div>
+
+          <div class="form-field span2">
+            <label for="f-notes">Notes</label>
+            <textarea id="f-notes" class="fm-label-input" placeholder="Internal notes for admin review…"></textarea>
+          </div>
+        </div>
+
+        <div class="fac-action-bar">
+          <button class="action-btn fm-btn-primary" id="btn-save">
+            <svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg> Save
+          </button>
+          <button class="action-btn btn-approve" id="btn-verify" style="display:none;font-size:10.5px;">
+            <svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg> Activate
+          </button>
+          <button class="action-btn fm-btn-deactivate" id="btn-deactivate" style="display:none;">
+            <svg class="icon" aria-hidden="true"><use href="#i-alert"></use></svg> Deactivate
+          </button>
+          <button class="action-btn fm-btn-ghost" id="btn-cancel">Cancel</button>
+        </div>
+
+        <div id="status-msg" class="fac-status-msg"></div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <!-- ══════════════════ Confirmation modal ══════════════════ -->
+  <div class="fm-modal-overlay" id="fac-confirm-overlay">
+    <div class="fm-modal" role="dialog" aria-modal="true" aria-labelledby="fac-confirm-title">
+      <div class="fm-modal-kicker" id="fac-confirm-kicker">Confirm action</div>
+      <h3 id="fac-confirm-title">Deactivate facility</h3>
+      <p id="fac-confirm-text">Deactivate this facility? It will no longer receive food or waste allocations.</p>
+      <div class="fm-modal-actions">
+        <button class="action-btn fm-btn-ghost" id="fac-confirm-cancel">Cancel</button>
+        <button class="action-btn btn-reject" id="fac-confirm-ok" style="min-height:32px;padding:0 14px;font-size:10.5px;">Deactivate</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ Toasts ══════════════════ -->
+  <div class="toast-container" id="toast-container"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  /* ── Auth (same guard as the Admin dashboard) ─────────────────────────── */
+  const token = localStorage.getItem('fb_token') || localStorage.getItem('token') || '';
+  let currentUser = null;
+  try { currentUser = JSON.parse(localStorage.getItem('fb_user') || 'null'); } catch (err) { currentUser = null; }
+  if (!token || !currentUser || currentUser.role !== 'admin') {
+    window.location.replace('/admin/index.html');
+    return;
+  }
+  const ADMIN_USER = currentUser;
+
+  /* Render the signed-in user card once */
+  (function renderUser() {
+    const name = ADMIN_USER.name || ADMIN_USER.email || 'Administrator';
+    const initials = String(name).trim().split(/\s+/).filter(Boolean).map(p => p[0]).slice(0, 2).join('').toUpperCase();
+    document.getElementById('sidebar-avatar').textContent = initials;
+    document.getElementById('sidebar-name').textContent = name;
+    document.getElementById('sidebar-role').textContent = 'Platform Administrator';
+  })();
+
+  function fmLogout() {
+    localStorage.removeItem('fb_token');
+    localStorage.removeItem('fb_user');
+    window.location.replace('/admin/index.html');
+  }
+
+  const API = (path, opts) => fetch('/api/admin' + path, {
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', ...(opts && opts.headers) },
+    ...opts
+  });
+
+  /* ── Toasts (same markup as the Admin dashboard) ──────────────────────── */
+  function icon(name) {
+    return `<svg class="icon" aria-hidden="true"><use href="#i-${name}"></use></svg>`;
+  }
+  function toast(message, type = 'info') {
+    const host = document.getElementById('toast-container');
+    if (!host) return;
+    const iconName = type === 'ok' ? 'check' : type === 'err' ? 'x' : 'activity';
+    const el = document.createElement('div');
+    el.className = `toast ${type === 'ok' ? 'success' : type === 'err' ? 'error' : 'info'}`;
+    el.setAttribute('role', type === 'err' ? 'alert' : 'status');
+    el.innerHTML = `${icon(iconName)}<span>${String(message ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>`;
+    el.addEventListener('click', () => el.remove());
+    host.appendChild(el);
+    window.setTimeout(() => el.remove(), 5600);
+  }
+
+  /* ── Escape HTML ─────────────────────────────────────────────────────── */
+  function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  /* ── State ───────────────────────────────────────────────────────────── */
+  let allFacilities = [];
+  let selectedId    = null;
+  let isNew         = false;
+  let searchQuery   = '';
+
+  /* ── Map setup (detail panel) ────────────────────────────────────────── */
+  let facMap  = null;
+  let facPin  = null;
+
+  function initFacMap() {
+    if (facMap) return;
+    facMap = L.map('facility-map').setView([12.97, 77.59], 11);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors', maxZoom: 19
+    }).addTo(facMap);
+
+    facMap.on('click', e => {
+      setPin(e.latlng.lat, e.latlng.lng);
+      document.getElementById('f-lat').value = e.latlng.lat.toFixed(6);
+      document.getElementById('f-lng').value = e.latlng.lng.toFixed(6);
+    });
+  }
+
+  function setPin(lat, lng) {
+    if (!facMap) return;
+    if (facPin) facMap.removeLayer(facPin);
+    facPin = L.marker([lat, lng], {
+      icon: L.divIcon({ className: '', html: '<div style="background:#8b5cf6;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>', iconSize: [14,14], iconAnchor: [7,7] })
+    }).addTo(facMap);
+    facMap.setView([lat, lng], Math.max(facMap.getZoom(), 14));
+  }
+
+  /* ── Load facilities ─────────────────────────────────────────────────── */
+  function loadFacilities() {
+    Promise.all([
+      API('/facilities').then(r => r.json()),
+      API('/participants').then(r => r.json())
+    ]).then(([facData, orgData]) => {
+      // Merge biogas_facilities + food_bank organizations
+      const biogas = (facData.facilities || []).map(f => ({ ...f, _kind: 'biogas' }));
+      const foodBanks = (orgData.orgs || [])
+        .filter(o => o.type === 'food_bank')
+        .map(o => ({
+          id: o.id, name: o.name, _kind: 'food_bank',
+          location_address: o.locationAddress, status: o.status, verified: !!o.verified,
+          // Use actual coordinates from the org record, not hardcoded zeros
+          location_lat: o.locationLat || o.location_lat || 0,
+          location_lng: o.locationLng || o.location_lng || 0,
+          contact_phone: o.contactPhone || o.contact_phone || '',
+          contact_email: o.contactEmail || o.contact_email || '',
+          operating_hours: o.operatingHours || o.operating_hours || ''
+        }));
+      allFacilities = [...biogas, ...foodBanks];
+      renderList();
+    }).catch(() => {
+      document.getElementById('fac-list').innerHTML =
+        `<div class="fm-empty"><strong>Could not load facilities</strong>The admin API is unreachable. Click the refresh button to try again.</div>`;
+      toast('Could not load facilities from the API.', 'err');
+    });
+  }
+
+  function facilityMatchesFilters(f) {
+    const typeF   = document.getElementById('filter-type').value;
+    const statusF = document.getElementById('filter-status').value;
+    if (typeF && f._kind !== typeF) return false;
+    if (statusF && f.status !== statusF) return false;
+    if (searchQuery) {
+      const hay = `${f.name || ''} ${f.location_address || ''}`.toLowerCase();
+      if (!hay.includes(searchQuery)) return false;
+    }
+    return true;
+  }
+
+  function typeBadge(kind) {
+    return kind === 'biogas'
+      ? '<span class="status-badge fm-badge-biogas">♻ Biogas</span>'
+      : '<span class="status-badge fm-badge-foodbank">🏦 Food Bank</span>';
+  }
+  function statusBadge(status) {
+    const value = status || 'pending';
+    const cls = value === 'active' ? 'sb-active' : value === 'pending' ? 'sb-pending' : 'sb-removed';
+    return `<span class="status-badge ${cls}" style="font-size:9px;">${esc(value)}</span>`;
+  }
+
+  function renderList() {
+    const items = allFacilities.filter(facilityMatchesFilters);
+
+    const countEl = document.getElementById('fac-count');
+    if (countEl) countEl.textContent = String(allFacilities.length);
+
+    if (!items.length) {
+      document.getElementById('fac-list').innerHTML = allFacilities.length
+        ? '<div class="fm-empty"><strong>No facilities match the current filters</strong>Adjust the search, type, or status filters.</div>'
+        : '<div class="fm-empty" style="padding:44px 18px;"><strong>No facilities yet</strong>Click <strong>Add New Facility</strong> to register the first one.</div>';
+      return;
+    }
+
+    document.getElementById('fac-list').innerHTML = items.map(f =>
+      `<div class="fac-row ${f.id === selectedId ? 'active' : ''}" data-id="${esc(f.id)}" role="button" tabindex="0" aria-pressed="${f.id === selectedId}">
+        <div class="fac-row-top">
+          <span class="fac-row-name">${esc(f.name)}</span>
+          ${typeBadge(f._kind)}
+          ${statusBadge(f.status)}
+        </div>
+        <div class="fac-row-addr">${esc(f.location_address || '—')}</div>
+      </div>`
+    ).join('');
+
+    document.querySelectorAll('.fac-row').forEach(card => {
+      const open = () => selectFacility(card.dataset.id);
+      card.addEventListener('click', open);
+      card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+    });
+  }
+
+  function bindListFilters() {
+    document.getElementById('filter-type').addEventListener('change', renderList);
+    document.getElementById('filter-status').addEventListener('change', renderList);
+    document.getElementById('fac-search').addEventListener('input', e => {
+      searchQuery = e.target.value.trim().toLowerCase();
+      renderList();
+    });
+    document.getElementById('btn-refresh').addEventListener('click', () => {
+      loadFacilities();
+      toast('Refreshing facilities from the live API.', 'info');
+    });
+  }
+
+  /* ── Select / open facility ──────────────────────────────────────────── */
+  function selectFacility(id) {
+    selectedId = id;
+    isNew = false;
+    const fac = allFacilities.find(f => f.id === id);
+    if (!fac) return;
+    showForm(fac);
+    renderList();
+    if (window.matchMedia('(max-width: 1080px)').matches) {
+      document.getElementById('detail-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  function showForm(fac) {
+    document.getElementById('no-selection').style.display = 'none';
+    document.getElementById('form-area').style.display = 'block';
+
+    setTimeout(() => { initFacMap(); facMap.invalidateSize(); }, 50);
+
+    const isNew_ = !fac || !fac.id || fac === 'new';
+    document.getElementById('form-title').querySelector('span').textContent = isNew_ ? 'New Facility' : fac.name;
+    document.getElementById('f-id').value      = isNew_ ? '' : (fac.id || '');
+    document.getElementById('f-name').value    = fac.name || '';
+    document.getElementById('f-type').value    = fac._kind || fac.type || 'biogas';
+    document.getElementById('f-address').value = fac.location_address || '';
+    document.getElementById('f-lat').value     = fac.location_lat || '';
+    document.getElementById('f-lng').value     = fac.location_lng || '';
+    document.getElementById('f-phone').value   = fac.contact_phone || '';
+    document.getElementById('f-email').value   = fac.contact_email || '';
+    document.getElementById('f-hours').value   = fac.operating_hours || '';
+    document.getElementById('f-capacity').value = fac.max_daily_intake_kg || '';
+    document.getElementById('f-notes').value   = fac.notes || '';
+
+    let wasteArr = [];
+    try { wasteArr = JSON.parse(fac.accepted_waste_types || '[]'); } catch { wasteArr = []; }
+    document.getElementById('f-waste').value = wasteArr.join(', ');
+
+    if (fac.location_lat && fac.location_lng) {
+      setTimeout(() => setPin(fac.location_lat, fac.location_lng), 80);
+    }
+
+    // Detail chips
+    document.getElementById('fac-detail-chips').innerHTML = isNew_
+      ? '<span class="status-badge sb-new">New</span>'
+      : `${typeBadge(fac._kind || fac.type || 'biogas')}${statusBadge(fac.status)}${fac.verified ? '<span class="status-badge sb-verified" style="font-size:9px;">Verified</span>' : ''}`;
+
+    const isFoodBank = (fac._kind || fac.type) === 'food_bank';
+    document.getElementById('field-waste-types').style.opacity = isFoodBank ? '.5' : '1';
+    document.getElementById('field-waste-types').querySelector('input').disabled = isFoodBank;
+
+    const canVerify     = !isNew_ && fac.status !== 'active';
+    const canDeactivate = !isNew_ && fac.status === 'active';
+    document.getElementById('btn-verify').style.display     = canVerify ? 'inline-flex' : 'none';
+    document.getElementById('btn-deactivate').style.display = canDeactivate ? 'inline-flex' : 'none';
+    document.getElementById('status-msg').textContent = '';
+  }
+
+  /* ── New facility button ─────────────────────────────────────────────── */
+  document.getElementById('btn-new').addEventListener('click', () => {
+    selectedId = null;
+    isNew = true;
+    showForm({ _kind: 'biogas', status: 'active', verified: 0 });
+    renderList();
+  });
+
+  /* ── Cancel button ───────────────────────────────────────────────────── */
+  document.getElementById('btn-cancel').addEventListener('click', () => {
+    selectedId = null;
+    isNew = false;
+    document.getElementById('no-selection').style.display = 'block';
+    document.getElementById('form-area').style.display = 'none';
+    renderList();
+  });
+
+  /* ── Confirmation modal (replaces window.confirm) ────────────────────── */
+  const confirmOverlay = document.getElementById('fac-confirm-overlay');
+  let onConfirmOk = null;
+  function openConfirm(text, okLabel) {
+    document.getElementById('fac-confirm-text').textContent = text;
+    document.getElementById('fac-confirm-ok').textContent = okLabel || 'Confirm';
+    confirmOverlay.classList.add('show');
+  }
+  document.getElementById('fac-confirm-ok').addEventListener('click', () => {
+    confirmOverlay.classList.remove('show');
+    if (typeof onConfirmOk === 'function') onConfirmOk();
+  });
+  document.getElementById('fac-confirm-cancel').addEventListener('click', () => confirmOverlay.classList.remove('show'));
+  confirmOverlay.addEventListener('click', e => { if (e.target === confirmOverlay) confirmOverlay.classList.remove('show'); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') confirmOverlay.classList.remove('show'); });
+
+  /* ── Geocoder search ─────────────────────────────────────────────────── */
+  document.getElementById('btn-geo-search').addEventListener('click', () => {
+    const q = document.getElementById('geo-input').value.trim();
+    if (!q) return;
+    API(`/geocode-suggest?q=${encodeURIComponent(q)}`).then(r => r.json()).then(data => {
+      const results = data.suggestions || [];
+      const box = document.getElementById('geo-results');
+      if (!results.length) { box.style.display = 'none'; toast('No geocoder matches found.', 'info'); return; }
+      box.style.display = 'block';
+      box.innerHTML = results.map((s, i) =>
+        `<div class="result-item" data-i="${i}">
+          ${icon('pin')}${esc(s.display_name)}
+          <small>lat: ${s.lat?.toFixed(5)}, lon: ${s.lon?.toFixed(5)}</small>
+        </div>`
+      ).join('');
+      box.querySelectorAll('.result-item').forEach((el, i) => {
+        el.addEventListener('click', () => {
+          const s = results[i];
+          document.getElementById('f-lat').value = s.lat.toFixed(6);
+          document.getElementById('f-lng').value = s.lon.toFixed(6);
+          document.getElementById('f-address').value = s.display_name;
+          setPin(s.lat, s.lon);
+          box.style.display = 'none';
+        });
+      });
+    }).catch(() => { toast('Geocoder unavailable', 'err'); });
+  });
+
+  /* ── Update pin from coords ──────────────────────────────────────────── */
+  document.getElementById('btn-pin-coords').addEventListener('click', () => {
+    const lat = parseFloat(document.getElementById('f-lat').value);
+    const lng = parseFloat(document.getElementById('f-lng').value);
+    if (!isNaN(lat) && !isNaN(lng)) setPin(lat, lng);
+    else toast('Enter both latitude and longitude first.', 'info');
+  });
+
+  /* ── OSM discover ────────────────────────────────────────────────────── */
+  document.getElementById('btn-osm-discover').addEventListener('click', () => {
+    const q    = document.getElementById('osm-input').value.trim();
+    const type = document.getElementById('osm-type').value;
+    if (!q) return;
+    API(`/osm-discover?q=${encodeURIComponent(q)}&type=${type}`).then(r => r.json()).then(data => {
+      const results = data.suggestions || [];
+      const box = document.getElementById('osm-results');
+      if (!results.length) { box.style.display = 'none'; toast('No OSM results found', 'info'); return; }
+      box.style.display = 'block';
+      box.innerHTML = results.map((s, i) =>
+        `<div class="result-item" data-i="${i}">
+          ${icon('globe')}${esc(s.display_name)}
+          <small>lat: ${s.lat?.toFixed(5)}, lon: ${s.lon?.toFixed(5)} • Source: OpenStreetMap</small>
+        </div>`
+      ).join('');
+      box.querySelectorAll('.result-item').forEach((el, i) => {
+        el.addEventListener('click', () => {
+          const s = results[i];
+          document.getElementById('f-lat').value = (typeof s.lat === 'number' ? s.lat : parseFloat(s.lat)).toFixed(6);
+          document.getElementById('f-lng').value = (typeof s.lon === 'number' ? s.lon : parseFloat(s.lon)).toFixed(6);
+          document.getElementById('f-address').value = s.display_name;
+          document.getElementById('f-notes').value = 'OSM-sourced facility.';
+          setPin(parseFloat(s.lat), parseFloat(s.lon));
+          box.style.display = 'none';
+          toast('OSM location pre-filled. Save to add as an active routing candidate.', 'info');
+        });
+      });
+    }).catch(() => toast('OSM discovery unavailable', 'err'));
+  });
+
+  /* ── Save (create or update) ─────────────────────────────────────────── */
+  document.getElementById('btn-save').addEventListener('click', () => {
+    const id   = document.getElementById('f-id').value;
+    const kind = document.getElementById('f-type').value;
+
+    const name          = document.getElementById('f-name').value.trim();
+    const locationAddress = document.getElementById('f-address').value.trim();
+    const locationLat   = parseFloat(document.getElementById('f-lat').value) || 0;
+    const locationLng   = parseFloat(document.getElementById('f-lng').value) || 0;
+    const contactPhone  = document.getElementById('f-phone').value.trim();
+    const contactEmail  = document.getElementById('f-email').value.trim();
+    const operatingHours = document.getElementById('f-hours').value.trim();
+    const notes         = document.getElementById('f-notes').value.trim();
+
+    if (!name) { toast('Name is required', 'err'); document.getElementById('f-name').focus(); return; }
+
+    // Food banks live in the organizations table, not biogas_facilities.
+    // Route their saves to PUT /orgs/:id (update only — food banks must register
+    // themselves; admin edits location/contact details here).
+    if (kind === 'food_bank') {
+      if (!id || isNew) {
+        toast('Food banks self-register via the sign-up flow. Here you can only edit their details.', 'err');
+        return;
+      }
+      const body = { name, locationAddress, locationLat, locationLng, contactPhone, contactEmail, operatingHours };
+      API(`/orgs/${id}`, { method: 'PUT', body: JSON.stringify(body) })
+        .then(r => r.json())
+        .then(d => {
+          if (d.error) { toast(d.error, 'err'); return; }
+          toast('Food bank details saved', 'ok');
+          loadFacilities();
+        })
+        .catch(() => toast('Save failed', 'err'));
+      return;
+    }
+
+    // Biogas facilities: saved to biogas_facilities table
+    const body = {
+      name, locationAddress, locationLat, locationLng,
+      contactPhone, contactEmail, operatingHours, notes,
+      maxDailyIntakeKg:  parseFloat(document.getElementById('f-capacity').value) || 0,
+      acceptedWasteTypes: document.getElementById('f-waste').value
+        .split(',').map(s => s.trim()).filter(Boolean)
+    };
+
+    const method = (id && !isNew) ? 'PUT' : 'POST';
+    const url    = (id && !isNew) ? `/facilities/${id}` : '/facilities';
+
+    API(url, { method, body: JSON.stringify(body) })
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) { toast(d.error, 'err'); return; }
+        toast('Saved successfully', 'ok');
+        if (!id || isNew) {
+          selectedId = d.id;
+          isNew = false;
+          document.getElementById('f-id').value = d.id || '';
+        }
+        loadFacilities();
+      })
+      .catch(() => toast('Save failed', 'err'));
+  });
+
+  /* ── Verify ──────────────────────────────────────────────────────────── */
+  document.getElementById('btn-verify').addEventListener('click', () => {
+    const id = document.getElementById('f-id').value;
+    if (!id) return;
+    API(`/facilities/${id}/verify`, { method: 'PUT', body: '{}' })
+      .then(r => r.json())
+      .then(() => { toast('Facility verified and activated', 'ok'); loadFacilities(); selectFacility(id); })
+      .catch(() => toast('Verification failed', 'err'));
+  });
+
+  /* ── Deactivate (with consistent modal confirmation) ─────────────────── */
+  document.getElementById('btn-deactivate').addEventListener('click', () => {
+    const id = document.getElementById('f-id').value;
+    if (!id) return;
+    openConfirm(
+      'Deactivate this facility? It will no longer receive food or waste allocations.',
+      'Deactivate'
+    );
+    onConfirmOk = () => {
+      API(`/facilities/${id}/deactivate`, { method: 'PUT', body: '{}' })
+        .then(r => r.json())
+        .then(() => { toast('Facility deactivated', 'ok'); loadFacilities(); selectFacility(id); })
+        .catch(() => toast('Deactivation failed', 'err'));
+    };
+  });
+
+  /* ── Mobile navigation + initial wiring ─────────────────────────────── */
+  document.getElementById('nav-toggle').addEventListener('click', () => {
+    const sidebar  = document.getElementById('sidebar');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    const open = !sidebar.classList.contains('open');
+    sidebar.classList.toggle('open', open);
+    document.body.classList.toggle('nav-open', open);
+    backdrop.classList.toggle('show', open);
+    document.getElementById('nav-toggle').setAttribute('aria-expanded', String(open));
+  });
+  document.getElementById('sidebar-backdrop').addEventListener('click', () => {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebar-backdrop').classList.remove('show');
+    document.body.classList.remove('nav-open');
+    document.getElementById('nav-toggle').setAttribute('aria-expanded', 'false');
+  });
+
+  bindListFilters();
+  loadFacilities();
+})();
+</script>
+</body>
+</html>

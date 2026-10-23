@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FoodBridge - Network Intelligence</title>
+  <meta name="description" content="FoodBridge Network Intelligence - live supply and demand coordination, rebalancing, reserve allocation and waste-risk intervention." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/css/portal.css" />
+  <link rel="stylesheet" href="styles/main.css" />
+  <script src="/assets/js/portal-ui.js" defer></script>
+</head>
+<body class="portal-network">
+  <a class="sr-only" href="#portal-content">Skip to main content</a>
+
+  <aside class="sidebar" id="sidebar" aria-label="Network Intelligence navigation">
+    <div class="sidebar-brand">
+      <div class="brand-lockup">
+        <div class="brand-logo" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 44" fill="none">
+            <path d="M22 40C10.4 40 4.5 31.7 4.5 19.5 4.5 8.8 11 3.5 22 3.5s17.5 5.3 17.5 16C39.5 31.7 33.6 40 22 40Z" fill="#16833B"/>
+            <path d="M22 39V18.5" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>
+            <path d="M22 27.5c-7.2 0-11.3-4.1-11.3-10.3 7.2 0 11.3 4.1 11.3 10.3Z" fill="#FF781F"/>
+            <path d="M22 23c6 0 9.5-3.6 9.5-9.1-6 0-9.5 3.6-9.5 9.1Z" fill="#9AF2A8"/>
+          </svg>
+        </div>
+        <div class="brand-copy">
+          <div class="brand-wordmark">Food<span>Bridge</span></div>
+          <div class="brand-subtitle">Network Intelligence</div>
+        </div>
+      </div>
+      <div class="portal-badge">
+        <svg class="icon" aria-hidden="true"><use href="#i-network"></use></svg>
+        Coordinator access
+      </div>
+    </div>
+
+    <div class="sidebar-context">
+      <div class="context-main">
+        <div class="org-avatar" id="sidebar-avatar">NC</div>
+        <div class="org-info">
+          <div class="org-name">FoodBridge Network</div>
+          <div class="org-status">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span>All active zones</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <span class="nav-section-label">Operations</span>
+      <button type="button" class="nav-item active" id="nav-overview" data-section="overview" aria-current="page" onclick="navigate('overview', this)">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-grid"></use></svg></span>
+        <span class="nav-label">Network Overview</span>
+      </button>
+      <button type="button" class="nav-item" id="nav-supply-demand" data-section="supply-demand" onclick="navigate('supply-demand', this)">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-scale"></use></svg></span>
+        <span class="nav-label">Supply &amp; Demand</span>
+      </button>
+      <button type="button" class="nav-item" id="nav-redistributions" data-section="redistributions" onclick="navigate('redistributions', this)">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-route"></use></svg></span>
+        <span class="nav-label">Redistributions</span>
+        <span class="nav-badge" id="redist-badge" hidden>0</span>
+      </button>
+      <button type="button" class="nav-item" id="nav-rebalancing" data-section="rebalancing" onclick="navigate('rebalancing', this)">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-network"></use></svg></span>
+        <span class="nav-label">Rebalancing</span>
+      </button>
+
+      <span class="nav-section-label">Coordination</span>
+      <button type="button" class="nav-item" id="nav-fallback" data-section="fallback" onclick="navigate('fallback', this)">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-inbox"></use></svg></span>
+        <span class="nav-label">Reserve Allocation</span>
+      </button>
+      <button type="button" class="nav-item" id="nav-community" data-section="community" onclick="navigate('community', this)">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-map"></use></svg></span>
+        <span class="nav-label">Community Intelligence</span>
+      </button>
+      <button type="button" class="nav-item" id="nav-waste-risk" data-section="waste-risk" onclick="navigate('waste-risk', this)">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-alert-circle"></use></svg></span>
+        <span class="nav-label">Waste Risk</span>
+        <span class="nav-badge red" id="risk-badge" hidden>0</span>
+      </button>
+      <button type="button" class="nav-item" id="nav-interventions" data-section="interventions" onclick="navigate('interventions', this)">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-lightbulb"></use></svg></span>
+        <span class="nav-label">Interventions</span>
+      </button>
+
+      <span class="nav-section-label">Analytics</span>
+      <button type="button" class="nav-item" id="nav-metrics" data-section="metrics" onclick="navigate('metrics', this)">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-chart"></use></svg></span>
+        <span class="nav-label">Network Metrics</span>
+      </button>
+      <a class="nav-item" href="/network-intelligence/map.html">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-map"></use></svg></span>
+        <span class="nav-label">Network Map</span>
+      </a>
+
+      <span class="nav-section-label">Intelligence · coming soon</span>
+      <button type="button" class="nav-item" disabled style="opacity:.6;cursor:not-allowed" title="Not available in this build">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-trending-up"></use></svg></span>
+        <span class="nav-label">Supply Prediction</span>
+        <span class="nav-badge">Soon</span>
+      </button>
+      <button type="button" class="nav-item" disabled style="opacity:.6;cursor:not-allowed" title="Not available in this build">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-activity"></use></svg></span>
+        <span class="nav-label">ML Optimisation</span>
+        <span class="nav-badge">Soon</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="signout-wide" type="button" onclick="logout()">
+        <svg class="icon" aria-hidden="true"><use href="#i-logout"></use></svg>
+        <span>Sign out</span>
+      </button>
+    </div>
+  </aside>
+
+  <div class="sidebar-backdrop" id="sidebar-backdrop" aria-hidden="true"></div>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="nav-toggle" type="button" aria-label="Open navigation menu" aria-controls="sidebar" aria-expanded="false">
+          <svg class="icon" aria-hidden="true"><use href="#i-menu"></use></svg>
+        </button>
+        <div class="topbar-copy">
+          <div class="topbar-kicker">FoodBridge Network</div>
+          <div class="topbar-title" id="page-title">Network Overview</div>
+          <div class="topbar-sub" id="topbar-sub">Live coordination status</div>
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <span class="updated-pill" id="last-updated">Waiting for data</span>
+        <button class="topbar-icon" id="refresh-btn" type="button" onclick="refreshCurrentPage()" aria-label="Refresh current page" title="Refresh current page">
+          <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg>
+        </button>
+        <button class="topbar-primary" id="map-btn" type="button" onclick="window.location.href='/network-intelligence/map.html'">
+          <svg class="icon" aria-hidden="true"><use href="#i-map"></use></svg>
+          <span>Network map</span>
+        </button>
+        <button class="account-trigger" type="button" data-account-toggle aria-haspopup="menu" aria-expanded="false">
+          <span class="avatar" id="account-avatar">NC</span>
+          <span class="account-copy">
+            <span class="account-name" id="user-chip">Coordinator</span>
+            <span class="account-role">Network account</span>
+          </span>
+          <svg class="icon" aria-hidden="true"><use href="#i-chevron"></use></svg>
+        </button>
+        <div class="account-menu" data-account-menu role="menu" aria-label="Account menu">
+          <div class="account-menu-head">
+            <div class="avatar" id="account-menu-avatar">NC</div>
+            <div>
+              <strong id="account-name">Coordinator</strong>
+              <small id="account-email">-</small>
+            </div>
+          </div>
+          <div class="account-menu-list">
+            <button class="account-menu-item" type="button" role="menuitem" onclick="navigate('overview', null)">
+              <svg class="icon" aria-hidden="true"><use href="#i-grid"></use></svg>
+              Network overview
+            </button>
+            <button class="account-menu-item" type="button" role="menuitem" onclick="navigate('waste-risk', null)">
+              <svg class="icon" aria-hidden="true"><use href="#i-alert-circle"></use></svg>
+              Waste risk queue
+            </button>
+            <button class="account-menu-item" type="button" role="menuitem" onclick="navigate('metrics', null)">
+              <svg class="icon" aria-hidden="true"><use href="#i-chart"></use></svg>
+              Network metrics
+            </button>
+            <button class="account-menu-item danger" type="button" role="menuitem" onclick="logout()">
+              <svg class="icon" aria-hidden="true"><use href="#i-logout"></use></svg>
+              Sign out
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="content" id="portal-content">
+      <!-- Overview -->
+      <section class="section active" id="page-overview" aria-labelledby="overview-title">
+        <div class="page-heading">
+          <div>
+            <div class="welcome-line"><span class="dot" aria-hidden="true"></span> Network control room</div>
+            <h1 id="overview-title">Network overview</h1>
+            <p>Live status of surplus, demand and redistribution activity across every active zone.</p>
+          </div>
+          <div class="heading-actions">
+            <button class="btn btn-secondary" type="button" onclick="navigate('redistributions', null)">
+              <svg class="icon" aria-hidden="true"><use href="#i-route"></use></svg>
+              View redistributions
+            </button>
+            <button class="btn btn-primary" type="button" onclick="window.location.href='/network-intelligence/map.html'">
+              <svg class="icon" aria-hidden="true"><use href="#i-map"></use></svg>
+              Open network map
+            </button>
+          </div>
+        </div>
+
+        <div class="stats-grid six">
+          <div class="stat-card green">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-package"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Active surplus</div>
+              <div class="stat-value" id="ov-surplus">--</div>
+              <div class="stat-change">Available posts across the network</div>
+            </div>
+          </div>
+          <div class="stat-card blue">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-users"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Active demands</div>
+              <div class="stat-value" id="ov-demand">--</div>
+              <div class="stat-change">Open or partially fulfilled needs</div>
+            </div>
+          </div>
+          <div class="stat-card purple">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-route"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Redistributions</div>
+              <div class="stat-value" id="ov-redist">--</div>
+              <div class="stat-change">Pending, confirmed or in transit</div>
+            </div>
+          </div>
+          <div class="stat-card green">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-target"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Fulfillment rate</div>
+              <div class="stat-value" id="ov-rate">--</div>
+              <div class="stat-change">Registered demand met to date</div>
+            </div>
+          </div>
+          <div class="stat-card red">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-alert-circle"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Waste risk items</div>
+              <div class="stat-value" id="ov-risk">--</div>
+              <div class="stat-change">Expiring within 3.5 hours</div>
+            </div>
+          </div>
+          <div class="stat-card amber">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-scale"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Recovered today</div>
+              <div class="stat-value" id="ov-recovered">--</div>
+              <div class="stat-change">Completed collections today</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-main-aside">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-heading">
+                <h2 class="card-title">Latest surplus</h2>
+                <p class="card-sub">Most recent donor listings across the network</p>
+              </div>
+              <button class="card-link" type="button" onclick="navigate('supply-demand', null)">
+                View all
+                <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg>
+              </button>
+            </div>
+            <div class="net-list" id="ov-surplus-list" aria-live="polite"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-heading">
+                <h2 class="card-title">Urgent demands</h2>
+                <p class="card-sub">Highest-priority unmet needs</p>
+              </div>
+              <button class="card-link" type="button" onclick="navigate('supply-demand', null)">
+                View all
+                <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg>
+              </button>
+            </div>
+            <div class="net-list" id="ov-demand-list" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-heading">
+              <h2 class="card-title">Immediate waste risks</h2>
+              <p class="card-sub">Food approaching its safe-until window with no accepted delivery</p>
+            </div>
+            <button class="card-link" type="button" onclick="navigate('waste-risk', null)">
+              Open risk queue
+              <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg>
+            </button>
+          </div>
+          <div class="net-list" id="ov-risk-list" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <!-- Supply and demand -->
+      <section class="section" id="page-supply-demand" aria-labelledby="supply-demand-title">
+        <div class="page-heading">
+          <div>
+            <h1 id="supply-demand-title">Supply &amp; demand</h1>
+            <p>Every current surplus post and active demand registration, with the status stored by the network.</p>
+          </div>
+          <div class="heading-actions">
+            <button class="btn btn-secondary" type="button" onclick="refreshCurrentPage()">
+              <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg>
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        <div class="filter-bar" role="group" aria-label="Filter supply and demand by type">
+          <button class="filter-btn active" id="sd-type-all" type="button" onclick="setSdType('all', this)">All <span class="filter-count" id="sd-count-all">0</span></button>
+          <button class="filter-btn" id="sd-type-surplus" type="button" onclick="setSdType('surplus', this)">Surplus <span class="filter-count" id="sd-count-surplus">0</span></button>
+          <button class="filter-btn" id="sd-type-demand" type="button" onclick="setSdType('demand', this)">Demands <span class="filter-count" id="sd-count-demand">0</span></button>
+          <button class="filter-btn" id="sd-type-unmatched" type="button" onclick="setSdType('unmatched', this)">Unmatched <span class="filter-count" id="sd-count-unmatched">0</span></button>
+        </div>
+
+        <div class="toolbar">
+          <div class="search-field toolbar-grow">
+            <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+            <label class="sr-only" for="sd-search">Search supply and demand</label>
+            <input id="sd-search" type="search" placeholder="Search food, organisation or area" oninput="applySdFilters()" />
+          </div>
+          <label class="sr-only" for="sd-status">Filter by status</label>
+          <select class="select-control" id="sd-status" onchange="applySdFilters()">
+            <option value="all">All statuses</option>
+            <option value="available">Available</option>
+            <option value="matched">Matched</option>
+            <option value="in_transit">In transit</option>
+            <option value="completed">Completed</option>
+            <option value="expired">Expired</option>
+            <option value="open">Open demand</option>
+            <option value="partially_fulfilled">Partially fulfilled</option>
+            <option value="fulfilled">Fulfilled</option>
+          </select>
+          <label class="sr-only" for="sd-sort">Sort supply and demand</label>
+          <select class="select-control" id="sd-sort" onchange="applySdFilters()">
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="quantity">Largest quantity</option>
+            <option value="urgency">Most urgent</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" type="button" onclick="clearSdFilters()">
+            <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+            Clear
+          </button>
+        </div>
+
+        <p class="filter-note" id="sd-count" aria-live="polite">Loading supply and demand...</p>
+        <div class="net-list" id="sd-list" aria-live="polite"></div>
+        <div class="load-more-wrap">
+          <button class="btn btn-secondary" id="sd-load-more" type="button" onclick="loadMoreSd()" hidden>Load more</button>
+        </div>
+      </section>
+
+      <!-- Redistributions -->
+      <section class="section" id="page-redistributions" aria-labelledby="redistributions-title">
+        <div class="page-heading">
+          <div>
+            <h1 id="redistributions-title">Redistributions</h1>
+            <p>Match tracking across donors, recipients and reserve points using the stored match status.</p>
+          </div>
+          <div class="heading-actions">
+            <button class="btn btn-secondary" type="button" onclick="refreshCurrentPage()">
+              <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg>
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        <div class="filter-bar" role="group" aria-label="Filter redistributions by status">
+          <button class="filter-btn active" id="rd-filter-all" type="button" onclick="setRdStatus('all', this)">All <span class="filter-count" id="rd-count-all">0</span></button>
+          <button class="filter-btn" id="rd-filter-pending" type="button" onclick="setRdStatus('pending', this)">Pending <span class="filter-count" id="rd-count-pending">0</span></button>
+          <button class="filter-btn" id="rd-filter-confirmed" type="button" onclick="setRdStatus('confirmed', this)">Confirmed <span class="filter-count" id="rd-count-confirmed">0</span></button>
+          <button class="filter-btn" id="rd-filter-in_transit" type="button" onclick="setRdStatus('in_transit', this)">In transit <span class="filter-count" id="rd-count-in_transit">0</span></button>
+          <button class="filter-btn" id="rd-filter-completed" type="button" onclick="setRdStatus('completed', this)">Completed <span class="filter-count" id="rd-count-completed">0</span></button>
+          <button class="filter-btn" id="rd-filter-declined" type="button" onclick="setRdStatus('declined', this)">Declined <span class="filter-count" id="rd-count-declined">0</span></button>
+          <button class="filter-btn" id="rd-filter-cancelled" type="button" onclick="setRdStatus('cancelled', this)">Cancelled <span class="filter-count" id="rd-count-cancelled">0</span></button>
+        </div>
+
+        <div class="toolbar">
+          <div class="search-field toolbar-grow">
+            <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+            <label class="sr-only" for="rd-search">Search redistributions</label>
+            <input id="rd-search" type="search" placeholder="Search food, donor or recipient" oninput="applyRedistributionFilters()" />
+          </div>
+          <button class="btn btn-ghost btn-sm" type="button" onclick="clearRdFilters()">
+            <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+            Clear
+          </button>
+        </div>
+
+        <p class="filter-note" id="rd-count" aria-live="polite">Loading redistributions...</p>
+        <div class="net-list" id="rd-list" aria-live="polite"></div>
+        <div class="load-more-wrap">
+          <button class="btn btn-secondary" id="rd-load-more" type="button" onclick="loadMoreRd()" hidden>Load more</button>
+        </div>
+      </section>
+
+      <!-- Rebalancing -->
+      <section class="section" id="page-rebalancing" aria-labelledby="rebalancing-title">
+        <div class="page-heading">
+          <div>
+            <h1 id="rebalancing-title">Network rebalancing</h1>
+            <p>Area-level surplus and deficit, plus analytical redirection recommendations.</p>
+          </div>
+          <div class="heading-actions">
+            <button class="btn btn-secondary" type="button" onclick="navigate('interventions', null)">
+              <svg class="icon" aria-hidden="true"><use href="#i-lightbulb"></use></svg>
+              Review interventions
+            </button>
+            <button class="btn btn-primary" type="button" onclick="window.location.href='/network-intelligence/map.html'">
+              <svg class="icon" aria-hidden="true"><use href="#i-map"></use></svg>
+              Open network map
+            </button>
+          </div>
+        </div>
+
+        <div class="net-callout">
+          <svg class="icon" aria-hidden="true"><use href="#i-info"></use></svg>
+          <div>
+            <strong>Rebalancing is analytical.</strong>
+            <p>These suggestions identify where meals are concentrated. No transfer is created until a coordinator reviews the recommendation and the receiving organisation is available.</p>
+          </div>
+        </div>
+
+        <p class="filter-note" id="rebalance-summary">Loading zone balance...</p>
+        <div class="two-col">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-heading">
+                <h2 class="card-title">Surplus zones</h2>
+                <p class="card-sub">Areas with more available supply than registered demand</p>
+              </div>
+              <span class="badge badge-success" id="surplus-zone-count">0 zones</span>
+            </div>
+            <div class="zone-list" id="surplus-zones" aria-live="polite"></div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <div class="card-heading">
+                <h2 class="card-title">Deficit zones</h2>
+                <p class="card-sub">Areas where registered demand exceeds available supply</p>
+              </div>
+              <span class="badge badge-danger" id="deficit-zone-count">0 zones</span>
+            </div>
+            <div class="zone-list" id="deficit-zones" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-heading">
+              <h2 class="card-title">Rebalancing recommendations</h2>
+              <p class="card-sub">Suggested redirections ranked by the size of the zone imbalance</p>
+            </div>
+            <span class="badge badge-planned">Planning only</span>
+          </div>
+          <div class="intervention-list" id="rebalancing-recs" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <!-- Reserve allocation -->
+      <section class="section" id="page-fallback" aria-labelledby="reserve-title">
+        <div class="page-heading">
+          <div>
+            <h1 id="reserve-title">Reserve allocation</h1>
+            <p>Surplus with no immediate demand can be routed to a storage-capable reserve point.</p>
+          </div>
+          <div class="heading-actions">
+            <button class="btn btn-secondary" type="button" onclick="refreshCurrentPage()">
+              <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg>
+              Refresh capacity
+            </button>
+          </div>
+        </div>
+
+        <div class="stats-grid three">
+          <div class="stat-card green">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-inbox"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Reserve points</div>
+              <div class="stat-value" id="rs-points">--</div>
+              <div class="stat-change">Storage-capable organisations</div>
+            </div>
+          </div>
+          <div class="stat-card blue">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-scale"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Available capacity</div>
+              <div class="stat-value" id="rs-available">--</div>
+              <div class="stat-change">Servings not committed</div>
+            </div>
+          </div>
+          <div class="stat-card amber">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-clock-fast"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Pending reserve routing</div>
+              <div class="stat-value" id="rs-pending">--</div>
+              <div class="stat-change">Surplus closing within two hours</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-heading">
+                <h2 class="card-title">Reserve capacity</h2>
+                <p class="card-sub">Capacity is based on committed and in-progress matches</p>
+              </div>
+            </div>
+            <div class="reserve-list" id="reserve-points" aria-live="polite"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-heading">
+                <h2 class="card-title">Pending reserve routing</h2>
+                <p class="card-sub">Available surplus approaching its safe-until window</p>
+              </div>
+            </div>
+            <div class="net-list" id="pending-reserve" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-heading">
+              <h2 class="card-title">Allocation order</h2>
+              <p class="card-sub">How the matching service prioritises surplus before reserve routing</p>
+            </div>
+          </div>
+          <ol class="allocation-flow">
+            <li><span class="allocation-num">1</span><div><strong>Immediate demand</strong><p>Emergency and immediate registered needs that pass distance, capacity and safety checks.</p></div></li>
+            <li><span class="allocation-num">2</span><div><strong>Regular demand</strong><p>Planned or recurring needs from verified demand organisations.</p></div></li>
+            <li><span class="allocation-num">3</span><div><strong>Reserve point</strong><p>A food bank or storage hub with enough declared capacity for the batch.</p></div></li>
+            <li><span class="allocation-num">4</span><div><strong>Recovery review</strong><p>No feasible target. The post remains available for later matching and is flagged for coordinator review.</p></div></li>
+          </ol>
+        </div>
+      </section>
+
+      <!-- Community intelligence -->
+      <section class="section" id="page-community" aria-labelledby="community-title">
+        <div class="page-heading">
+          <div>
+            <h1 id="community-title">Community food intelligence</h1>
+            <p>Hotspots, access gaps and recurring supply-demand mismatches across active zones.</p>
+          </div>
+          <div class="heading-actions">
+            <button class="btn btn-secondary" type="button" onclick="refreshCurrentPage()">
+              <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg>
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card green">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-package"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Surplus hotspots</div>
+              <div class="stat-value" id="ci-surplus">--</div>
+              <div class="stat-change">Areas with concentrated supply</div>
+            </div>
+          </div>
+          <div class="stat-card orange">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-users"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Demand hotspots</div>
+              <div class="stat-value" id="ci-demand">--</div>
+              <div class="stat-change">Areas with persistent unmet need</div>
+            </div>
+          </div>
+          <div class="stat-card red">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-alert"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Access gaps</div>
+              <div class="stat-value" id="ci-gaps">--</div>
+              <div class="stat-change">Demand zones without recent delivery</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-heading">
+                <h2 class="card-title">Surplus hotspots</h2>
+                <p class="card-sub">Areas with consistently high food availability</p>
+              </div>
+            </div>
+            <div class="hotspot-grid" id="surplus-hotspots" aria-live="polite"></div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <div class="card-heading">
+                <h2 class="card-title">Demand hotspots</h2>
+                <p class="card-sub">Areas with persistently high unmet need</p>
+              </div>
+            </div>
+            <div class="hotspot-grid" id="demand-hotspots" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-heading">
+              <h2 class="card-title">Food access gaps</h2>
+              <p class="card-sub">Underserved areas with no confirmed delivery in the last 30 days</p>
+            </div>
+          </div>
+          <div class="hotspot-grid" id="access-gaps" aria-live="polite"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-heading">
+              <h2 class="card-title">Recurring supply-demand mismatches</h2>
+              <p class="card-sub">Structural patterns derived from post attributes and active demand</p>
+            </div>
+          </div>
+          <div class="net-list" id="recurring-mismatches" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <!-- Waste risk -->
+      <section class="section" id="page-waste-risk" aria-labelledby="waste-risk-title">
+        <div class="page-heading">
+          <div>
+            <h1 id="waste-risk-title">Waste risk</h1>
+            <p>Available surplus approaching its safe-until window. This queue is advisory: re-routing happens through the matched-supply workflow, not from this page.</p>
+          </div>
+          <div class="heading-actions">
+            <button class="btn btn-secondary" type="button" onclick="refreshCurrentPage()">
+              <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg>
+              Refresh risk queue
+            </button>
+          </div>
+        </div>
+
+        <div class="stats-grid three">
+          <div class="stat-card red">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-alert"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">High risk</div>
+              <div class="stat-value" id="risk-high-count">--</div>
+              <div class="stat-change">Expires within two hours</div>
+            </div>
+          </div>
+          <div class="stat-card amber">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-clock-fast"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Medium risk</div>
+              <div class="stat-value" id="risk-pending-count">--</div>
+              <div class="stat-change">Approaching the safe-until window</div>
+            </div>
+          </div>
+          <div class="stat-card blue">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-package"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Total at risk</div>
+              <div class="stat-value" id="risk-blocked-count">--</div>
+              <div class="stat-change">Available posts requiring attention</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="net-callout">
+          <svg class="icon" aria-hidden="true"><use href="#i-shield"></use></svg>
+          <div>
+            <strong>Advisory queue.</strong>
+            <p>This build has no re-match or force-reserve endpoint. Coordinate a donor, recipient or reserve placement through the existing match and operations workflows; the queue updates from stored surplus status.</p>
+          </div>
+        </div>
+
+        <div class="filter-bar" role="group" aria-label="Filter waste risks">
+          <button class="filter-btn active" id="risk-filter-all" type="button" onclick="setRiskFilter('all', this)">All <span class="filter-count" id="risk-filter-all-count">0</span></button>
+          <button class="filter-btn" id="risk-filter-high" type="button" onclick="setRiskFilter('high', this)">High risk <span class="filter-count" id="risk-filter-high-count">0</span></button>
+          <button class="filter-btn" id="risk-filter-medium" type="button" onclick="setRiskFilter('medium', this)">Medium risk <span class="filter-count" id="risk-filter-medium-count">0</span></button>
+        </div>
+
+        <div class="risk-list" id="risk-full-list" aria-live="polite"></div>
+      </section>
+
+      <!-- Interventions -->
+      <section class="section" id="page-interventions" aria-labelledby="interventions-title">
+        <div class="page-heading">
+          <div>
+            <h1 id="interventions-title">Interventions</h1>
+            <p>System-generated recommendations ranked by urgency and network impact.</p>
+          </div>
+          <div class="heading-actions">
+            <button class="btn btn-secondary" type="button" onclick="refreshCurrentPage()">
+              <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg>
+              Refresh recommendations
+            </button>
+          </div>
+        </div>
+
+        <div class="net-callout">
+          <svg class="icon" aria-hidden="true"><use href="#i-info"></use></svg>
+          <div>
+            <strong>Only match and reserve actions run automatically.</strong>
+            <p>Transfer planning, access-point recruitment and prevention recommendations require coordinator follow-up. They are linked to the relevant workspace and never marked complete automatically.</p>
+          </div>
+        </div>
+
+        <div class="stats-grid three">
+          <div class="stat-card red">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-alert-circle"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">High priority</div>
+              <div class="stat-value" id="int-high-count">--</div>
+              <div class="stat-change">Act first</div>
+            </div>
+          </div>
+          <div class="stat-card amber">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-clock"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Medium priority</div>
+              <div class="stat-value" id="int-medium-count">--</div>
+              <div class="stat-change">Review this cycle</div>
+            </div>
+          </div>
+          <div class="stat-card green">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-check-circle"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Low priority</div>
+              <div class="stat-value" id="int-low-count">--</div>
+              <div class="stat-change">Monitor</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="filter-bar" role="group" aria-label="Filter interventions by priority">
+          <button class="filter-btn active" id="int-filter-all" type="button" onclick="setIntFilter('all', this)">All <span class="filter-count" id="int-count-all">0</span></button>
+          <button class="filter-btn" id="int-filter-high" type="button" onclick="setIntFilter('high', this)">High <span class="filter-count" id="int-count-high">0</span></button>
+          <button class="filter-btn" id="int-filter-medium" type="button" onclick="setIntFilter('medium', this)">Medium <span class="filter-count" id="int-count-medium">0</span></button>
+          <button class="filter-btn" id="int-filter-low" type="button" onclick="setIntFilter('low', this)">Low <span class="filter-count" id="int-count-low">0</span></button>
+        </div>
+
+        <div class="intervention-list" id="interventions-list" aria-live="polite"></div>
+      </section>
+
+      <!-- Metrics -->
+      <section class="section" id="page-metrics" aria-labelledby="metrics-title">
+        <div class="page-heading">
+          <div>
+            <h1 id="metrics-title">Network metrics</h1>
+            <p>Measured network totals and seven-day flows across all recorded activity.</p>
+          </div>
+          <div class="heading-actions">
+            <button class="btn btn-secondary" type="button" onclick="refreshCurrentPage()">
+              <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg>
+              Refresh metrics
+            </button>
+          </div>
+        </div>
+
+        <div class="stats-grid six">
+          <div class="stat-card green">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-package"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Total surplus</div>
+              <div class="stat-value" id="m-total-surplus">--</div>
+              <div class="stat-change">All recorded posts</div>
+            </div>
+          </div>
+          <div class="stat-card blue">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-users"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Total demand</div>
+              <div class="stat-value" id="m-total-demand">--</div>
+              <div class="stat-change">All recorded requests</div>
+            </div>
+          </div>
+          <div class="stat-card green">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-check-circle"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Food recovered</div>
+              <div class="stat-value" id="m-recovered">--</div>
+              <div class="stat-change">Completed collections</div>
+            </div>
+          </div>
+          <div class="stat-card purple">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-leaf"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Waste prevented</div>
+              <div class="stat-value" id="m-waste-prevented">--</div>
+              <div class="stat-change">CO2e estimate from recovered food</div>
+            </div>
+          </div>
+          <div class="stat-card blue">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-target"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Fulfillment rate</div>
+              <div class="stat-value" id="m-fulfillment">--</div>
+              <div class="stat-change">Demand met to date</div>
+            </div>
+          </div>
+          <div class="stat-card red">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-clock"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Unmet demand</div>
+              <div class="stat-value" id="m-unmet">--</div>
+              <div class="stat-change">Open demand quantity</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-heading">
+              <h2 class="card-title">Network health</h2>
+              <p class="card-sub">Supporting measures from the same metrics response</p>
+            </div>
+          </div>
+          <div class="metric-mini-grid">
+            <div class="metric-mini"><span>Seven-day network utilization</span><strong id="m-utilization">--</strong></div>
+            <div class="metric-mini"><span>Seven-day fulfilled</span><strong id="m-success">--</strong></div>
+            <div class="metric-mini"><span>Seven-day expired</span><strong id="m-expired">--</strong></div>
+            <div class="metric-mini"><span>Surplus trend</span><strong id="m-trend">--</strong></div>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="card chart-card">
+            <div class="card-header">
+              <div class="card-heading">
+                <h2 class="card-title">Supply vs demand</h2>
+                <p class="card-sub">Daily recorded quantities for the last seven days</p>
+              </div>
+            </div>
+            <div class="net-chart" id="weekly-chart" role="group" aria-label="Supply, demand and fulfilled quantities for the last seven days"></div>
+            <div class="chart-legend">
+              <span class="legend-item"><i style="background:var(--fb-primary)"></i> Surplus</span>
+              <span class="legend-item"><i style="background:var(--fb-blue)"></i> Demand</span>
+              <span class="legend-item"><i style="background:var(--fb-orange)"></i> Fulfilled</span>
+            </div>
+            <p class="chart-note">Hover or focus a bar to read its value. Surplus and recovered quantities are recorded in kilograms; demand follows the unit registered by each organization.</p>
+          </div>
+
+          <div class="card chart-card">
+            <div class="card-header">
+              <div class="card-heading">
+                <h2 class="card-title">Waste intercepted</h2>
+                <p class="card-sub">Recovered and expired quantities for the last seven days</p>
+              </div>
+            </div>
+            <div class="net-chart" id="waste-chart" role="group" aria-label="Intercepted and wasted quantities for the last seven days"></div>
+            <div class="chart-legend">
+              <span class="legend-item"><i style="background:var(--fb-success)"></i> Intercepted</span>
+              <span class="legend-item"><i style="background:var(--fb-error)"></i> Expired</span>
+            </div>
+            <p class="chart-note">Only completed matches count as intercepted food. Expired posts count as wasted.</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-heading">
+              <h2 class="card-title">Forecast accuracy</h2>
+              <p class="card-sub">Not available in this build</p>
+            </div>
+            <span class="badge badge-planned">Coming soon</span>
+          </div>
+          <div class="net-callout">
+            <svg class="icon" aria-hidden="true"><use href="#i-info"></use></svg>
+            <div>
+              <strong>No forecast or accuracy endpoint is implemented.</strong>
+              <p>This deployment records observed supply, demand and match activity only. Prediction scoring, model accuracy and learning feedback will be added with a future forecasting pipeline; no simulated values are shown.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast-container" id="toast-container" aria-live="polite"></div>
+  <script type="module" src="./js/dashboard.js"></script>
+</body>
+</html>

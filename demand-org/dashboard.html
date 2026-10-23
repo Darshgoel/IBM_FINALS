@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FoodBridge — Demand Organization Portal</title>
+  <meta name="description" content="FoodBridge Demand Organization Portal — register food needs, manage matches, capacity, and fulfillment." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/css/portal.css" />
+  <link rel="stylesheet" href="styles/main.css" />
+  <script src="/assets/js/portal-ui.js" defer></script>
+</head>
+<body class="portal-demand">
+  <a class="sr-only" href="#portal-content">Skip to main content</a>
+
+  <aside class="sidebar" id="sidebar" aria-label="Demand organization navigation">
+    <div class="sidebar-brand">
+      <div class="brand-lockup">
+        <div class="brand-logo" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 44" fill="none">
+            <path d="M22 40C10.4 40 4.5 31.7 4.5 19.5 4.5 8.8 11 3.5 22 3.5s17.5 5.3 17.5 16C39.5 31.7 33.6 40 22 40Z" fill="#16833B"/>
+            <path d="M22 39V18.5" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>
+            <path d="M22 27.5c-7.2 0-11.3-4.1-11.3-10.3 7.2 0 11.3 4.1 11.3 10.3Z" fill="#FF781F"/>
+            <path d="M22 23c6 0 9.5-3.6 9.5-9.1-6 0-9.5 3.6-9.5 9.1Z" fill="#9AF2A8"/>
+          </svg>
+        </div>
+        <div class="brand-copy">
+          <div class="brand-wordmark">Food<span>Bridge</span></div>
+          <div class="brand-subtitle">Demand Organization</div>
+        </div>
+      </div>
+      <div class="portal-badge">
+        <svg class="icon" aria-hidden="true"><use href="#i-users"></use></svg>
+        Recipient access
+      </div>
+    </div>
+
+    <div class="sidebar-context">
+      <div class="context-main">
+        <div class="org-avatar" id="sidebar-avatar">NG</div>
+        <div class="org-info">
+          <div class="org-name" id="sidebar-org-name">Loading organization…</div>
+          <div class="org-status" id="sidebar-org-type">Demand organization</div>
+        </div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <span class="nav-section-label">Workspace</span>
+      <button class="nav-item active" id="nav-overview" type="button" onclick="showPage('overview')">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-grid"></use></svg></span>
+        <span class="nav-label">Overview</span>
+      </button>
+      <button class="nav-item" id="nav-register-demand" type="button" onclick="showPage('register-demand')">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg></span>
+        <span class="nav-label">Register Demand</span>
+      </button>
+      <button class="nav-item" id="nav-my-demands" type="button" onclick="showPage('my-demands')">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-inbox"></use></svg></span>
+        <span class="nav-label">My Demands</span>
+      </button>
+
+      <span class="nav-section-label">Supply</span>
+      <button class="nav-item" id="nav-matches" type="button" onclick="showPage('matches')">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-truck"></use></svg></span>
+        <span class="nav-label">Matched Supply</span>
+        <span class="nav-badge" id="match-badge" hidden>0</span>
+      </button>
+
+      <span class="nav-section-label">Organization</span>
+      <button class="nav-item" id="nav-capacity" type="button" onclick="showPage('capacity')">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-wallet"></use></svg></span>
+        <span class="nav-label">Capacity</span>
+      </button>
+      <button class="nav-item" id="nav-insights" type="button" onclick="showPage('insights')">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-chart"></use></svg></span>
+        <span class="nav-label">Insights</span>
+      </button>
+      <button class="nav-item" id="nav-alerts" type="button" onclick="showPage('alerts')">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-bell"></use></svg></span>
+        <span class="nav-label">Alerts</span>
+        <span class="nav-badge" id="alert-badge" hidden>0</span>
+      </button>
+      <button class="nav-item" id="nav-profile" type="button" onclick="showPage('profile')">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg></span>
+        <span class="nav-label">Profile</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="signout-wide" type="button" onclick="logout()">
+        <svg class="icon" aria-hidden="true"><use href="#i-logout"></use></svg>
+        <span>Sign out</span>
+      </button>
+    </div>
+  </aside>
+
+  <div class="sidebar-backdrop" id="sidebar-backdrop" aria-hidden="true"></div>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="nav-toggle" type="button" aria-label="Open navigation menu" aria-controls="sidebar" aria-expanded="false">
+          <svg class="icon" aria-hidden="true"><use href="#i-menu"></use></svg>
+        </button>
+        <div class="topbar-copy">
+          <div class="topbar-kicker">FoodBridge Demand</div>
+          <div class="topbar-title" id="topbar-title">Overview</div>
+          <div class="topbar-sub" id="topbar-sub">Your organization activity at a glance</div>
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <button class="topbar-primary" type="button" onclick="showPage('register-demand')">
+          <svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg>
+          <span>Register Demand</span>
+        </button>
+        <button class="alert-btn" id="topbar-alert-btn" type="button" onclick="showPage('alerts')" aria-label="Open alerts">
+          <svg class="icon" aria-hidden="true"><use href="#i-bell"></use></svg>
+          <span class="alert-dot" id="topbar-alert-dot" hidden></span>
+        </button>
+        <button class="account-trigger" type="button" data-account-toggle aria-haspopup="menu" aria-expanded="false">
+          <span class="avatar" id="account-avatar">NG</span>
+          <span class="account-copy">
+            <span class="account-name" id="user-chip">—</span>
+            <span class="account-role">Demand organization</span>
+          </span>
+          <svg class="icon" aria-hidden="true"><use href="#i-chevron"></use></svg>
+        </button>
+        <div class="account-menu" data-account-menu role="menu" aria-label="Account menu">
+          <div class="account-menu-head">
+            <div class="avatar" id="account-menu-avatar">NG</div>
+            <div>
+              <strong id="account-name">—</strong>
+              <small id="account-email">—</small>
+            </div>
+          </div>
+          <div class="account-menu-list">
+            <button class="account-menu-item" type="button" role="menuitem" onclick="showPage('profile')">
+              <svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg>
+              Organization profile
+            </button>
+            <button class="account-menu-item" type="button" role="menuitem" onclick="showPage('capacity')">
+              <svg class="icon" aria-hidden="true"><use href="#i-wallet"></use></svg>
+              Capacity settings
+            </button>
+            <button class="account-menu-item danger" type="button" role="menuitem" onclick="logout()">
+              <svg class="icon" aria-hidden="true"><use href="#i-logout"></use></svg>
+              Sign out
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="content" id="portal-content">
+      <!-- ── Overview ─────────────────────────────────────────────────── -->
+      <section class="page-content active" id="page-overview" aria-labelledby="overview-title">
+        <div class="page-heading">
+          <div>
+            <div class="welcome-line"><span class="dot" aria-hidden="true"></span> Demand organization workspace</div>
+            <h1 id="overview-title">Good to see you, <span id="welcome-name">Organization</span></h1>
+            <p>Track registered needs, respond to matched supply, and keep your capacity current so the network can plan around you.</p>
+          </div>
+          <div class="heading-actions">
+            <button class="btn btn-secondary" type="button" onclick="showPage('matches')">
+              <svg class="icon" aria-hidden="true"><use href="#i-truck"></use></svg>
+              View matches
+            </button>
+            <button class="btn btn-primary" type="button" onclick="showPage('register-demand')">
+              <svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg>
+              Register demand
+            </button>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card blue">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-inbox"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Active demands</div>
+              <div class="stat-value" id="stat-active">—</div>
+              <div class="stat-change" id="stat-active-sub">Open and currently matching</div>
+            </div>
+          </div>
+          <div class="stat-card green">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-check-circle"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Fulfilled demands</div>
+              <div class="stat-value" id="stat-fulfilled">—</div>
+              <div class="stat-change" id="stat-fulfilled-sub">Needs completed through the network</div>
+            </div>
+          </div>
+          <div class="stat-card amber">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-target"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Pending matches</div>
+              <div class="stat-value" id="stat-pending">—</div>
+              <div class="stat-change" id="stat-pending-sub">Offers awaiting your decision</div>
+            </div>
+          </div>
+          <div class="stat-card purple">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-utensils"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Servings received</div>
+              <div class="stat-value" id="stat-people">—</div>
+              <div class="stat-change" id="stat-people-sub">Completed handovers, all time</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-heading">
+                <h2 class="card-title">Recent demands</h2>
+                <p class="card-sub">Your latest registered food needs</p>
+              </div>
+              <button class="card-link" type="button" onclick="showPage('my-demands')">View all <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg></button>
+            </div>
+            <div class="demand-list" id="overview-demands">
+              <div class="empty-state">
+                <span class="empty-icon"><svg class="icon" aria-hidden="true"><use href="#i-inbox"></use></svg></span>
+                <p>Loading recent demands…</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-heading">
+                <h2 class="card-title">Recent matches</h2>
+                <p class="card-sub">Supply matched to your registered needs</p>
+              </div>
+              <button class="card-link" type="button" onclick="showPage('matches')">View all <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg></button>
+            </div>
+            <div class="match-list" id="overview-matches">
+              <div class="empty-state">
+                <span class="empty-icon"><svg class="icon" aria-hidden="true"><use href="#i-truck"></use></svg></span>
+                <p>Loading matches…</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="card-header">
+            <div class="card-heading">
+              <h2 class="card-title">Recent alerts</h2>
+              <p class="card-sub">Notifications from the FoodBridge network</p>
+            </div>
+            <button class="card-link" type="button" onclick="showPage('alerts')">Open alerts <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg></button>
+          </div>
+          <div class="alerts-list" id="overview-alerts">
+            <div class="empty-state">
+              <span class="empty-icon"><svg class="icon" aria-hidden="true"><use href="#i-bell"></use></svg></span>
+              <p>Loading alerts…</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Register Demand ──────────────────────────────────────────── -->
+      <section class="page-content" id="page-register-demand" aria-labelledby="register-title">
+        <div class="page-heading">
+          <div>
+            <h2 id="register-title">Register food demand</h2>
+            <p>Describe what your organization needs. The network checks quantity, timing, capacity and distance before offering supply.</p>
+          </div>
+        </div>
+
+        <div class="grid-aside-main">
+          <div class="card form-card">
+            <div id="demand-error" class="msg error" style="display:none" role="alert"></div>
+
+            <div class="form-group">
+              <label>Priority / urgency</label>
+              <div class="urgency-selector" id="urgency-selector" role="group" aria-label="Priority or urgency">
+                <button class="urgency-btn" type="button" data-urgency="emergency" onclick="selectUrgency('emergency')">
+                  <svg class="icon" aria-hidden="true"><use href="#i-alert"></use></svg> Emergency
+                </button>
+                <button class="urgency-btn" type="button" data-urgency="immediate" onclick="selectUrgency('immediate')">
+                  <svg class="icon" aria-hidden="true"><use href="#i-clock-fast"></use></svg> Immediate
+                </button>
+                <button class="urgency-btn selected" type="button" data-urgency="regular" onclick="selectUrgency('regular')">
+                  <svg class="icon" aria-hidden="true"><use href="#i-calendar"></use></svg> Regular
+                </button>
+                <button class="urgency-btn" type="button" data-urgency="planned" onclick="selectUrgency('planned')">
+                  <svg class="icon" aria-hidden="true"><use href="#i-clock"></use></svg> Planned
+                </button>
+              </div>
+            </div>
+
+            <div class="form-group-title">
+              <svg class="icon" aria-hidden="true"><use href="#i-utensils"></use></svg>
+              Food requirement
+            </div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="d-food-type">Food type required <span class="req" aria-hidden="true">*</span></label>
+                <select id="d-food-type">
+                  <option value="cooked_meals">Cooked meals</option>
+                  <option value="raw_ingredients">Raw ingredients</option>
+                  <option value="packaged_food">Packaged food</option>
+                  <option value="bread_bakery">Bread / bakery</option>
+                  <option value="dairy">Dairy products</option>
+                  <option value="fruits_vegetables">Fruits &amp; vegetables</option>
+                  <option value="any">Any / no preference</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="d-quantity">Quantity <span class="req" aria-hidden="true">*</span></label>
+                <input type="number" id="d-quantity" placeholder="e.g. 150" min="1" inputmode="numeric" />
+              </div>
+              <div class="form-group">
+                <label for="d-unit">Unit</label>
+                <select id="d-unit">
+                  <option value="servings">Servings / meals</option>
+                  <option value="kg">Kilograms (kg)</option>
+                  <option value="litres">Litres</option>
+                  <option value="packets">Packets</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="d-needed-by">Needed by</label>
+                <input type="datetime-local" id="d-needed-by" />
+                <div class="form-help">Leave blank only if the need is genuinely open-ended.</div>
+              </div>
+              <div class="form-group full">
+                <label for="d-dietary">Dietary requirements / restrictions</label>
+                <input type="text" id="d-dietary" placeholder="e.g. No pork, vegetarian preferred, no nuts" />
+              </div>
+              <div class="form-group full">
+                <label for="d-notes">Additional notes</label>
+                <textarea id="d-notes" placeholder="Preparation needs, delivery constraints, storage limits, or anything else the network should know…"></textarea>
+              </div>
+            </div>
+
+            <div class="form-group-title">
+              <svg class="icon" aria-hidden="true"><use href="#i-recycle"></use></svg>
+              Recurring need
+            </div>
+            <div class="toggle-row">
+              <input type="checkbox" id="d-recurring" />
+              <label for="d-recurring">This is a recurring demand</label>
+              <span class="toggle-desc">Marks this need as recurring for network planning. Automatic reposting is not enabled in this version.</span>
+            </div>
+
+            <div id="recurring-fields" style="display:none">
+              <div class="form-grid" style="margin-top:14px">
+                <div class="form-group">
+                  <label for="d-recur-freq">Frequency</label>
+                  <select id="d-recur-freq">
+                    <option value="daily">Every day</option>
+                    <option value="weekdays">Weekdays (Mon–Fri)</option>
+                    <option value="weekends">Weekends (Sat–Sun)</option>
+                    <option value="weekly">Specific days of the week</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="d-recur-time">Preferred time</label>
+                  <input type="time" id="d-recur-time" value="17:00" />
+                </div>
+              </div>
+              <div class="form-help" style="margin-top:8px">The frequency and preferred time are saved with this demand so coordinators can see the pattern. Automatic future occurrences are not generated by the current backend.</div>
+            </div>
+
+            <div class="form-actions">
+              <button class="btn btn-primary btn-lg" id="demand-submit-btn" type="button" onclick="submitDemand()">
+                <svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg>
+                Register demand
+              </button>
+              <button class="btn btn-ghost" type="button" onclick="clearDemandForm()">Clear form</button>
+            </div>
+          </div>
+
+          <aside class="stack">
+            <div class="card tinted">
+              <div class="card-header">
+                <div class="card-heading">
+                  <h2 class="card-title">How matching works</h2>
+                  <p class="card-sub">A demand becomes an offer only when supply is safe and feasible</p>
+                </div>
+              </div>
+              <div class="tips-list">
+                <div class="risk-item">
+                  <span class="risk-icon" style="background:var(--fb-success-soft);color:var(--fb-success)"><svg class="icon" aria-hidden="true"><use href="#i-target"></use></svg></span>
+                  <div class="risk-body">
+                    <div class="risk-title">Safety and capacity first</div>
+                    <div class="risk-detail">Food type, dietary needs, preparation state, timing and your declared capacity are checked before a match.</div>
+                  </div>
+                </div>
+                <div class="risk-item">
+                  <span class="risk-icon" style="background:var(--fb-blue-soft);color:var(--fb-blue)"><svg class="icon" aria-hidden="true"><use href="#i-truck"></use></svg></span>
+                  <div class="risk-body">
+                    <div class="risk-title">You decide on offers</div>
+                    <div class="risk-detail">A pending offer is not food you have received. Accept only after confirming safety and collection feasibility.</div>
+                  </div>
+                </div>
+                <div class="risk-item">
+                  <span class="risk-icon" style="background:var(--fb-purple-soft);color:var(--fb-purple)"><svg class="icon" aria-hidden="true"><use href="#i-check-circle"></use></svg></span>
+                  <div class="risk-body">
+                    <div class="risk-title">Impact follows handover</div>
+                    <div class="risk-detail">Servings count only after the handover is confirmed, not when the match is created.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header">
+                <div class="card-heading"><h2 class="card-title">Capacity reminder</h2></div>
+              </div>
+              <p class="card-sub" style="margin:0">Keep your receiving and serving limits current. A stale capacity can create offers your team cannot safely handle.</p>
+              <button class="btn btn-sm" type="button" style="margin-top:12px" onclick="showPage('capacity')">Review capacity</button>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ── My Demands ───────────────────────────────────────────────── -->
+      <section class="page-content" id="page-my-demands" aria-labelledby="demands-title">
+        <div class="page-heading">
+          <div>
+            <h2 id="demands-title">My demands</h2>
+            <p>Search, filter and manage every registered need, including recurring needs and completed history.</p>
+          </div>
+          <div class="heading-actions">
+            <button class="btn btn-primary" type="button" onclick="showPage('register-demand')">
+              <svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg>
+              New demand
+            </button>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <label class="search-field toolbar-grow">
+            <span class="sr-only">Search demands</span>
+            <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+            <input class="search-input" id="demand-search" type="search" placeholder="Search food, status, urgency or matched supply…" oninput="setDemandSearch(this.value)" />
+          </label>
+          <label class="sr-only" for="demand-sort">Sort demands</label>
+          <select class="select-control" id="demand-sort" onchange="setDemandSort(this.value)">
+            <option value="newest">Newest first</option>
+            <option value="deadline">Needed soonest</option>
+            <option value="quantity">Largest quantity</option>
+            <option value="urgency">Highest urgency</option>
+          </select>
+          <span class="count-pill" id="demand-count">—</span>
+        </div>
+
+        <div class="filter-bar" role="group" aria-label="Filter demands by status">
+          <button class="filter-btn active" id="filter-all" type="button" onclick="filterDemands('all', this)">All</button>
+          <button class="filter-btn" id="filter-active" type="button" onclick="filterDemands('active', this)">Active</button>
+          <button class="filter-btn" id="filter-searching" type="button" onclick="filterDemands('searching', this)">Searching</button>
+          <button class="filter-btn" id="filter-matched" type="button" onclick="filterDemands('matched', this)">Matched</button>
+          <button class="filter-btn" id="filter-fulfilled" type="button" onclick="filterDemands('fulfilled', this)">Fulfilled</button>
+          <button class="filter-btn" id="filter-recurring" type="button" onclick="filterDemands('recurring', this)">Recurring</button>
+          <button class="filter-btn" id="filter-cancelled" type="button" onclick="filterDemands('cancelled', this)">Cancelled</button>
+        </div>
+
+        <div class="demand-list" id="demands-list" aria-live="polite">
+          <div class="empty-state"><p>Loading your demands…</p></div>
+        </div>
+      </section>
+
+      <!-- ── Matched Supply ───────────────────────────────────────────── -->
+      <section class="page-content" id="page-matches" aria-labelledby="matches-title">
+        <div class="page-heading">
+          <div>
+            <h2 id="matches-title">Matched supply &amp; pickups</h2>
+            <p>Confirm offers, track active pickups and keep a completed handover history. A match is not the same as delivered food.</p>
+          </div>
+          <div class="heading-actions">
+            <button class="btn btn-secondary" type="button" onclick="showPage('capacity')">
+              <svg class="icon" aria-hidden="true"><use href="#i-wallet"></use></svg>
+              Review capacity
+            </button>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <label class="search-field toolbar-grow">
+            <span class="sr-only">Search matched supply</span>
+            <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+            <input class="search-input" id="match-search" type="search" placeholder="Search donor, food, pickup area or status…" oninput="setMatchSearch(this.value)" />
+          </label>
+          <span class="count-pill" id="match-summary">Loading matches…</span>
+        </div>
+
+        <div class="filter-bar" role="group" aria-label="Filter matches">
+          <button class="filter-btn active" data-match-filter="all" type="button" onclick="filterMatches('all', this)">All</button>
+          <button class="filter-btn" data-match-filter="action" type="button" onclick="filterMatches('action', this)">Needs action</button>
+          <button class="filter-btn" data-match-filter="active" type="button" onclick="filterMatches('active', this)">Active pickups</button>
+          <button class="filter-btn" data-match-filter="completed" type="button" onclick="filterMatches('completed', this)">Completed history</button>
+        </div>
+
+        <div class="match-list" id="matches-list" aria-live="polite">
+          <div class="empty-state">
+            <span class="empty-icon"><svg class="icon" aria-hidden="true"><use href="#i-truck"></use></svg></span>
+            <p>Loading matched supply…</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Capacity ─────────────────────────────────────────────────── -->
+      <section class="page-content" id="page-capacity" aria-labelledby="capacity-title">
+        <div class="page-heading">
+          <div>
+            <h2 id="capacity-title">Capacity &amp; availability</h2>
+            <p>Tell the network what you can currently receive and handle. These limits are used during matching.</p>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="card form-card">
+            <div class="card-header">
+              <div class="card-heading">
+                <h2 class="card-title">Update capacity</h2>
+                <p class="card-sub">Update whenever your situation changes</p>
+              </div>
+            </div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="cap-receive">Receiving capacity today</label>
+                <input type="number" id="cap-receive" placeholder="Meals / kg you can receive" min="0" />
+              </div>
+              <div class="form-group">
+                <label for="cap-serve">Serving capacity</label>
+                <input type="number" id="cap-serve" placeholder="Maximum meals per day" min="0" />
+              </div>
+              <div class="form-group">
+                <label for="cap-storage">Storage capacity</label>
+                <input type="number" id="cap-storage" placeholder="Storage space in kg" min="0" />
+              </div>
+            </div>
+            <div class="form-help" style="margin-top:10px">Only these three declared limits are stored. Live storage occupancy and availability cut-off times are not tracked in this version.</div>
+            <div class="form-actions">
+              <button class="btn btn-primary" id="capacity-save-btn" type="button" onclick="updateCapacity()">
+                <svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg>
+                Save capacity
+              </button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-heading">
+                <h2 class="card-title">Declared limits</h2>
+                <p class="card-sub">The values currently used by the matching engine</p>
+              </div>
+            </div>
+            <div id="capacity-bars">
+              <div class="capacity-bar-row">
+                <div class="capacity-bar-label">Receiving</div>
+                <div class="capacity-bar-track"><div class="capacity-bar-fill" id="bar-receive" style="width:0%"></div></div>
+                <div class="capacity-bar-val" id="val-receive">—</div>
+              </div>
+              <div class="capacity-bar-row">
+                <div class="capacity-bar-label">Serving</div>
+                <div class="capacity-bar-track"><div class="capacity-bar-fill" id="bar-serve" style="width:0%"></div></div>
+                <div class="capacity-bar-val" id="val-serve">—</div>
+              </div>
+              <div class="capacity-bar-row">
+                <div class="capacity-bar-label">Storage</div>
+                <div class="capacity-bar-track"><div class="capacity-bar-fill amber" id="bar-storage" style="width:0%"></div></div>
+                <div class="capacity-bar-val" id="val-storage">—</div>
+              </div>
+            </div>
+            <div class="form-help" id="cap-utilization-note" style="margin-top:12px"></div>
+
+            <div class="card-section">
+              <div class="card-title">Demand profile</div>
+              <p class="card-sub">Your recurring needs that feed network intelligence</p>
+              <div class="tag-list" id="demand-profile-tags" style="margin-top:10px">
+                <span class="tag">Loading…</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="grid-column:1/-1">
+            <div class="card-header">
+              <div class="card-heading">
+                <h2 class="card-title">Recurring requirements</h2>
+                <p class="card-sub">Needs flagged as recurring. Patterns are stored for planning; automatic reposting is not enabled.</p>
+              </div>
+            </div>
+            <div id="recurring-list">
+              <div class="empty-state" style="padding:20px"><p>Loading recurring requirements…</p></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Insights ─────────────────────────────────────────────────── -->
+      <section class="page-content" id="page-insights" aria-labelledby="insights-title">
+        <div class="page-heading">
+          <div>
+            <h2 id="insights-title">Organization insights</h2>
+            <p>Demand trends, fulfillment analysis and network intelligence for your organization.</p>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card green">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-target"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Fulfillment rate</div>
+              <div class="stat-value" id="ins-fulfillment-rate">—</div>
+              <div class="stat-change up">Share of demands fulfilled</div>
+            </div>
+          </div>
+          <div class="stat-card blue">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-inbox"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Total demands registered</div>
+              <div class="stat-value" id="ins-total-demands">—</div>
+              <div class="stat-change">All time</div>
+            </div>
+          </div>
+          <div class="stat-card red">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-alert"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Unmet demands</div>
+              <div class="stat-value" id="ins-unmet">—</div>
+              <div class="stat-change down">Needs without received supply</div>
+            </div>
+          </div>
+          <div class="stat-card purple">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-utensils"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Servings received</div>
+              <div class="stat-value" id="ins-people-total">—</div>
+              <div class="stat-change up">Completed handovers</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-heading">
+                <h2 class="card-title">Demand vs fulfilled</h2>
+                <p class="card-sub">Last seven days, kg equivalent · green = received, red = still unmet</p>
+              </div>
+            </div>
+            <div class="chart-wrap demand-chart" id="demand-chart"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-heading">
+                <h2 class="card-title">Urgent shortages</h2>
+                <p class="card-sub">Open needs whose deadline is within six hours</p>
+              </div>
+            </div>
+            <div id="shortage-list"></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="card-header">
+            <div class="card-heading">
+              <h2 class="card-title">Food received breakdown</h2>
+              <p class="card-sub">Types of food your organization has received</p>
+            </div>
+          </div>
+          <div id="food-breakdown" class="tag-list">
+            <span class="tag">Loading breakdown…</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Alerts ───────────────────────────────────────────────────── -->
+      <section class="page-content" id="page-alerts" aria-labelledby="alerts-title">
+        <div class="page-heading">
+          <div>
+            <h2 id="alerts-title">Alerts</h2>
+            <p>Network notifications relevant to your organization, including offer and capacity updates.</p>
+          </div>
+          <div class="heading-actions">
+            <button class="btn btn-secondary" type="button" onclick="markAllAlertsRead()">
+              <svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg>
+              Mark all read
+            </button>
+          </div>
+        </div>
+        <div class="card flush" style="overflow:hidden">
+          <div class="alerts-list" id="alerts-full-list">
+            <div class="empty-state" style="margin:16px"><p>Loading alerts…</p></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Profile ──────────────────────────────────────────────────── -->
+      <section class="page-content" id="page-profile" aria-labelledby="profile-title">
+        <div class="page-heading">
+          <div>
+            <h2 id="profile-title">Organization profile</h2>
+            <p>Update the details the network uses for matching, communication and service planning.</p>
+          </div>
+        </div>
+
+        <div class="grid-aside-main">
+          <div class="card form-card">
+            <div class="msg error" id="profile-error" style="display:none" role="alert"></div>
+            <div class="msg success" id="profile-success" style="display:none" role="status"></div>
+
+            <div class="form-group-title">
+              <svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg>
+              Organization details
+            </div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="p-org-name">Organization name <span class="req" aria-hidden="true">*</span></label>
+                <input type="text" id="p-org-name" autocomplete="organization" />
+              </div>
+              <div class="form-group">
+                <label for="p-org-type">Organization type</label>
+                <input type="text" id="p-org-type" readonly aria-describedby="org-type-help" />
+                <div class="form-help" id="org-type-help">Managed by FoodBridge verification; not editable here.</div>
+              </div>
+              <div class="form-group full">
+                <label for="p-address">Location address</label>
+                <input type="text" id="p-address" autocomplete="street-address" />
+              </div>
+              <div class="form-group">
+                <label for="p-phone">Contact phone</label>
+                <input type="tel" id="p-phone" autocomplete="tel" />
+              </div>
+              <div class="form-group">
+                <label for="p-hours">Operating hours</label>
+                <input type="text" id="p-hours" placeholder="e.g. Daily 4pm–9pm" />
+              </div>
+            </div>
+
+            <div class="form-group-title">
+              <svg class="icon" aria-hidden="true"><use href="#i-users"></use></svg>
+              Serving &amp; capacity
+            </div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="p-serve-cap">Serving capacity (meals/day)</label>
+                <input type="number" id="p-serve-cap" min="0" />
+              </div>
+              <div class="form-group">
+                <label for="p-population">Population served</label>
+                <input type="text" id="p-population" placeholder="e.g. Homeless adults, migrant workers" />
+              </div>
+              <div class="form-group full">
+                <label for="p-food-req">Food requirements / preferences</label>
+                <textarea id="p-food-req" placeholder="Vegetarian, halal, no allergens, hot meals preferred…"></textarea>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button class="btn btn-primary" id="profile-save-btn" type="button" onclick="saveProfile()">
+                <svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg>
+                Save profile
+              </button>
+              <span class="form-help" style="margin-left:auto">Saved changes are used by the next matching run.</span>
+            </div>
+          </div>
+
+          <aside class="stack">
+            <div class="card">
+              <div class="card-header">
+                <div class="card-heading">
+                  <h2 class="card-title">Account access</h2>
+                  <p class="card-sub">Managed by FoodBridge authentication</p>
+                </div>
+              </div>
+              <div class="stack-sm">
+                <div>
+                  <div class="mini-label">Signed-in email</div>
+                  <div class="item-main" id="profile-account-email" style="margin-top:3px">—</div>
+                </div>
+                <div>
+                  <div class="mini-label">Organization type</div>
+                  <div class="item-main" id="profile-org-type" style="margin-top:3px">—</div>
+                </div>
+                <div class="form-help">Contact FoodBridge support if verified organization details need to change.</div>
+              </div>
+            </div>
+            <div class="card tinted">
+              <div class="card-header">
+                <div class="card-heading"><h2 class="card-title">Capacity is matching input</h2></div>
+              </div>
+              <p class="card-sub" style="margin:0">Declared receiving and serving limits are used to avoid offers your team cannot safely accept. Update them before a busy service period.</p>
+              <button class="btn btn-sm" type="button" style="margin-top:12px" onclick="showPage('capacity')">Open capacity</button>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="fb-modal" id="matchDetailModal" aria-hidden="true">
+    <div class="fb-modal-backdrop" onclick="closeMatchDetail()"></div>
+    <div class="fb-modal-card wide" role="dialog" aria-modal="true" aria-labelledby="matchDetailTitle">
+      <div class="fb-modal-head">
+        <div>
+          <p class="fb-modal-kicker">Matched supply detail</p>
+          <h3 id="matchDetailTitle">Loading…</h3>
+        </div>
+        <button class="fb-modal-close" type="button" aria-label="Close match detail" onclick="closeMatchDetail()">
+          <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+        </button>
+      </div>
+      <div class="fb-modal-body" id="matchDetailBody">
+        <div class="empty-state"><p>Loading match details…</p></div>
+      </div>
+      <div class="fb-modal-footer" id="matchDetailFooter"></div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toast-container" aria-live="polite"></div>
+  <script src="js/dashboard.js" type="module"></script>
+</body>
+</html>

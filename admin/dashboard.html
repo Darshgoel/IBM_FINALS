@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FoodBridge — Admin &amp; Verification</title>
+  <meta name="description" content="FoodBridge Admin Portal — organization verification, safety review, dispute resolution, and participant management." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles/main.css" />
+  <link rel="stylesheet" href="/assets/css/dashboard.css" />
+  <link rel="stylesheet" href="./styles/admin.css" />
+  <script src="/assets/js/dashboard-shell.js" defer></script>
+</head>
+<body class="portal-admin">
+
+<!-- ── Shared outline icon sprite ─────────────────────────────────────────── -->
+<svg class="fb-sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.6"/></symbol>
+  <symbol id="i-building" viewBox="0 0 24 24"><path d="M4 21V5.8A1.8 1.8 0 0 1 5.8 4h8.4A1.8 1.8 0 0 1 16 5.8V21"/><path d="M16 9h2.2A1.8 1.8 0 0 1 20 10.8V21"/><path d="M8 8h4M8 12h4M8 16h4M2 21h20"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/><path d="M16 5.4a3 3 0 0 1 0 5.2"/><path d="M18 14.4a5 5 0 0 1 2.5 4.3"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 5 6v5.2c0 4.5 2.9 8.1 7 9.8 4.1-1.7 7-5.3 7-9.8V6l-7-3Z"/><path d="m9.2 12 1.9 1.9 3.8-4.1"/></symbol>
+  <symbol id="i-scale" viewBox="0 0 24 24"><path d="M12 3v18M5 7h14M6.5 7 3 15h7L6.5 7ZM17.5 7 14 15h7l-3.5-8Z"/><path d="M8 21h8"/></symbol>
+  <symbol id="i-package" viewBox="0 0 24 24"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z"/><path d="m4.4 7.7 7.6 4.4 7.6-4.4M12 12.1V21"/><path d="m8 5.2 8 4.6"/></symbol>
+  <symbol id="i-truck" viewBox="0 0 24 24"><path d="M3 6h10v10H3z"/><path d="M13 9h4l3 3v4h-7z"/><circle cx="7" cy="18" r="1.8"/><circle cx="17.5" cy="18" r="1.8"/></symbol>
+  <symbol id="i-activity" viewBox="0 0 24 24"><path d="M3 12h4l2.2-6 4.1 12L15.4 12H21"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H6.8A1.8 1.8 0 0 0 5 4.8v14.4A1.8 1.8 0 0 0 6.8 21h10.4a1.8 1.8 0 0 0 1.8-1.8V8l-5-5Z"/><path d="M14 3v5h5M8.5 13h7M8.5 17h5"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.3"/><path d="m15.5 15.5 4 4"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5"/><path d="M19.2 12a7.4 7.4 0 1 0-1.9 6.4"/></symbol>
+  <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24"><path d="M10 5H5.8A1.8 1.8 0 0 0 4 6.8v10.4A1.8 1.8 0 0 0 5.8 19H10"/><path d="M14 8l4 4-4 4M8 12h10"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m4.5 12.5 5 5 10-11"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3 2.8 20h18.4L12 3Z"/><path d="M12 9v4.5M12 17h.01"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5.2l3.5 2"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M20 10c0 5.2-8 11-8 11S4 15.2 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+  <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8 8"/><path d="M18 14v4.2A1.8 1.8 0 0 1 16.2 20H5.8A1.8 1.8 0 0 1 4 18.2V7.8A1.8 1.8 0 0 1 5.8 6H10"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M4 12h16M14 6l6 6-6 6"/></symbol>
+  <symbol id="i-map" viewBox="0 0 24 24"><path d="m3 6 5.5-2 7 2L21 4v14l-5.5 2-7-2L3 20V6Z"/><path d="M8.5 4v14M15.5 6v14"/></symbol>
+  <symbol id="i-grid-view" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11"/></symbol>
+</svg>
+
+<!-- ══════════════════ SIDEBAR ══════════════════ -->
+<aside class="sidebar" id="sidebar" aria-label="Administrator navigation">
+  <div class="sidebar-brand">
+    <div class="brand-lockup">
+      <div class="mark" aria-hidden="true"></div>
+      <div class="brand-copy">
+        <h2 class="brand-wordmark">Food<span>Bridge</span></h2>
+        <p class="brand-subtitle">Admin &amp; Verification</p>
+      </div>
+    </div>
+    <p class="brand-descriptor">Platform Administration</p>
+    <div class="admin-badge"><svg class="icon" aria-hidden="true"><use href="#i-shield"></use></svg> Admin access</div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <span class="nav-section-label">Dashboard</span>
+    <button class="nav-item active" id="nav-overview" onclick="showPage('overview')" aria-current="page">
+      <svg class="nav-icon" aria-hidden="true"><use href="#i-grid"></use></svg><span>Overview</span>
+    </button>
+
+    <span class="nav-section-label">Verification</span>
+    <button class="nav-item" id="nav-verification" onclick="showPage('verification')">
+      <svg class="nav-icon" aria-hidden="true"><use href="#i-building"></use></svg><span>Org Verification</span>
+      <span class="nav-badge" id="badge-pending" hidden>0</span>
+    </button>
+    <button class="nav-item" id="nav-participants" onclick="showPage('participants')">
+      <svg class="nav-icon" aria-hidden="true"><use href="#i-users"></use></svg><span>All Participants</span>
+    </button>
+
+    <span class="nav-section-label">Trust &amp; Safety</span>
+    <button class="nav-item" id="nav-safety" onclick="showPage('safety')">
+      <svg class="nav-icon" aria-hidden="true"><use href="#i-shield"></use></svg><span>Safety Review</span>
+      <span class="nav-badge" id="badge-flags" hidden>0</span>
+    </button>
+    <button class="nav-item" id="nav-disputes" onclick="showPage('disputes')">
+      <svg class="nav-icon" aria-hidden="true"><use href="#i-scale"></use></svg><span>Disputes</span>
+      <span class="nav-badge amber" id="badge-disputes" hidden>0</span>
+    </button>
+
+    <span class="nav-section-label">Records</span>
+    <button class="nav-item" id="nav-records" onclick="showPage('records')">
+      <svg class="nav-icon" aria-hidden="true"><use href="#i-file"></use></svg><span>Compliance Records</span>
+    </button>
+
+    <span class="nav-section-label">Operations</span>
+    <a class="nav-item" href="./facilities.html">
+      <svg class="nav-icon" aria-hidden="true"><use href="#i-grid-view"></use></svg><span>Facility Verification</span>
+      <svg class="nav-icon nav-external" aria-hidden="true" style="margin-left:auto;opacity:.6"><use href="#i-external"></use></svg>
+    </a>
+    <a class="nav-item" href="../network-intelligence/map.html">
+      <svg class="nav-icon" aria-hidden="true"><use href="#i-map"></use></svg><span>Network Map</span>
+      <svg class="nav-icon nav-external" aria-hidden="true" style="margin-left:auto;opacity:.6"><use href="#i-external"></use></svg>
+    </a>
+    <a class="nav-item" href="../ops/index.html">
+      <svg class="nav-icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg><span>Operations Portal</span>
+    </a>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="user-card">
+      <div class="user-avatar" id="sidebar-avatar">AD</div>
+      <div class="user-info">
+        <div class="user-name" id="sidebar-name">Administrator</div>
+        <div class="user-role" id="sidebar-role">Platform Administrator</div>
+      </div>
+      <button class="logout-btn" onclick="logout()" aria-label="Sign out" title="Sign out">
+        <svg class="icon" aria-hidden="true"><use href="#i-logout"></use></svg>
+      </button>
+    </div>
+  </div>
+</aside>
+
+<div class="sidebar-backdrop" id="sidebar-backdrop" onclick="closeSidebar()" aria-hidden="true"></div>
+
+<!-- ══════════════════ MAIN ══════════════════ -->
+<div class="main">
+
+  <header class="topbar">
+    <div class="topbar-left">
+      <button class="nav-toggle" id="nav-toggle" aria-label="Open navigation menu"
+              aria-controls="sidebar" aria-expanded="false">
+        <svg class="icon" aria-hidden="true"><use href="#i-menu"></use></svg>
+      </button>
+      <div class="topbar-copy">
+        <div class="topbar-kicker">FoodBridge Admin</div>
+        <div class="topbar-title" id="topbar-title">Overview</div>
+        <div class="topbar-sub" id="topbar-sub">Platform administration at a glance</div>
+      </div>
+    </div>
+
+    <div class="topbar-actions">
+      <span class="live-indicator" id="live-indicator" title="Data loaded from the live API">
+        <span class="live-dot" aria-hidden="true"></span>
+        <span class="live-text" id="live-text">Live data</span>
+      </span>
+      <button class="topbar-btn" id="refresh-btn" onclick="refreshPage(this)" title="Refresh data" aria-label="Refresh data">
+        <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg>
+        <span class="topbar-btn-label">Refresh</span>
+      </button>
+      <div class="account-btn" title="Signed in administrator" style="cursor:default">
+        <span class="account-avatar" id="account-avatar">AD</span>
+        <span class="account-copy"><strong id="account-name">Administrator</strong><small id="account-email">admin</small></span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ─── OVERVIEW ─── -->
+  <section class="page-content active" id="page-overview">
+    <header class="page-header">
+      <div class="page-header-copy">
+        <nav class="breadcrumb" aria-label="Breadcrumb"><span>Admin</span><svg class="icon" aria-hidden="true"><use href="#i-chevron-right"></use></svg><span aria-current="page">Overview</span></nav>
+        <h2>Admin Overview</h2>
+        <p>Platform health, pending actions, and recent verification activity.</p>
+      </div>
+      <div class="page-header-actions">
+        <span class="updated-pill"><span class="live-dot" aria-hidden="true"></span><span id="overview-updated">Waiting for data…</span></span>
+        <button class="btn btn-ghost" type="button" onclick="refreshPage(this)">
+          <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg> Refresh
+        </button>
+      </div>
+    </header>
+
+    <div class="stats-grid admin-kpis">
+      <div class="stat-card amber clickable" role="link" tabindex="0" data-page="verification" title="Review pending registrations">
+        <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-clock"></use></svg></div>
+        <div class="stat-label">Pending Verification</div>
+        <div class="stat-value" id="ov-pending">—</div>
+        <div class="stat-sub">organizations awaiting review</div>
+      </div>
+      <div class="stat-card green clickable" role="link" tabindex="0" data-page="participants" data-filter="verified" title="View verified organizations">
+        <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-shield"></use></svg></div>
+        <div class="stat-label">Verified Organizations</div>
+        <div class="stat-value" id="ov-verified">—</div>
+        <div class="stat-sub">active and approved</div>
+      </div>
+      <div class="stat-card red clickable" role="link" tabindex="0" data-page="safety" title="Review open safety flags">
+        <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-alert"></use></svg></div>
+        <div class="stat-label">Flagged Cases</div>
+        <div class="stat-value" id="ov-flagged">—</div>
+        <div class="stat-sub">open safety reports</div>
+      </div>
+      <div class="stat-card purple clickable" role="link" tabindex="0" data-page="disputes" title="Resolve open disputes">
+        <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-scale"></use></svg></div>
+        <div class="stat-label">Open Disputes</div>
+        <div class="stat-value" id="ov-disputes">—</div>
+        <div class="stat-sub">awaiting resolution</div>
+      </div>
+      <div class="stat-card blue clickable" role="link" tabindex="0" data-page="participants" data-filter="suspended" title="View suspended organizations">
+        <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg></div>
+        <div class="stat-label">Suspended</div>
+        <div class="stat-value" id="ov-suspended">—</div>
+        <div class="stat-sub">organizations restricted</div>
+      </div>
+      <div class="stat-card green" title="Administrative actions recorded today">
+        <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-activity"></use></svg></div>
+        <div class="stat-label">Actions Today</div>
+        <div class="stat-value" id="ov-actions">—</div>
+        <div class="stat-sub">administrative actions logged</div>
+      </div>
+    </div>
+
+    <div class="two-col overview-panels">
+      <article class="card">
+        <div class="card-head">
+          <div>
+            <h3 class="card-title">Pending verification</h3>
+            <p class="card-sub">Organizations waiting for approval.</p>
+          </div>
+          <button class="link-btn" onclick="showPage('verification')">Review all <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg></button>
+        </div>
+        <div class="compact-list" id="ov-pending-list"></div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <div>
+            <h3 class="card-title">Recent flags</h3>
+            <p class="card-sub">Latest reports and their current status.</p>
+          </div>
+          <button class="link-btn" onclick="showPage('safety')">Review all <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg></button>
+        </div>
+        <div class="compact-list" id="ov-flag-list"></div>
+      </article>
+    </div>
+
+    <div class="two-col overview-panels">
+      <article class="card">
+        <div class="card-head">
+          <div>
+            <h3 class="card-title">Recent administrative activity</h3>
+            <p class="card-sub">Latest decisions recorded in the compliance log.</p>
+          </div>
+          <button class="link-btn" onclick="showPage('records')">Open records <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg></button>
+        </div>
+        <div class="compact-list" id="ov-records"></div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <div>
+            <h3 class="card-title">Operational workspaces</h3>
+            <p class="card-sub">Directory and map tools that support verification.</p>
+          </div>
+        </div>
+        <div class="quick-actions">
+          <a class="quick-action" href="./facilities.html">
+            <span class="qa-icon"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg></span>
+            <span><strong>Facility verification</strong><small>Access points, coordinates, and verification status</small></span>
+            <svg class="icon qa-arrow" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+          </a>
+          <a class="quick-action" href="../network-intelligence/map.html">
+            <span class="qa-icon amber"><svg class="icon" aria-hidden="true"><use href="#i-map"></use></svg></span>
+            <span><strong>Network map</strong><small>Shared map of verified network participants</small></span>
+            <svg class="icon qa-arrow" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+          </a>
+          <a class="quick-action" href="../ops/index.html">
+            <span class="qa-icon purple"><svg class="icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg></span>
+            <span><strong>Operations portal</strong><small>Role entry point and workspace directory</small></span>
+            <svg class="icon qa-arrow" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+          </a>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ─── VERIFICATION QUEUE ─── -->
+  <section class="page-content" id="page-verification">
+    <header class="page-header">
+      <div class="page-header-copy">
+        <nav class="breadcrumb" aria-label="Breadcrumb"><span>Admin</span><svg class="icon" aria-hidden="true"><use href="#i-chevron-right"></use></svg><span aria-current="page">Org Verification</span></nav>
+        <h2>Organization Verification</h2>
+        <p>Review submitted organizations and manage verification decisions.</p>
+      </div>
+      <div class="page-header-actions">
+        <span class="count-pill" id="verification-count">0</span>
+        <button class="btn btn-ghost" type="button" onclick="loadVerification()">
+          <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg> Refresh
+        </button>
+      </div>
+    </header>
+
+    <div class="summary-strip" id="verification-summary" aria-live="polite"></div>
+
+    <div class="table-toolbar">
+      <div class="search-bar">
+        <svg class="icon search-icon" aria-hidden="true"><use href="#i-search"></use></svg>
+        <label class="sr-only" for="verification-search">Search pending organizations</label>
+        <input class="search-input" id="verification-search" type="search"
+               placeholder="Search by name, email, or location…" oninput="searchVerification()" />
+      </div>
+      <div class="toolbar-controls">
+        <button class="btn btn-ghost btn-sm" type="button" onclick="resetVerificationFilters()">Reset filters</button>
+      </div>
+    </div>
+
+    <div class="filter-bar" role="group" aria-label="Filter pending organizations">
+      <button class="filter-chip active" id="vf-all" aria-pressed="true" onclick="vFilter('all')">All</button>
+      <button class="filter-chip" id="vf-donor" aria-pressed="false" onclick="vFilter('donor')">Donors</button>
+      <button class="filter-chip" id="vf-demand_org" aria-pressed="false" onclick="vFilter('demand_org')">Demand Orgs</button>
+      <button class="filter-chip" id="vf-nodoc" aria-pressed="false" onclick="vFilter('nodoc')">Missing document</button>
+    </div>
+
+    <div class="table-card">
+      <div id="verification-list" class="table-scroll" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <!-- ─── ALL PARTICIPANTS ─── -->
+  <section class="page-content" id="page-participants">
+    <header class="page-header">
+      <div class="page-header-copy">
+        <nav class="breadcrumb" aria-label="Breadcrumb"><span>Admin</span><svg class="icon" aria-hidden="true"><use href="#i-chevron-right"></use></svg><span aria-current="page">All Participants</span></nav>
+        <h2>All Participants</h2>
+        <p>Every organization registered on the platform.</p>
+      </div>
+      <div class="page-header-actions">
+        <span class="count-pill" id="participants-count">0</span>
+        <button class="btn btn-ghost" type="button" onclick="loadParticipants()">
+          <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg> Refresh
+        </button>
+      </div>
+    </header>
+
+    <div class="table-toolbar">
+      <div class="search-bar">
+        <svg class="icon search-icon" aria-hidden="true"><use href="#i-search"></use></svg>
+        <label class="sr-only" for="participant-search">Search participants</label>
+        <input class="search-input" id="participant-search" type="search"
+               placeholder="Search by name, email, or location…" oninput="searchParticipants()" />
+      </div>
+      <div class="toolbar-controls">
+        <button class="btn btn-ghost btn-sm" type="button" onclick="resetParticipantFilters()">Reset filters</button>
+      </div>
+    </div>
+
+    <div class="filter-bar" role="group" aria-label="Filter participants">
+      <button class="filter-chip active" id="pf-all" aria-pressed="true" onclick="pFilter('all')">All</button>
+      <button class="filter-chip" id="pf-verified" aria-pressed="false" onclick="pFilter('verified')">Verified</button>
+      <button class="filter-chip" id="pf-pending" aria-pressed="false" onclick="pFilter('pending')">Pending</button>
+      <button class="filter-chip" id="pf-suspended" aria-pressed="false" onclick="pFilter('suspended')">Suspended</button>
+      <button class="filter-chip" id="pf-restricted" aria-pressed="false" onclick="pFilter('restricted')">Restricted</button>
+      <button class="filter-chip" id="pf-rejected" aria-pressed="false" onclick="pFilter('rejected')">Rejected</button>
+    </div>
+
+    <div class="table-card">
+      <div id="participants-list" class="table-scroll" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <!-- ─── SAFETY REVIEW ─── -->
+  <section class="page-content" id="page-safety">
+    <header class="page-header">
+      <div class="page-header-copy">
+        <nav class="breadcrumb" aria-label="Breadcrumb"><span>Admin</span><svg class="icon" aria-hidden="true"><use href="#i-chevron-right"></use></svg><span aria-current="page">Safety Review</span></nav>
+        <h2>Safety &amp; Trust Review</h2>
+        <p>Flagged cases, safety incidents, and reports requiring attention.</p>
+      </div>
+      <div class="page-header-actions">
+        <span class="updated-pill"><span class="live-dot" aria-hidden="true"></span><span id="safety-updated">Waiting for data…</span></span>
+        <button class="btn btn-ghost" type="button" onclick="loadSafety()">
+          <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg> Refresh
+        </button>
+      </div>
+    </header>
+
+    <div class="summary-strip" id="safety-summary" aria-live="polite"></div>
+
+    <div class="table-toolbar">
+      <div class="search-bar">
+        <svg class="icon search-icon" aria-hidden="true"><use href="#i-search"></use></svg>
+        <label class="sr-only" for="safety-search">Search safety reports</label>
+        <input class="search-input" id="safety-search" type="search"
+               placeholder="Search by case, organization, or issue…" oninput="searchSafety()" />
+      </div>
+      <div class="toolbar-controls">
+        <button class="btn btn-ghost btn-sm" type="button" onclick="resetSafetyFilters()">Reset filters</button>
+      </div>
+    </div>
+
+    <div class="filter-bar" role="group" aria-label="Filter safety reports">
+      <button class="filter-chip active" id="sf-all" aria-pressed="true" onclick="sFilter('all')">All</button>
+      <button class="filter-chip" id="sf-high" aria-pressed="false" onclick="sFilter('high')">High priority</button>
+      <button class="filter-chip" id="sf-medium" aria-pressed="false" onclick="sFilter('medium')">Medium</button>
+      <button class="filter-chip" id="sf-open" aria-pressed="false" onclick="sFilter('open')">Open</button>
+      <button class="filter-chip" id="sf-closed" aria-pressed="false" onclick="sFilter('closed')">Closed</button>
+    </div>
+
+    <div class="table-card">
+      <div id="safety-list" class="table-scroll" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <!-- ─── DISPUTES ─── -->
+  <section class="page-content" id="page-disputes">
+    <header class="page-header">
+      <div class="page-header-copy">
+        <nav class="breadcrumb" aria-label="Breadcrumb"><span>Admin</span><svg class="icon" aria-hidden="true"><use href="#i-chevron-right"></use></svg><span aria-current="page">Disputes</span></nav>
+        <h2>Issue &amp; Dispute Resolution</h2>
+        <p>Failed handovers, quantity disputes, complaints, and conflicts between participants.</p>
+      </div>
+      <div class="page-header-actions">
+        <span class="count-pill" id="disputes-count">0</span>
+        <button class="btn btn-ghost" type="button" onclick="loadDisputes()">
+          <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg> Refresh
+        </button>
+      </div>
+    </header>
+
+    <div class="table-toolbar">
+      <div class="search-bar">
+        <svg class="icon search-icon" aria-hidden="true"><use href="#i-search"></use></svg>
+        <label class="sr-only" for="dispute-search">Search disputes</label>
+        <input class="search-input" id="dispute-search" type="search"
+               placeholder="Search by case, party, or issue…" oninput="searchDisputes()" />
+      </div>
+      <div class="toolbar-controls">
+        <button class="btn btn-ghost btn-sm" type="button" onclick="resetDisputeFilters()">Reset filters</button>
+      </div>
+    </div>
+
+    <div class="filter-bar" role="group" aria-label="Filter disputes">
+      <button class="filter-chip active" id="df-all" aria-pressed="true" onclick="dFilter('all')">All</button>
+      <button class="filter-chip" id="df-open" aria-pressed="false" onclick="dFilter('open')">Open</button>
+      <button class="filter-chip" id="df-resolved" aria-pressed="false" onclick="dFilter('resolved')">Resolved</button>
+    </div>
+
+    <div class="table-card">
+      <div id="disputes-list" class="table-scroll" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <!-- ─── RECORDS ─── -->
+  <section class="page-content" id="page-records">
+    <header class="page-header">
+      <div class="page-header-copy">
+        <nav class="breadcrumb" aria-label="Breadcrumb"><span>Admin</span><svg class="icon" aria-hidden="true"><use href="#i-chevron-right"></use></svg><span aria-current="page">Compliance Records</span></nav>
+        <h2>Verification &amp; Compliance Records</h2>
+        <p>Administrative audit trail of verification, moderation, and governance actions.</p>
+      </div>
+      <div class="page-header-actions">
+        <button class="btn btn-ghost" type="button" onclick="loadRecords()">
+          <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg> Refresh
+        </button>
+      </div>
+    </header>
+
+    <div class="table-toolbar">
+      <div class="search-bar">
+        <svg class="icon search-icon" aria-hidden="true"><use href="#i-search"></use></svg>
+        <label class="sr-only" for="records-search">Search compliance records</label>
+        <input class="search-input" id="records-search" type="search"
+               placeholder="Search by organization, administrator, or action…" oninput="searchRecords()" />
+      </div>
+      <div class="toolbar-controls">
+        <span class="count-pill" id="records-count">0</span>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div id="records-list" class="table-scroll" aria-live="polite"></div>
+    </div>
+    <p class="section-note">This log is the authoritative record of administrative decisions. Records are append-only through the existing backend.</p>
+  </section>
+
+</div><!-- /main -->
+
+<!-- ── Confirmation Modal ── -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal" id="modal" role="dialog" aria-modal="true"
+       aria-labelledby="modal-title" aria-describedby="modal-desc">
+    <div class="modal-head">
+      <div>
+        <div class="modal-kicker" id="modal-kicker">Confirm action</div>
+        <h3 id="modal-title">Confirm Action</h3>
+      </div>
+      <button class="modal-x" type="button" onclick="closeModal()" aria-label="Close dialog">
+        <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+      </button>
+    </div>
+    <p id="modal-desc">Are you sure?</p>
+    <p class="modal-warning" id="modal-warning" hidden></p>
+    <label class="modal-notes-label" for="modal-notes" id="modal-notes-label">Reason or notes <span id="modal-notes-required" hidden>(required)</span></label>
+    <textarea id="modal-notes" placeholder="Add a note or reason…"></textarea>
+    <div class="modal-actions">
+      <button class="modal-confirm" id="modal-confirm-btn">Confirm</button>
+      <button class="modal-cancel" type="button" onclick="closeModal()">Cancel</button>
+    </div>
+    <p class="modal-hint">Press <kbd>Esc</kbd> to cancel</p>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container" role="status" aria-live="polite"></div>
+
+<script type="module" src="./js/dashboard.js"></script>
+</body>
+</html>

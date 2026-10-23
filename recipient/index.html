@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FoodBridge — Find Food Near You</title>
+  <meta name="description" content="FoodBridge — Find nearby food access points: community kitchens, shelters, food banks, and NGOs serving food in your area." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="./styles/main.css" />
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header class="site-header">
+  <div class="shell header-inner">
+    <a class="brand" href="/" aria-label="FoodBridge home">
+      <span class="brand-mark" aria-hidden="true">
+        <svg class="brand-mark" viewBox="0 0 44 44" aria-hidden="true" focusable="false">
+          <path d="M22 40C10.4 40 4.5 31.7 4.5 19.5 4.5 8.8 11 3.5 22 3.5s17.5 5.3 17.5 16C39.5 31.7 33.6 40 22 40Z" fill="#13833B"/>
+          <path d="M22 39V18.5" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>
+          <path d="M22 27.5c-7.2 0-11.3-4.1-11.3-10.3 7.2 0 11.3 4.1 11.3 10.3Z" fill="#FF781F"/>
+          <path d="M22 23c6 0 9.5-3.6 9.5-9.1-6 0-9.5 3.6-9.5 9.1Z" fill="#9AF2A8"/>
+        </svg>
+      </span>
+      <span class="brand-word">Food<strong>Bridge</strong></span>
+    </a>
+    <nav class="header-nav" aria-label="Site">
+      <a href="/">Home</a>
+      <a href="/impact.html">Impact</a>
+      <a href="/about.html">About</a>
+    </nav>
+    <a class="header-cta" href="/donor/">Donate Food <span aria-hidden="true">→</span></a>
+  </div>
+</header>
+
+<main class="page-main">
+
+  <!-- ── Hero & Search ── -->
+  <div class="hero">
+    <div class="shell">
+      <span class="hero-eyebrow">Food access, without paperwork</span>
+      <h2>Find <em>food near you</em> right&nbsp;now</h2>
+      <p>Community kitchens, shelters, food banks, and NGOs serving meals in your area. No sign-up needed.</p>
+
+      <div class="search-card">
+        <!-- Location -->
+        <div class="field-block">
+          <label class="field-label" for="location-input">📍 Your location</label>
+          <div class="location-row">
+            <input
+              type="text"
+              class="location-input"
+              id="location-input"
+              placeholder="Enter area, landmark or address…"
+              autocomplete="off"
+            />
+            <button class="locate-btn" id="locate-btn" onclick="useMyLocation()" title="Use my current location" aria-label="Use my current location">📡</button>
+          </div>
+        </div>
+
+        <!-- Options -->
+        <div class="options-row">
+          <div class="option-group">
+            <label class="field-label" for="sel-people">👥 People</label>
+            <select class="opt-select" id="sel-people">
+              <option value="1">1 person</option>
+              <option value="2">2 people</option>
+              <option value="3" selected>3–5 people</option>
+              <option value="6">6–10 people</option>
+              <option value="11">11+ people</option>
+            </select>
+          </div>
+          <div class="option-group">
+            <label class="field-label" for="sel-dietary">🥗 Dietary</label>
+            <select class="opt-select" id="sel-dietary">
+              <option value="any">No restriction</option>
+              <option value="vegetarian">Vegetarian</option>
+              <option value="vegan">Vegan</option>
+              <option value="halal">Halal</option>
+              <option value="no_nuts">No nuts</option>
+            </select>
+          </div>
+          <div class="option-group">
+            <label class="field-label" for="sel-urgency">⏱️ Urgency</label>
+            <select class="opt-select" id="sel-urgency">
+              <option value="now">Need it now</option>
+              <option value="today" selected>Today</option>
+              <option value="tomorrow">Tomorrow</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Error -->
+        <div id="search-error" class="form-error" style="display:none;"></div>
+
+        <button class="search-btn" id="search-btn" onclick="searchFood()">
+          🔍 Find Food Access Points
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Demo mode banner (hidden until API is unreachable) ── -->
+  <div id="demo-mode-banner" class="demo-banner" style="display:none;">
+    <div class="shell demo-banner-inner">
+      <span aria-hidden="true">⚠️</span>
+      <span>Live data unavailable — showing <strong>sample demo locations</strong> only. Start the backend server to see real results.</span>
+    </div>
+  </div>
+
+  <!-- ── Results ── -->
+  <section class="results-section" id="results-section">
+    <div class="shell">
+
+      <!-- Suggested match -->
+      <div class="rec-banner" id="rec-banner">
+        <div class="rec-icon" aria-hidden="true">⭐</div>
+        <div class="rec-content">
+          <div class="rec-label">Suggested match</div>
+          <div class="rec-name" id="rec-name">—</div>
+          <div class="rec-why" id="rec-why">—</div>
+        </div>
+        <button class="rec-go-btn" id="rec-go-btn">Get Directions →</button>
+      </div>
+
+      <!-- List / Map toggle header -->
+      <div class="results-header">
+        <div class="results-title">
+          <h3>Nearby Food Access Points</h3>
+          <div class="results-count" id="results-count">Searching…</div>
+        </div>
+        <div class="results-tools">
+          <div class="view-toggle-group" role="group" aria-label="Results view">
+            <button class="view-toggle-btn active" id="btn-view-list" onclick="switchView('list')">☰ List</button>
+            <button class="view-toggle-btn" id="btn-view-map" onclick="switchView('map')">🗺 Map</button>
+          </div>
+          <select class="sort-select" id="sort-select" onchange="sortResults()" aria-label="Sort results">
+            <option value="distance">Sort: Nearest</option>
+            <option value="availability">Sort: Available Now</option>
+            <option value="capacity">Sort: Most Capacity</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Loading -->
+      <div id="loading-state" class="loading-dots" style="display:none;" aria-live="polite">
+        <span></span><span></span><span></span>
+      </div>
+
+      <!-- Access points list -->
+      <div class="access-list" id="access-list">
+        <!-- Rendered by JS -->
+      </div>
+
+      <!-- Map view -->
+      <div id="map-view" style="display:none;">
+        <div id="recipient-map"></div>
+        <div class="map-legend">
+          <span><span class="map-leg-dot" style="background:#FF781F;"></span> Food access point</span>
+          <span><span class="map-leg-dot" style="background:#246BEE;"></span> Your location</span>
+          <span><span class="map-leg-dot" style="background:#F5A623;"></span> Top pick</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ── Alert opt-in ── -->
+<div class="alert-opt" id="alert-opt">
+  <div class="shell">
+    <div class="alert-opt-card">
+      <span class="alert-opt-icon" aria-hidden="true">🔔</span>
+      <div class="alert-opt-text">
+        <p>Get notified when food becomes available nearby</p>
+        <span>We'll send a one-time browser notification — no account needed</span>
+      </div>
+      <button class="alert-opt-btn" onclick="enableAlerts()">Enable</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Detail panel ── -->
+<div class="detail-overlay" id="detail-overlay" onclick="closeDetail(event)">
+  <div class="detail-panel" id="detail-panel" role="dialog" aria-modal="true" aria-labelledby="d-name">
+    <div class="detail-handle" aria-hidden="true"></div>
+    <div class="detail-header">
+      <div class="detail-icon" id="d-icon" aria-hidden="true">🏠</div>
+      <div class="detail-heading">
+        <div class="detail-name" id="d-name">—</div>
+        <div class="detail-subtype" id="d-subtype">—</div>
+      </div>
+      <button class="detail-x" onclick="closeDetailPanel()" aria-label="Close details">✕</button>
+    </div>
+
+    <!-- Availability -->
+    <div class="detail-section">
+      <div class="detail-section-title">Availability</div>
+      <div id="d-avail-chip"></div>
+      <div class="detail-row" style="margin-top:10px;">
+        <div class="detail-row-icon" aria-hidden="true">⏰</div>
+        <div class="detail-row-text"><strong>Hours:</strong> <span id="d-hours">—</span></div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-row-icon" aria-hidden="true">🍽️</div>
+        <div class="detail-row-text"><strong>Food available:</strong> <span id="d-food">—</span></div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-row-icon" aria-hidden="true">📦</div>
+        <div class="detail-row-text"><strong>Capacity right now:</strong> <span id="d-capacity">—</span></div>
+      </div>
+    </div>
+
+    <!-- Location -->
+    <div class="detail-section">
+      <div class="detail-section-title">Location &amp; Access</div>
+      <div class="detail-row">
+        <div class="detail-row-icon" aria-hidden="true">📍</div>
+        <div class="detail-row-text" id="d-address">—</div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-row-icon" aria-hidden="true">📏</div>
+        <div class="detail-row-text"><span id="d-distance">—</span></div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-row-icon" aria-hidden="true">ℹ️</div>
+        <div class="detail-row-text" id="d-access-info">—</div>
+      </div>
+    </div>
+
+    <!-- Contact -->
+    <div class="detail-section" id="d-contact-section">
+      <div class="detail-section-title">Contact</div>
+      <div class="detail-row">
+        <div class="detail-row-icon" aria-hidden="true">📞</div>
+        <div class="detail-row-text" id="d-phone">—</div>
+      </div>
+    </div>
+
+    <button class="detail-directions-btn" id="d-directions-btn">🗺️ Get Directions</button>
+    <button class="detail-close-btn" onclick="closeDetailPanel()">Close</button>
+  </div>
+</div>
+
+<!-- ── Toast ── -->
+<div class="toast-container" id="toast-container" aria-live="polite"></div>
+
+<!-- ── Footer ── -->
+<footer class="site-footer">
+  <div class="shell site-footer-inner">
+    <p>
+      <a class="brand" href="/" aria-label="FoodBridge home"><span class="brand-word">Food<strong>Bridge</strong></span></a>
+      — connecting surplus food with those who need it.
+    </p>
+    <nav aria-label="Footer">
+      <a href="/">Home</a>
+      <a href="/donor/">Donate Food</a>
+      <a href="/impact.html">Impact</a>
+      <a href="/how-it-works.html">How it works</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="./js/app.js"></script>
+</body>
+</html>

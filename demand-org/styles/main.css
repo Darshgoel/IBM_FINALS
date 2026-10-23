@@ -1,0 +1,210 @@
+/* ==========================================================================
+   FoodBridge — Demand Organization portal layer
+   Shared shell and component styles live in /assets/css/portal.css.
+   ========================================================================== */
+
+.portal-demand .brand-logo { background: rgba(255, 255, 255, 0.14); }
+
+.portal-demand .portal-badge {
+  border-color: rgba(174, 210, 255, 0.24);
+  background: rgba(174, 210, 255, 0.12);
+  color: #D7E8FF;
+}
+
+.portal-demand #welcome-name { color: var(--fb-primary-dark); }
+
+.portal-demand #page-register-demand .grid-aside-main,
+.portal-demand #page-profile .grid-aside-main { align-items: start; }
+
+.portal-demand .demand-item .demand-status-badge {
+  margin-top: 4px;
+}
+
+.portal-demand #demands-list .empty-state,
+.portal-demand #matches-list .empty-state {
+  grid-column: 1 / -1;
+}
+
+.portal-demand .match-list .match-card + .match-card { margin-top: 9px; }
+
+.portal-demand .match-card .match-details .icon,
+.portal-demand .demand-meta .icon { color: var(--fb-muted); }
+
+.portal-demand .match-card .match-donor .icon {
+  display: inline-block;
+  margin-right: 4px;
+  vertical-align: -3px;
+}
+
+.portal-demand .match-score .icon { width: 12px; height: 12px; }
+
+.portal-demand .match-actions .btn-sm,
+.portal-demand .match-actions .match-btn { min-height: 30px; }
+
+.portal-demand .match-expiry {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  margin-top: 9px;
+  padding: 7px 9px;
+  border-radius: 7px;
+  background: var(--fb-warning-soft);
+  color: var(--fb-warning-text);
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+.portal-demand .match-expiry.expired {
+  background: var(--fb-error-soft);
+  color: #B42D24;
+}
+
+.portal-demand .match-expiry .icon { width: 14px; height: 14px; margin-top: 1px; }
+
+.portal-demand #capacity-bars .capacity-bar-row { padding: 9px 0; }
+
+.portal-demand #capacity-bars .capacity-bar-row + .capacity-bar-row { border-top: 1px solid var(--fb-divider); }
+
+.portal-demand #cap-utilization-note {
+  padding: 9px 11px;
+  border: 1px solid #CFDEFA;
+  border-radius: 8px;
+  background: var(--fb-blue-soft);
+  color: #1D4FBE;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.portal-demand .recurring-card {
+  padding: 13px;
+  border: 1px solid var(--fb-border);
+  border-radius: 11px;
+  background: #fff;
+}
+
+.portal-demand .recurring-card + .recurring-card { margin-top: 9px; }
+
+.portal-demand .recurring-card .recurring-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.portal-demand .recurring-card .recurring-title {
+  color: var(--fb-text);
+  font-size: 12.5px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.portal-demand .recurring-card .recurring-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 11px;
+  margin-top: 5px;
+  color: var(--fb-muted);
+  font-size: 10.5px;
+}
+
+.portal-demand .recurring-card .recurring-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.portal-demand .insight-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-bottom: 12px;
+  padding: 9px 11px;
+  border: 1px solid var(--fb-border);
+  border-radius: 8px;
+  background: #FBFDFB;
+  color: var(--fb-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.portal-demand .insight-header strong { color: var(--fb-text); }
+
+.portal-demand #demand-chart {
+  display: flex;
+  flex-direction: column;
+  height: 235px;
+  min-height: 235px;
+  padding: 8px 4px 0;
+}
+
+.portal-demand #demand-chart .demand-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+}
+
+.portal-demand #demand-chart .demand-bar-column {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  height: 100%;
+  justify-content: flex-end;
+}
+
+.portal-demand #demand-chart .demand-bar-pair {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  width: 100%;
+  min-height: 1px;
+  justify-content: center;
+}
+
+.portal-demand #demand-chart .chart-bar {
+  width: 44%;
+  min-width: 5px;
+  max-width: 20px;
+}
+
+.portal-demand #demand-chart .chart-x-label {
+  overflow: hidden;
+  width: 100%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portal-demand #demand-chart .chart-legend {
+  justify-content: center;
+  padding-top: 4px;
+}
+
+.portal-demand .shortage-list .demand-item { padding: 10px 11px; }
+
+.portal-demand #alerts-full-list .alert-item:last-child { border-bottom: 0; }
+
+.portal-demand .profile-readonly {
+  background: #F4F7F3;
+  color: var(--fb-secondary);
+}
+
+.portal-demand #matchDetailBody .fb-detail-grid { margin-bottom: 12px; }
+
+.portal-demand .match-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+@media (max-width: 560px) {
+  .portal-demand .topbar-primary span { display: none; }
+  .portal-demand #demand-chart { height: 205px; min-height: 205px; }
+  .portal-demand .demand-item { align-items: flex-start; }
+}

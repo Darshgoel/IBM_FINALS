@@ -1,0 +1,189 @@
+/* ==========================================================================
+   FoodBridge — Donor portal layer
+   Shared shell and component styles live in /assets/css/portal.css.
+   This file only contains donor-specific refinements.
+   ========================================================================== */
+
+.portal-donor .brand-logo {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.portal-donor .sidebar-context {
+  margin-bottom: 2px;
+}
+
+.portal-donor .welcome-name,
+.portal-donor #welcome-name {
+  color: var(--fb-primary-dark);
+}
+
+.portal-donor #section-post .grid-aside-main,
+.portal-donor #section-profile .grid-aside-main {
+  align-items: start;
+}
+
+.portal-donor #section-post .card.form-card,
+.portal-donor #section-profile .card.form-card {
+  min-width: 0;
+}
+
+.portal-donor .form-group .tag-selector {
+  padding: 2px 0;
+}
+
+.portal-donor .chart-canvas-wrap {
+  height: 248px;
+  min-height: 248px;
+  flex: 0 0 248px;
+}
+
+.portal-donor .stats-grid .stat-card {
+  cursor: default;
+}
+
+.portal-donor #recent-surplus-list .item-row {
+  padding: 10px 11px;
+}
+
+.portal-donor #recent-surplus-list .item-row .item-food {
+  max-width: 100%;
+}
+
+.portal-donor .surplus-grid .empty-state {
+  grid-column: 1 / -1;
+}
+
+.portal-donor .surplus-card .btn-sm {
+  min-height: 29px;
+}
+
+.portal-donor .impact-hero-stat {
+  position: relative;
+}
+
+.portal-donor .impact-hero-stat::after {
+  content: "";
+  position: absolute;
+  right: 15px;
+  bottom: 15px;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--fb-success-soft);
+  opacity: 0.65;
+}
+
+.portal-donor #section-impact .chart-canvas-wrap {
+  height: 235px;
+  min-height: 235px;
+  flex: 0 0 235px;
+}
+
+.portal-donor #section-impact .card.chart-card {
+  align-self: start;
+}
+
+.portal-donor .prediction-grid > .prediction-card {
+  height: 100%;
+}
+
+.portal-donor .risk-list .risk-item {
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-color: var(--fb-divider);
+  background: #FBFDFB;
+}
+
+.portal-donor .tips-list .risk-item {
+  align-items: flex-start;
+}
+
+.portal-donor .prevention-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 12px 13px;
+  border: 1px solid var(--fb-border);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.portal-donor .prevention-tip .tip-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 8px;
+  background: var(--fb-warning-soft);
+  color: var(--fb-warning);
+}
+
+.portal-donor .prevention-tip .tip-title {
+  color: var(--fb-text);
+  font-size: 12.5px;
+  font-weight: 650;
+}
+
+.portal-donor .prevention-tip .tip-detail {
+  margin-top: 2px;
+  color: var(--fb-secondary);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.portal-donor .history-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--fb-divider);
+  border-radius: 8px;
+  background: #FBFDFB;
+}
+
+.portal-donor .history-row .day {
+  color: var(--fb-text);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.portal-donor .history-row .count {
+  color: var(--fb-muted);
+  font-size: 10.5px;
+  text-align: right;
+}
+
+.portal-donor .verify-status-box.active {
+  border-color: #C8E6D0;
+  background: var(--fb-success-soft);
+  color: #0E6A30;
+}
+
+.portal-donor .verify-status-box.pending {
+  border-color: #F5DBAC;
+  background: var(--fb-warning-soft);
+  color: var(--fb-warning-text);
+}
+
+.portal-donor .verify-status-box.rejected,
+.portal-donor .verify-status-box.suspended {
+  border-color: #F3C8C4;
+  background: var(--fb-error-soft);
+  color: #B42D24;
+}
+
+.portal-donor #surplusDetailBody .fb-detail-item strong {
+  font-size: 12.5px;
+}
+
+@media (max-width: 820px) {
+  .portal-donor .chart-canvas-wrap,
+  .portal-donor #section-impact .chart-canvas-wrap {
+    height: 220px;
+    min-height: 220px;
+    flex: 0 0 220px;
+  }
+}

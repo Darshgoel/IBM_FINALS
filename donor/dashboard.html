@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FoodBridge — Donor Portal</title>
+  <meta name="description" content="FoodBridge Donor Portal — post surplus food, track collections, and measure your community impact." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/css/portal.css" />
+  <link rel="stylesheet" href="styles/main.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <script src="/assets/js/portal-ui.js" defer></script>
+</head>
+<body class="portal-donor">
+  <a class="sr-only" href="#portal-content">Skip to main content</a>
+
+  <aside class="sidebar" id="sidebar" aria-label="Donor navigation">
+    <div class="sidebar-brand">
+      <div class="brand-lockup">
+        <div class="brand-logo" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 44" fill="none">
+            <path d="M22 40C10.4 40 4.5 31.7 4.5 19.5 4.5 8.8 11 3.5 22 3.5s17.5 5.3 17.5 16C39.5 31.7 33.6 40 22 40Z" fill="#16833B"/>
+            <path d="M22 39V18.5" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>
+            <path d="M22 27.5c-7.2 0-11.3-4.1-11.3-10.3 7.2 0 11.3 4.1 11.3 10.3Z" fill="#FF781F"/>
+            <path d="M22 23c6 0 9.5-3.6 9.5-9.1-6 0-9.5 3.6-9.5 9.1Z" fill="#9AF2A8"/>
+          </svg>
+        </div>
+        <div class="brand-copy">
+          <div class="brand-wordmark">Food<span>Bridge</span></div>
+          <div class="brand-subtitle">Donor Portal</div>
+        </div>
+      </div>
+      <div class="portal-badge">
+        <svg class="icon" aria-hidden="true"><use href="#i-heart"></use></svg>
+        Surplus donor access
+      </div>
+    </div>
+
+    <div class="sidebar-context">
+      <div class="context-main">
+        <div class="org-avatar" id="org-avatar">D</div>
+        <div class="org-info">
+          <div class="org-name" id="sidebar-org-name">Loading organization…</div>
+          <div class="org-status" id="sidebar-org-status">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span>Donor organization</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <span class="nav-section-label">Workspace</span>
+      <button type="button" class="nav-item active" data-section="overview" aria-current="page" onclick="navigate('overview', this)">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-grid"></use></svg></span>
+        <span class="nav-label">Overview</span>
+      </button>
+      <button type="button" class="nav-item" data-section="post" onclick="navigate('post', this)">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg></span>
+        <span class="nav-label">Post Surplus</span>
+      </button>
+      <button type="button" class="nav-item" data-section="my-surplus" onclick="navigate('my-surplus', this)">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-package"></use></svg></span>
+        <span class="nav-label">My Surplus</span>
+        <span class="nav-badge" id="active-count" hidden>0</span>
+      </button>
+
+      <span class="nav-section-label">Insights</span>
+      <button type="button" class="nav-item" data-section="impact" onclick="navigate('impact', this)">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-leaf"></use></svg></span>
+        <span class="nav-label">Impact</span>
+      </button>
+      <button type="button" class="nav-item" data-section="predictions" onclick="navigate('predictions', this)">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-sparkles"></use></svg></span>
+        <span class="nav-label">Predictions</span>
+      </button>
+
+      <span class="nav-section-label">Account</span>
+      <button type="button" class="nav-item" data-section="profile" onclick="navigate('profile', this)">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg></span>
+        <span class="nav-label">Profile</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="signout-wide" type="button" onclick="logout()">
+        <svg class="icon" aria-hidden="true"><use href="#i-logout"></use></svg>
+        <span>Sign out</span>
+      </button>
+    </div>
+  </aside>
+
+  <div class="sidebar-backdrop" id="sidebar-backdrop" aria-hidden="true"></div>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="nav-toggle" type="button" aria-label="Open navigation menu" aria-controls="sidebar" aria-expanded="false">
+          <svg class="icon" aria-hidden="true"><use href="#i-menu"></use></svg>
+        </button>
+        <div class="topbar-copy">
+          <div class="topbar-kicker">FoodBridge Donor</div>
+          <div class="topbar-title" id="page-title">Overview</div>
+          <div class="topbar-sub" id="topbar-sub">Surplus food recovery and impact</div>
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <button class="topbar-primary" type="button" onclick="navigate('post', null)">
+          <svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg>
+          <span>Post Surplus</span>
+        </button>
+        <button class="alert-btn" id="alert-btn" type="button" onclick="toggleAlerts()" aria-label="Open notifications" aria-expanded="false" aria-controls="alerts-panel">
+          <svg class="icon" aria-hidden="true"><use href="#i-bell"></use></svg>
+          <span class="alert-dot" id="alert-dot" hidden></span>
+        </button>
+        <button class="account-trigger" type="button" data-account-toggle aria-haspopup="menu" aria-expanded="false">
+          <span class="avatar" id="account-avatar">D</span>
+          <span class="account-copy">
+            <span class="account-name" id="user-chip">—</span>
+            <span class="account-role">Donor account</span>
+          </span>
+          <svg class="icon" aria-hidden="true"><use href="#i-chevron"></use></svg>
+        </button>
+        <div class="account-menu" data-account-menu role="menu" aria-label="Account menu">
+          <div class="account-menu-head">
+            <div class="avatar" id="account-menu-avatar">D</div>
+            <div>
+              <strong id="account-name">—</strong>
+              <small id="account-email">—</small>
+            </div>
+          </div>
+          <div class="account-menu-list">
+            <button class="account-menu-item" type="button" role="menuitem" onclick="navigate('profile', null)">
+              <svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg>
+              Organization profile
+            </button>
+            <button class="account-menu-item" type="button" role="menuitem" onclick="navigate('my-surplus', null)">
+              <svg class="icon" aria-hidden="true"><use href="#i-package"></use></svg>
+              My surplus listings
+            </button>
+            <button class="account-menu-item danger" type="button" role="menuitem" onclick="logout()">
+              <svg class="icon" aria-hidden="true"><use href="#i-logout"></use></svg>
+              Sign out
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="alerts-panel" id="alerts-panel" role="region" aria-label="Notifications">
+      <div class="alerts-header">
+        <span>Notifications</span>
+        <button type="button" onclick="markAllRead()">Mark all read</button>
+      </div>
+      <div class="alerts-list" id="alerts-list">
+        <div class="alert-empty">No notifications yet.</div>
+      </div>
+    </div>
+
+    <main class="content" id="portal-content">
+      <!-- ── Overview ─────────────────────────────────────────────────── -->
+      <section class="section active" id="section-overview" aria-labelledby="overview-title">
+        <div class="page-heading">
+          <div>
+            <div class="welcome-line"><span class="dot" aria-hidden="true"></span> Donor workspace</div>
+            <h1 id="overview-title">Welcome back, <span id="welcome-name">Donor</span></h1>
+            <p>Here is how your surplus is moving through the network and the impact it has created.</p>
+          </div>
+          <div class="heading-actions">
+            <button class="btn btn-secondary" type="button" onclick="navigate('impact', null)">
+              <svg class="icon" aria-hidden="true"><use href="#i-chart"></use></svg>
+              View impact
+            </button>
+            <button class="btn btn-primary" type="button" onclick="navigate('post', null)">
+              <svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg>
+              Post surplus
+            </button>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card amber">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-package"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Posts created</div>
+              <div class="stat-value" id="stat-posted">—</div>
+              <div class="stat-change">All surplus listings you have posted</div>
+            </div>
+          </div>
+          <div class="stat-card green">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-check-circle"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Recovered</div>
+              <div class="stat-value" id="stat-recovered">—</div>
+              <div class="stat-change">Completed collections only</div>
+            </div>
+          </div>
+          <div class="stat-card blue">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-target"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Matches made</div>
+              <div class="stat-value" id="stat-matched">—</div>
+              <div class="stat-change">Listings matched through the network</div>
+            </div>
+          </div>
+          <div class="stat-card purple">
+            <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-utensils"></use></svg></div>
+            <div class="stat-body">
+              <div class="stat-label">Meals equivalent</div>
+              <div class="stat-value" id="stat-meals">—</div>
+              <div class="stat-change">Estimated from recovered quantities</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-main-aside">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-heading">
+                <h2 class="card-title">Recent surplus</h2>
+                <p class="card-sub">Your latest listings and current collection status</p>
+              </div>
+              <button class="card-link" type="button" onclick="navigate('my-surplus', null)">
+                View all
+                <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg>
+              </button>
+            </div>
+            <div id="recent-surplus-list" class="item-list" aria-live="polite">
+              <div class="empty-state">
+                <span class="empty-icon"><svg class="icon" aria-hidden="true"><use href="#i-package"></use></svg></span>
+                <strong>No surplus posted yet</strong>
+                <p>Post surplus food and the network will look for a suitable recipient.</p>
+                <button class="cta" type="button" onclick="navigate('post', null)">Post your first surplus</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card chart-card">
+            <div class="card-header">
+              <div class="card-heading">
+                <h2 class="card-title">Monthly activity</h2>
+                <p class="card-sub">Posted surplus by month, from your recorded history</p>
+              </div>
+            </div>
+            <div class="chart-canvas-wrap" id="trend-chart-wrap">
+              <canvas id="trend-chart" aria-label="Monthly surplus posts and quantity"></canvas>
+              <div class="chart-empty" id="trend-empty" hidden>
+                <span class="empty-icon"><svg class="icon" aria-hidden="true"><use href="#i-chart"></use></svg></span>
+                <strong>No monthly history yet</strong>
+                <p>Your first posted surplus will appear here after it is recorded.</p>
+              </div>
+            </div>
+            <div class="chart-legend">
+              <span><span class="legend-dot" style="background:#16833B"></span>Posts created</span>
+              <span><span class="legend-dot" style="background:#2563EB"></span>Quantity posted (kg equivalent)</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Post Surplus ──────────────────────────────────────────────── -->
+      <section class="section" id="section-post" aria-labelledby="post-title">
+        <div class="page-heading">
+          <div>
+            <h2 id="post-title">Share surplus food</h2>
+            <p>Add accurate food, timing and pickup details. The network uses this information to find a safe, feasible recipient.</p>
+          </div>
+        </div>
+
+        <div class="grid-aside-main">
+          <div class="card form-card">
+            <div id="post-error" class="msg error" style="display:none" role="alert"></div>
+            <div id="post-success" class="msg success" style="display:none" role="status"></div>
+
+            <div class="form-group-title">
+              <svg class="icon" aria-hidden="true"><use href="#i-utensils"></use></svg>
+              Food details
+            </div>
+            <div class="form-row-2">
+              <div class="form-group">
+                <label for="p-food-name">Food name <span class="req" aria-hidden="true">*</span></label>
+                <input type="text" id="p-food-name" placeholder="e.g. Vegetable biryani" autocomplete="off" />
+              </div>
+              <div class="form-group">
+                <label for="p-food-type">Food category <span class="req" aria-hidden="true">*</span></label>
+                <select id="p-food-type">
+                  <option value="cooked_meal">Cooked meal</option>
+                  <option value="bakery">Bakery &amp; bread</option>
+                  <option value="produce">Fresh produce</option>
+                  <option value="dairy">Dairy</option>
+                  <option value="packaged">Packaged / canned</option>
+                  <option value="beverages">Beverages</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-row-2">
+              <div class="form-group">
+                <label for="p-quantity">Quantity <span class="req" aria-hidden="true">*</span></label>
+                <input type="number" id="p-quantity" placeholder="e.g. 12" min="0.1" step="0.1" inputmode="decimal" />
+              </div>
+              <div class="form-group">
+                <label for="p-unit">Unit</label>
+                <select id="p-unit">
+                  <option value="kg">Kilograms (kg)</option>
+                  <option value="portions">Portions / meals</option>
+                  <option value="litres">Litres</option>
+                  <option value="packs">Packs</option>
+                  <option value="boxes">Boxes</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="p-prep-state">Preparation state</label>
+              <select id="p-prep-state">
+                <option value="freshly_prepared">Freshly prepared</option>
+                <option value="packaged_sealed">Packaged / sealed</option>
+                <option value="raw_uncooked">Raw / uncooked</option>
+                <option value="frozen">Frozen</option>
+                <option value="refrigerated">Refrigerated</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Dietary tags <span class="form-help" style="margin:0;font-weight:400">Select all that apply</span></label>
+              <div class="tag-selector" id="dietary-tags">
+                <button type="button" class="tag-btn" data-val="vegetarian" onclick="toggleTag(this)">Vegetarian</button>
+                <button type="button" class="tag-btn" data-val="vegan" onclick="toggleTag(this)">Vegan</button>
+                <button type="button" class="tag-btn" data-val="halal" onclick="toggleTag(this)">Halal</button>
+                <button type="button" class="tag-btn" data-val="gluten_free" onclick="toggleTag(this)">Gluten-free</button>
+                <button type="button" class="tag-btn" data-val="nut_free" onclick="toggleTag(this)">Nut-free</button>
+              </div>
+            </div>
+
+            <div class="form-group-title">
+              <svg class="icon" aria-hidden="true"><use href="#i-clock"></use></svg>
+              Availability &amp; safety window
+            </div>
+            <div class="form-row-2">
+              <div class="form-group">
+                <label for="p-avail-time">Available from <span class="req" aria-hidden="true">*</span></label>
+                <input type="datetime-local" id="p-avail-time" />
+                <div class="form-help">When the food can first be collected.</div>
+              </div>
+              <div class="form-group">
+                <label for="p-usable-time">Safe until <span class="req" aria-hidden="true">*</span></label>
+                <input type="datetime-local" id="p-usable-time" />
+                <div class="form-help">The latest time the food remains safe to use.</div>
+              </div>
+            </div>
+
+            <div class="form-group-title">
+              <svg class="icon" aria-hidden="true"><use href="#i-pin"></use></svg>
+              Pickup information
+            </div>
+            <div class="form-group">
+              <label for="p-pickup">Pickup address</label>
+              <input type="text" id="p-pickup" placeholder="Leave blank to use your registered organization address" autocomplete="street-address" />
+            </div>
+            <div class="form-group">
+              <label for="p-instructions">Collection instructions</label>
+              <textarea id="p-instructions" rows="3" placeholder="e.g. Call on arrival, use the service entrance, bring a chilled container…"></textarea>
+            </div>
+
+            <div class="form-group-title">
+              <svg class="icon" aria-hidden="true"><use href="#i-shield"></use></svg>
+              Safety confirmation
+            </div>
+            <div class="form-group">
+              <label class="checkbox-row" for="p-hygiene">
+                <input type="checkbox" id="p-hygiene" />
+                <span>I confirm this food is fit for human consumption, has <strong>not been served or returned from a plate</strong>, and the details above are accurate. <span class="req" aria-hidden="true">*</span></span>
+              </label>
+              <div class="form-help">The current database records this confirmation as the listing's safety flag. Storage and temperature fields are not collected.</div>
+            </div>
+
+            <div class="form-actions">
+              <button class="btn btn-primary btn-lg" id="post-btn" type="button" onclick="postSurplus()">
+                <svg class="icon" aria-hidden="true"><use href="#i-upload"></use></svg>
+                Post surplus
+              </button>
+              <button class="btn btn-ghost" type="button" onclick="navigate('overview', null)">Cancel</button>
+              <span class="form-help" style="margin-left:auto">The network matches your post automatically after it is saved.</span>
+            </div>
+          </div>
+
+          <aside class="stack">
+            <div class="card tinted">
+              <div class="card-header">
+                <div class="card-heading">
+                  <h2 class="card-title">What happens next</h2>
+                  <p class="card-sub">A clear path from surplus to a safe handover</p>
+                </div>
+              </div>
+              <div class="tips-list">
+                <div class="risk-item">
+                  <span class="risk-icon" style="background:var(--fb-success-soft);color:var(--fb-success)"><svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg></span>
+                  <div class="risk-body">
+                    <div class="risk-title">1. Feasibility matching</div>
+                    <div class="risk-detail">Nearby demand is checked for quantity, food type, receiving capacity, timing and distance.</div>
+                  </div>
+                </div>
+                <div class="risk-item">
+                  <span class="risk-icon" style="background:var(--fb-blue-soft);color:var(--fb-blue)"><svg class="icon" aria-hidden="true"><use href="#i-bell"></use></svg></span>
+                  <div class="risk-body">
+                    <div class="risk-title">2. Recipient decision</div>
+                    <div class="risk-detail">A recipient confirms food safety before accepting. Offers that are not accepted can be re-routed.</div>
+                  </div>
+                </div>
+                <div class="risk-item">
+                  <span class="risk-icon" style="background:var(--fb-purple-soft);color:var(--fb-purple)"><svg class="icon" aria-hidden="true"><use href="#i-truck"></use></svg></span>
+                  <div class="risk-body">
+                    <div class="risk-title">3. Collection &amp; impact</div>
+                    <div class="risk-detail">Recovered food is counted only after the recipient confirms the handover.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header">
+                <div class="card-heading">
+                  <h2 class="card-title">Food safety reminder</h2>
+                </div>
+              </div>
+              <p class="card-sub" style="margin:0">Only post food that is fit for human consumption. When in doubt about temperature, time or handling, do not post it.</p>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ── My Surplus ────────────────────────────────────────────────── -->
+      <section class="section" id="section-my-surplus" aria-labelledby="surplus-title">
+        <div class="page-heading">
+          <div>
+            <h2 id="surplus-title">My surplus</h2>
+            <p>Search, filter and inspect every listing from posting through to handover.</p>
+          </div>
+          <div class="heading-actions">
+            <button class="btn btn-primary" type="button" onclick="navigate('post', null)">
+              <svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg>
+              New surplus post
+            </button>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <label class="search-field toolbar-grow">
+            <span class="sr-only">Search your surplus posts</span>
+            <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+            <input class="search-input" id="surplus-search" type="search" placeholder="Search food, status, matched partner or pickup address…" oninput="setSurplusSearch(this.value)" />
+          </label>
+          <label class="sr-only" for="surplus-sort">Sort surplus posts</label>
+          <select class="select-control" id="surplus-sort" onchange="setSurplusSort(this.value)">
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="quantity">Largest quantity</option>
+            <option value="expiry">Closing soonest</option>
+          </select>
+        </div>
+
+        <div class="filter-bar" role="group" aria-label="Filter by status">
+          <button class="filter-btn active" type="button" data-filter="all" onclick="filterSurplus('all', this)">All</button>
+          <button class="filter-btn" type="button" data-filter="available" onclick="filterSurplus('available', this)">Available</button>
+          <button class="filter-btn" type="button" data-filter="matched" onclick="filterSurplus('matched', this)">Matched</button>
+          <button class="filter-btn" type="button" data-filter="in_transit" onclick="filterSurplus('in_transit', this)">In transit</button>
+          <button class="filter-btn" type="button" data-filter="completed" onclick="filterSurplus('completed', this)">Completed</button>
+          <button class="filter-btn" type="button" data-filter="expired" onclick="filterSurplus('expired', this)">Expired</button>
+          <button class="filter-btn" type="button" data-filter="cancelled" onclick="filterSurplus('cancelled', this)">Cancelled</button>
+        </div>
+
+        <div id="surplus-list" class="surplus-grid" aria-live="polite">
+          <div class="empty-state">
+            <span class="empty-icon"><svg class="icon" aria-hidden="true"><use href="#i-package"></use></svg></span>
+            <p>Loading your surplus posts…</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Impact ────────────────────────────────────────────────────── -->
+      <section class="section" id="section-impact" aria-labelledby="impact-title">
+        <div class="page-heading">
+          <div>
+            <h2 id="impact-title">Your impact</h2>
+            <p>Completed handovers, recovered food and the waste your organization helped avoid.</p>
+          </div>
+          <div class="heading-actions">
+            <button class="btn btn-secondary" type="button" onclick="navigate('my-surplus', null)">
+              <svg class="icon" aria-hidden="true"><use href="#i-package"></use></svg>
+              View listings
+            </button>
+          </div>
+        </div>
+
+        <div class="impact-hero">
+          <div class="impact-hero-stat">
+            <div class="impact-big-num" id="impact-meals">—</div>
+            <div class="impact-big-label">Meals equivalent provided</div>
+          </div>
+          <div class="impact-hero-stat">
+            <div class="impact-big-num" id="impact-kg">—</div>
+            <div class="impact-big-label">Food recovered</div>
+          </div>
+          <div class="impact-hero-stat">
+            <div class="impact-big-num" id="impact-waste">—</div>
+            <div class="impact-big-label">Food expired unused</div>
+          </div>
+          <div class="impact-hero-stat">
+            <div class="impact-big-num" id="impact-completed">—</div>
+            <div class="impact-big-label">Completed collections</div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card chart-card">
+            <div class="card-header">
+              <div class="card-heading">
+                <h2 class="card-title">Listing outcomes</h2>
+                <p class="card-sub">How your posted listings have resolved so far</p>
+              </div>
+            </div>
+            <div class="chart-canvas-wrap" id="impact-doughnut-wrap">
+              <canvas id="impact-doughnut" aria-label="Listing outcome distribution"></canvas>
+              <div class="chart-empty" id="impact-doughnut-empty" hidden>
+                <span class="empty-icon"><svg class="icon" aria-hidden="true"><use href="#i-chart"></use></svg></span>
+                <strong>No outcome data yet</strong>
+                <p>Post and complete a collection to see how your listings resolve.</p>
+              </div>
+            </div>
+            <div class="chart-legend" id="impact-legend"></div>
+          </div>
+
+          <div class="card chart-card">
+            <div class="card-header">
+              <div class="card-heading">
+                <h2 class="card-title">Posted vs recovered</h2>
+                <p class="card-sub">Monthly volume in kg equivalent, from your recorded surplus history</p>
+              </div>
+            </div>
+            <div class="chart-canvas-wrap" id="impact-bar-wrap">
+              <canvas id="impact-bar" aria-label="Monthly recovered food quantity"></canvas>
+              <div class="chart-empty" id="impact-bar-empty" hidden>
+                <span class="empty-icon"><svg class="icon" aria-hidden="true"><use href="#i-chart"></use></svg></span>
+                <strong>No completed history yet</strong>
+                <p>Recovery is recorded after a recipient confirms the handover.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="card-header">
+            <div class="card-heading">
+              <h2 class="card-title">How these figures are calculated</h2>
+            </div>
+          </div>
+          <div class="grid-3">
+            <div>
+              <div class="mini-label">Recovered food</div>
+              <p class="card-sub" style="margin-top:4px">Only listings with a completed handover are counted as recovered. Matched or in-transit food is still in progress.</p>
+            </div>
+            <div>
+              <div class="mini-label">Meals equivalent</div>
+              <p class="card-sub" style="margin-top:4px">Estimated using FoodBridge's standard conversion of approximately 3.5 meals per kilogram of prepared food. Different units are converted before totalling.</p>
+            </div>
+            <div>
+              <div class="mini-label">Waste avoided</div>
+              <p class="card-sub" style="margin-top:4px">The displayed CO₂e estimate uses a documented planning factor applied to recovered kilograms. It is an estimate, not a measured emission reduction.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Predictions ───────────────────────────────────────────────── -->
+      <section class="section" id="section-predictions" aria-labelledby="predictions-title">
+        <div class="page-heading">
+          <div>
+            <h2 id="predictions-title">Surplus predictions</h2>
+            <p>Statistical forecasts built from your recorded surplus history. They are planning estimates, not guarantees.</p>
+          </div>
+        </div>
+        <div id="prediction-content" aria-live="polite">
+          <div class="empty-state">
+            <span class="empty-icon"><svg class="icon" aria-hidden="true"><use href="#i-sparkles"></use></svg></span>
+            <strong>Forecasts need history</strong>
+            <p>Post at least two surplus records to generate a prediction. Accuracy appears after your first full forecast day closes.</p>
+            <button class="cta" type="button" onclick="navigate('post', null)">Post surplus</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Profile ───────────────────────────────────────────────────── -->
+      <section class="section" id="section-profile" aria-labelledby="profile-title">
+        <div class="page-heading">
+          <div>
+            <h2 id="profile-title">Organization profile</h2>
+            <p>Keep the details the network uses for matching, pickup and communication up to date.</p>
+          </div>
+        </div>
+
+        <div class="grid-aside-main">
+          <div class="card form-card">
+            <div id="profile-error" class="msg error" style="display:none" role="alert"></div>
+            <div id="profile-success" class="msg success" style="display:none" role="status"></div>
+
+            <div class="form-group-title">
+              <svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg>
+              Organization details
+            </div>
+            <div class="form-group">
+              <label for="pr-name">Organization name</label>
+              <input type="text" id="pr-name" autocomplete="organization" />
+            </div>
+            <div class="form-row-2">
+              <div class="form-group">
+                <label for="pr-address">Location address</label>
+                <input type="text" id="pr-address" autocomplete="street-address" />
+              </div>
+              <div class="form-group">
+                <label for="pr-phone">Contact phone</label>
+                <input type="tel" id="pr-phone" autocomplete="tel" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="pr-hours">Operating hours</label>
+              <input type="text" id="pr-hours" placeholder="e.g. Monday–Friday, 8am–10pm" />
+            </div>
+            <div class="form-group">
+              <label for="pr-desc">Organization description</label>
+              <textarea id="pr-desc" rows="3" placeholder="Describe your organization and the surplus you typically provide…"></textarea>
+            </div>
+
+            <div class="form-group-title">
+              <svg class="icon" aria-hidden="true"><use href="#i-utensils"></use></svg>
+              Food categories you typically donate
+            </div>
+            <div class="form-group">
+              <div class="tag-selector" id="profile-food-cats">
+                <button type="button" class="tag-btn" data-val="cooked_meal" onclick="toggleProfileTag(this)">Cooked meals</button>
+                <button type="button" class="tag-btn" data-val="bakery" onclick="toggleProfileTag(this)">Bakery</button>
+                <button type="button" class="tag-btn" data-val="produce" onclick="toggleProfileTag(this)">Produce</button>
+                <button type="button" class="tag-btn" data-val="dairy" onclick="toggleProfileTag(this)">Dairy</button>
+                <button type="button" class="tag-btn" data-val="packaged" onclick="toggleProfileTag(this)">Packaged</button>
+                <button type="button" class="tag-btn" data-val="beverages" onclick="toggleProfileTag(this)">Beverages</button>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button class="btn btn-primary" id="profile-save-btn" type="button" onclick="saveProfile()">Save profile</button>
+              <span class="form-help" style="margin-left:auto">Changes are applied only after the server confirms them.</span>
+            </div>
+          </div>
+
+          <aside class="stack">
+            <div class="card">
+              <div class="card-header">
+                <div class="card-heading">
+                  <h2 class="card-title">Verification status</h2>
+                  <p class="card-sub">Your organization must be active to post surplus</p>
+                </div>
+              </div>
+              <div class="verify-status-box" id="verify-status-box">Loading status…</div>
+            </div>
+            <div class="card">
+              <div class="card-header">
+                <div class="card-heading">
+                  <h2 class="card-title">Account access</h2>
+                  <p class="card-sub">Managed by FoodBridge authentication</p>
+                </div>
+              </div>
+              <div class="stack-sm">
+                <div>
+                  <div class="mini-label">Signed-in email</div>
+                  <div class="item-main" id="profile-account-email" style="margin-top:3px">—</div>
+                </div>
+                <div>
+                  <div class="mini-label">Account role</div>
+                  <div class="item-main" style="margin-top:3px">Donor organization</div>
+                </div>
+                <div class="form-help">Contact FoodBridge support if your verified organization details need to change.</div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="fb-modal" id="surplusDetailModal" aria-hidden="true">
+    <div class="fb-modal-backdrop" data-close-surplus-detail onclick="closeSurplusDetail()"></div>
+    <div class="fb-modal-card wide" role="dialog" aria-modal="true" aria-labelledby="surplusDetailTitle">
+      <div class="fb-modal-head">
+        <div>
+          <p class="fb-modal-kicker">Surplus post detail</p>
+          <h3 id="surplusDetailTitle">Loading…</h3>
+        </div>
+        <button class="fb-modal-close" type="button" aria-label="Close surplus detail" onclick="closeSurplusDetail()">
+          <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+        </button>
+      </div>
+      <div class="fb-modal-body" id="surplusDetailBody">
+        <div class="empty-state"><p>Loading post details…</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toast-container" aria-live="polite"></div>
+  <script src="js/dashboard.js" type="module"></script>
+</body>
+</html>
