@@ -751,21 +751,21 @@ router.get('/overpass-bounds', async (req, res) => {
       overpassQuery =
         `[out:json][timeout:15];` +
         `(` +
-        `  node["plant:method"="anaerobic_digestion"](${bbox});` +
-        `  way["plant:method"="anaerobic_digestion"](${bbox});` +
-        `  node["power"="plant"]["plant:source"="biogas"](${bbox});` +
-        `  way["power"="plant"]["plant:source"="biogas"](${bbox});` +
-        `  node["amenity"="biogas"](${bbox});` +
-        `  node["industrial"="biogas_plant"](${bbox});` +
+        `  nwr["plant:method"="anaerobic_digestion"](${bbox});` +
+        `  nwr["generator:method"="anaerobic_digestion"](${bbox});` +
+        `  nwr["power"="plant"]["plant:source"="biogas"](${bbox});` +
+        `  nwr["power"="plant"]["plant:source"="biomass"]["plant:method"="anaerobic_digestion"](${bbox});` +
+        `  nwr["amenity"="biogas"](${bbox});` +
+        `  nwr["industrial"="biogas_plant"](${bbox});` +
         `)out center;`;
     } else {
       overpassQuery =
         `[out:json][timeout:15];` +
         `(` +
-        `  node["social_facility"="food_bank"](${bbox});` +
-        `  way["social_facility"="food_bank"](${bbox});` +
-        `  node["amenity"="food_bank"](${bbox});` +
-        `  node["social_facility"="soup_kitchen"](${bbox});` +
+        `  nwr["amenity"="social_facility"]["social_facility"="food_bank"](${bbox});` +
+        `  nwr["social_facility"="food_bank"](${bbox});` +
+        `  nwr["amenity"="food_bank"](${bbox});` +
+        `  nwr["social_facility"="soup_kitchen"](${bbox});` +
         `)out center;`;
     }
 
