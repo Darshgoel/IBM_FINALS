@@ -221,13 +221,16 @@
 
       const form = $('registerForm');
       if (form) form.reset();
+      const approvalMessage = data.autoApproved
+        ? ' Your organisation has been automatically approved and can use partner features immediately.'
+        : ' Your organisation is pending verification, so posting or matching unlocks after a coordinator approves it. You can sign in while verification is pending.';
       showAlert(
         'authRegisterSuccess',
-        `Account created for ${payload.orgName}. Your organisation is pending verification, so posting or matching unlocks after a coordinator approves it. You can sign in while verification is pending.`,
+        `Account created for ${payload.orgName}.${approvalMessage}`,
         'success'
       );
       const notice = $('pendingNotice');
-      if (notice) notice.hidden = false;
+      if (notice) notice.hidden = !!data.autoApproved;
       setLoading(button, false, 'Create account');
       setTimeout(() => switchTab('signin'), 1800);
     } catch (err) {

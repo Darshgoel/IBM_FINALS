@@ -559,6 +559,9 @@ function renderOverviewRecords(items) {
 
 async function loadVerification() {
   setHTML('verification-list', tableLoading('Loading pending registrations…'));
+  // Load the setting independently so a failed verification queue does not
+  // prevent an admin from seeing or changing automatic approval.
+  loadAutomaticApprovalSetting();
   try {
     const data = await apiFetch('/admin/pending');
     state.pending = (data.orgs || []).map(normalizeOrg);
@@ -571,6 +574,57 @@ async function loadVerification() {
     state.pending = [];
     setText('verification-count', '—');
     setHTML('verification-list', tableEmpty('alert', 'Verification queue unavailable', error.message || 'The pending registrations could not be loaded.'));
+  }
+}
+
+async function loadAutomaticApprovalSetting() {
+  const toggle = document.getElementById('auto-approval-toggle');
+  if (!toggle) return;
+  toggle.disabled = true;
+  setText('auto-approval-status', 'Loading setting…');
+  try {
+    const data = await apiFetch('/admin/settings/auto-approval');
+    toggle.checked = data.enabled === true;
+    toggle.disabled = false;
+    setText('auto-approval-status', toggle.checked
+      ? 'On — future partner registrations will be activated automatically.'
+      : 'Off — new registrations stay in the manual review queue.');
+  } catch (error) {
+    reportError(error, 'loadAutomaticApprovalSetting');
+    toggle.checked = false;
+    setText('auto-approval-status', 'Setting unavailable; automatic approval cannot be changed.');
+  }
+}
+
+async function saveAutomaticApprovalSetting(event) {
+  const toggle = event.currentTarget;
+  const requestedValue = toggle.checked;
+  if (requestedValue && !window.confirm(
+    'Enable automatic approval? Future donor, NGO, food-bank, and biogas registrations will be activated without manual review. Existing pending registrations will not change.'
+  )) {
+    toggle.checked = false;
+    return;
+  }
+
+  toggle.disabled = true;
+  setText('auto-approval-status', 'Saving setting…');
+  try {
+    const data = await apiFetch('/admin/settings/auto-approval', 'PUT', { enabled: requestedValue });
+    toggle.checked = data.enabled === true;
+    setText('auto-approval-status', toggle.checked
+      ? 'On — future partner registrations will be activated automatically.'
+      : 'Off — new registrations stay in the manual review queue.');
+    toast(toggle.checked
+      ? 'Automatic approval enabled for future partner registrations.'
+      : 'Automatic approval disabled. New registrations will need review.', 'success');
+  } catch (error) {
+    toggle.checked = !requestedValue;
+    setText('auto-approval-status', toggle.checked
+      ? 'On — future partner registrations will be activated automatically.'
+      : 'Off — new registrations stay in the manual review queue.');
+    toast(error.message || 'Could not save the automatic approval setting.', 'error');
+  } finally {
+    toggle.disabled = false;
   }
 }
 
@@ -1352,6 +1406,8 @@ function wireNavigation() {
 }
 
 function wireDelegatedActions() {
+  document.getElementById('auto-approval-toggle')?.addEventListener('change', saveAutomaticApprovalSetting);
+
   document.addEventListener('click', event => {
     const target = event.target.closest('[data-action]');
     if (target) {

@@ -184,6 +184,17 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS platform_settings (
+    setting_key TEXT PRIMARY KEY,
+    setting_value TEXT NOT NULL,
+    updated_by TEXT,
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+
+  INSERT INTO platform_settings (setting_key, setting_value)
+  VALUES ('automatic_organization_approval', 'false')
+  ON CONFLICT(setting_key) DO NOTHING;
+
   CREATE TABLE IF NOT EXISTS partner_verification_responses (
     id TEXT PRIMARY KEY,
     request_record_id TEXT NOT NULL,

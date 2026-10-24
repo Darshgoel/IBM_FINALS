@@ -1,0 +1,10 @@
+const fs = require('fs');
+const path = require('path');
+const project = process.cwd();
+const Database = require(path.join(project,'backend/node_modules/better-sqlite3'));
+const dotenv = require(path.join(project,'backend/node_modules/dotenv'));
+const db = new Database(path.join(project,'backend/database/foodbridge.db'), { readonly: true, fileMustExist: true });
+const local={total:db.prepare('SELECT COUNT(*) AS n FROM users').get().n,byRole:db.prepare('SELECT role, COUNT(*) AS n FROM users GROUP BY role ORDER BY role').all()}; db.close();
+console.log(JSON.stringify({local},null,2));
+const env={}; for(const file of ['.env','backend/.env']) if(fs.existsSync(path.join(project,file))) Object.assign(env,dotenv.parse(fs.readFileSync(path.join(project,file))));
+console.log('remote_database_url_configured_locally:',Boolean(process.env.DATABASE_URL||env.DATABASE_URL));

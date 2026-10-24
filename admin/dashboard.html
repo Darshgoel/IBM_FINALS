@@ -248,6 +248,19 @@
 
     <div class="summary-strip" id="verification-summary" aria-live="polite"></div>
 
+    <section class="auto-approval-card" aria-labelledby="auto-approval-title">
+      <div class="auto-approval-copy">
+        <h3 id="auto-approval-title">Automatic approval for new partners</h3>
+        <p id="auto-approval-help">When enabled, new donors, NGOs, food banks, and biogas facilities are activated without manual review. Donor licence upload is still required, but its authenticity will not be checked by an administrator. Existing pending registrations are unchanged.</p>
+        <p class="auto-approval-status" id="auto-approval-status" aria-live="polite">Loading setting…</p>
+      </div>
+      <label class="auto-approval-switch" for="auto-approval-toggle">
+        <span class="sr-only">Automatically approve new partners</span>
+        <input id="auto-approval-toggle" type="checkbox" role="switch" aria-describedby="auto-approval-help auto-approval-status" disabled />
+        <span class="auto-approval-track" aria-hidden="true"><span></span></span>
+      </label>
+    </section>
+
     <div class="table-toolbar">
       <div class="search-bar">
         <svg class="icon search-icon" aria-hidden="true"><use href="#i-search"></use></svg>

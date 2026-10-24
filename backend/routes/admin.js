@@ -9,6 +9,40 @@ const router = express.Router();
 router.use(authenticate);
 router.use(requireRole('admin'));
 
+const AUTO_APPROVAL_SETTING = 'automatic_organization_approval';
+
+router.get('/settings/auto-approval', (req, res) => {
+  try {
+    const setting = db.prepare('SELECT setting_value, updated_at FROM platform_settings WHERE setting_key = ?')
+      .get(AUTO_APPROVAL_SETTING);
+    res.json({ enabled: setting?.setting_value === 'true', updatedAt: setting?.updated_at || null });
+  } catch (err) {
+    console.error('[Admin/AutoApproval/GET]', err);
+    res.status(500).json({ error: 'Failed to load automatic approval setting' });
+  }
+});
+
+router.put('/settings/auto-approval', (req, res) => {
+  try {
+    if (typeof req.body?.enabled !== 'boolean') {
+      return res.status(400).json({ error: 'enabled must be a boolean' });
+    }
+    const value = req.body.enabled ? 'true' : 'false';
+    db.prepare(`
+      INSERT INTO platform_settings (setting_key, setting_value, updated_by, updated_at)
+      VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(setting_key) DO UPDATE SET
+        setting_value = excluded.setting_value,
+        updated_by = excluded.updated_by,
+        updated_at = CURRENT_TIMESTAMP
+    `).run(AUTO_APPROVAL_SETTING, value, req.user.id);
+    res.json({ enabled: req.body.enabled });
+  } catch (err) {
+    console.error('[Admin/AutoApproval/PUT]', err);
+    res.status(500).json({ error: 'Failed to update automatic approval setting' });
+  }
+});
+
 // Helper to format role from org type
 function orgRole(type) {
   if (['restaurant', 'hotel', 'caterer', 'retailer', 'institution', 'donor', 'other_donor'].includes(type)) {
@@ -142,7 +176,9 @@ router.get('/overview', (req, res) => {
       type: r.action,
       title: `Action: ${r.action.toUpperCase()} — ${r.org_name || 'Organization'}`,
       detail: r.notes || `Administrative ${r.action} recorded.`,
-      admin: r.admin_name || 'Platform Administrator',
+      admin: r.notes?.startsWith('Automatically approved at registration')
+        ? 'Automatic approval'
+        : (r.admin_name || 'Platform Administrator'),
       createdAt: r.created_at
     }));
 
@@ -404,7 +440,11 @@ router.get('/records', (req, res) => {
       type: r.action === 'info_response' ? 'partner_response' : r.action,
       title: `${r.action.toUpperCase()} — ${r.org_name || 'Organization'}`,
       detail: r.notes || `Administrative record logged.`,
-      admin: r.action === 'info_response' ? (r.org_name || 'Partner organization') : (r.admin_name || 'Platform Administrator'),
+      admin: r.action === 'info_response'
+        ? (r.org_name || 'Partner organization')
+        : (r.notes?.startsWith('Automatically approved at registration')
+          ? 'Automatic approval'
+          : (r.admin_name || 'Platform Administrator')),
       createdAt: r.created_at,
       documentUrl: r.document_url || '',
       documentName: r.document_name || ''

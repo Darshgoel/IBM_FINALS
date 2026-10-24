@@ -624,7 +624,7 @@ async function handleRegister() {
     }
 
     const notice = $('pending-notice');
-    if (notice) {
+    if (notice && !data.autoApproved) {
       notice.hidden = false;
       const orgLabel = {
         food_bank: 'Food bank',
@@ -634,10 +634,12 @@ async function handleRegister() {
       }[role] || 'Organisation';
       notice.innerHTML = `Account created. <strong>${escapeHtml(payload.orgName)}</strong> is pending verification. ${orgLabel} features will unlock once a coordinator approves it. You can sign in and explore your dashboard in the meantime.`;
     }
-    showMsg('signup-success', 'Your account is ready. You can sign in while verification is pending.', 'success');
+    showMsg('signup-success', data.autoApproved
+      ? 'Your account is ready and your organisation has been automatically approved.'
+      : 'Your account is ready. You can sign in while verification is pending.', 'success');
     // Show sign-in button for orgs that need admin approval
     const signinNotice = $('pending-notice-signin');
-    if (signinNotice) signinNotice.hidden = false;
+    if (signinNotice) signinNotice.hidden = !!data.autoApproved;
     setLoading(button, false, 'Create Account');
   } catch (err) {
     showMsg('signup-error', err.message || 'Unable to create your account right now.');

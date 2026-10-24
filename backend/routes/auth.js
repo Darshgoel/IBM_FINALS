@@ -30,6 +30,11 @@ router.post('/register', (req, res) => {
       return res.status(400).json({ error: 'A valid FSSAI licence document is required to register as a food donor' });
     }
 
+    const autoApprovalSetting = db.prepare(
+      'SELECT setting_value FROM platform_settings WHERE setting_key = ?'
+    ).get('automatic_organization_approval');
+    const autoApproveOrganization = autoApprovalSetting?.setting_value === 'true';
+
     const existing = db.prepare('SELECT id FROM users WHERE lower(email) = ?').get(normalizedEmail);
     if (existing) return res.status(409).json({ error: 'Email already registered' });
 
@@ -45,6 +50,7 @@ router.post('/register', (req, res) => {
     const passwordHash = bcrypt.hashSync(password, 10);
     const userId = uuidv4();
     let orgId = null;
+    let autoApproved = false;
 
     const result = db.transaction(() => {
       // Handle document storage if provided
@@ -60,15 +66,24 @@ router.post('/register', (req, res) => {
       // Create organization for donor, demand_org, and food_bank
       if (!['recipient', 'biogas_operator'].includes(role) && orgName) {
         orgId = uuidv4();
+        const organizationStatus = autoApproveOrganization ? 'active' : 'pending';
         db.prepare(`
         INSERT INTO organizations (id, name, type, location_address, location_lat, location_lng, operating_hours, contact_phone, contact_email, description, status, document_url, document_name)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           orgId, orgName, orgType || role, locationAddress || '',
           locationLat || 0, locationLng || 0, operatingHours || '',
           contactPhone || '', normalizedEmail, description || '',
-          finalDocUrl, finalDocName
+          organizationStatus, finalDocUrl, finalDocName
         );
+        if (autoApproveOrganization) {
+          db.prepare('UPDATE organizations SET verified = 1 WHERE id = ?').run(orgId);
+          db.prepare(`
+            INSERT INTO verification_records (id, org_id, verified_by, action, notes)
+            VALUES (?, ?, NULL, 'approved', ?)
+          `).run(uuidv4(), orgId, 'Automatically approved at registration by the administrator setting.');
+          autoApproved = true;
+        }
 
         if (finalDocUrl) {
           db.prepare(`
@@ -96,11 +111,13 @@ router.post('/register', (req, res) => {
         } else if (orgName) {
           // Register a brand-new facility
           biogasFacilityId = uuidv4();
+          const facilityStatus = autoApproveOrganization ? 'active' : 'pending';
+          const facilityVerified = autoApproveOrganization ? 1 : 0;
           db.prepare(`
             INSERT INTO biogas_facilities
               (id, name, location_address, location_lat, location_lng, contact_phone, contact_email,
                operating_hours, accepted_waste_types, max_daily_intake_kg, status, verified, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `).run(
             biogasFacilityId,
             orgName,
@@ -112,8 +129,17 @@ router.post('/register', (req, res) => {
             operatingHours || '',
             req.body.acceptedWasteTypes ? JSON.stringify(req.body.acceptedWasteTypes) : '[]',
             req.body.maxDailyIntakeKg || 0,
+            facilityStatus,
+            facilityVerified,
             description || 'Biogas operator registered through FoodBridge public site.'
           );
+          if (autoApproveOrganization) {
+            db.prepare(`
+              INSERT INTO verification_records (id, org_id, verified_by, action, notes)
+              VALUES (?, ?, NULL, 'approved', ?)
+            `).run(uuidv4(), biogasFacilityId, 'Automatically approved at registration by the administrator setting.');
+            autoApproved = true;
+          }
         }
       }
 
@@ -135,7 +161,8 @@ router.post('/register', (req, res) => {
       return {
         token,
         user: { id: userId, email: normalizedEmail, name, role, orgId, biogasFacilityId: biogasFacilityId || undefined },
-        documentUploaded: !!finalDocUrl
+        documentUploaded: !!finalDocUrl,
+        autoApproved
       };
     })();
 
