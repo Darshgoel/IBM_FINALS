@@ -8,7 +8,7 @@
 
 If you do not wish to run the project locally, the live production application is deployed on **Render**:
 
-🔗 **Live Website:** [https://foodbridge.onrender.com](https://foodbridge.onrender.com)
+🔗 **Live Website:** [https://foodbridge-rwni.onrender.com](https://foodbridge-rwni.onrender.com)
 
 > **Note:** If visiting for the first time after inactivity, Render's free tier may take ~30–50 seconds to spin up from a cold start.
 
