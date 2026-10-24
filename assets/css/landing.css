@@ -2590,43 +2590,6 @@ select.field-input {
   text-underline-offset: 2px;
 }
 
-.demo-box {
-  margin-top: 14px;
-  border: 1px solid #E5EBE6;
-  border-radius: 8px;
-  background: #FAFCFA;
-  padding: 9px 11px;
-  font-size: 10.5px;
-  color: #5A675E;
-}
-
-.demo-box summary {
-  cursor: pointer;
-  font-weight: 600;
-  color: #4A574E;
-}
-
-.demo-grid {
-  display: grid;
-  grid-template-columns: 62px minmax(0, 1fr);
-  gap: 3px 8px;
-  margin-top: 7px;
-  font-size: 9.5px;
-  line-height: 1.4;
-}
-
-.demo-grid span {
-  font-weight: 600;
-  color: #67736B;
-}
-
-.demo-grid code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 9px;
-  color: #3E4B42;
-  overflow-wrap: anywhere;
-}
-
 .msg {
   display: none;
   margin-bottom: 11px;
