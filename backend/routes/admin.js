@@ -13,27 +13,15 @@ router.use(authenticate);
 router.use(requireRole('admin'));
 
 const AUTO_APPROVAL_SETTING = 'automatic_organization_approval';
-const BENGALURU_DEMO_SEED_SETTING = 'bengaluru_demo_partners_seeded_v1';
+const BENGALURU_DEMO_NGO_SEED_SETTING = 'bengaluru_demo_ngos_seeded_v1';
 
-const BENGALURU_DEMO_PARTNERS = [
-  { kind: 'donor', label: 'Donor', name: 'Demo Donor 01 - Jayanagar Foods', area: 'Jayanagar', lat: 12.925, lng: 77.584 },
-  { kind: 'donor', label: 'Donor', name: 'Demo Donor 02 - Malleshwaram Foods', area: 'Malleshwaram', lat: 13.003, lng: 77.564 },
-  { kind: 'donor', label: 'Donor', name: 'Demo Donor 03 - Indiranagar Foods', area: 'Indiranagar', lat: 12.978, lng: 77.641 },
-  { kind: 'donor', label: 'Donor', name: 'Demo Donor 04 - Whitefield Foods', area: 'Whitefield', lat: 12.970, lng: 77.750 },
-  { kind: 'donor', label: 'Donor', name: 'Demo Donor 05 - Yelahanka Foods', area: 'Yelahanka', lat: 13.101, lng: 77.596 },
-  { kind: 'donor', label: 'Donor', name: 'Demo Donor 06 - Electronic City Foods', area: 'Electronic City', lat: 12.840, lng: 77.677 },
-  { kind: 'donor', label: 'Donor', name: 'Demo Donor 07 - Rajajinagar Foods', area: 'Rajajinagar', lat: 12.992, lng: 77.557 },
-  { kind: 'donor', label: 'Donor', name: 'Demo Donor 08 - Banashankari Foods', area: 'Banashankari', lat: 12.926, lng: 77.547 },
-  { kind: 'donor', label: 'Donor', name: 'Demo Donor 09 - Koramangala Foods', area: 'Koramangala', lat: 12.935, lng: 77.625 },
-  { kind: 'donor', label: 'Donor', name: 'Demo Donor 10 - Hebbal Foods', area: 'Hebbal', lat: 13.036, lng: 77.597 },
-  { kind: 'food_bank', label: 'Food Bank', name: 'Demo Food Bank 01 - KR Market', area: 'KR Market', lat: 12.963, lng: 77.576 },
-  { kind: 'food_bank', label: 'Food Bank', name: 'Demo Food Bank 02 - HSR Layout', area: 'HSR Layout', lat: 12.912, lng: 77.639 },
-  { kind: 'food_bank', label: 'Food Bank', name: 'Demo Food Bank 03 - Vijayanagar', area: 'Vijayanagar', lat: 12.972, lng: 77.535 },
-  { kind: 'food_bank', label: 'Food Bank', name: 'Demo Food Bank 04 - BTM Layout', area: 'BTM Layout', lat: 12.917, lng: 77.610 },
-  { kind: 'food_bank', label: 'Food Bank', name: 'Demo Food Bank 05 - Kengeri', area: 'Kengeri', lat: 12.918, lng: 77.484 },
-  { kind: 'biogas_operator', label: 'Biogas Plant', name: 'Demo Biogas Plant 01 - Peenya', area: 'Peenya', lat: 13.033, lng: 77.527 },
-  { kind: 'biogas_operator', label: 'Biogas Plant', name: 'Demo Biogas Plant 02 - Bommanahalli', area: 'Bommanahalli', lat: 12.900, lng: 77.625 },
-  { kind: 'biogas_operator', label: 'Biogas Plant', name: 'Demo Biogas Plant 03 - Devanahalli', area: 'Devanahalli', lat: 13.248, lng: 77.714 }
+const BENGALURU_DEMO_NGOS = [
+  { name: 'Demo NGO 01 - Jayanagar Community Meals', area: 'Jayanagar', lat: 12.925, lng: 77.584 },
+  { name: 'Demo NGO 02 - Shivajinagar Relief Network', area: 'Shivajinagar', lat: 12.985, lng: 77.604 },
+  { name: 'Demo NGO 03 - Mahadevapura Family Support', area: 'Mahadevapura', lat: 12.991, lng: 77.696 },
+  { name: 'Demo NGO 04 - Basavanagudi Food Collective', area: 'Basavanagudi', lat: 12.942, lng: 77.569 },
+  { name: 'Demo NGO 05 - Marathahalli Community Aid', area: 'Marathahalli', lat: 12.956, lng: 77.701 },
+  { name: 'Demo NGO 06 - Rajarajeshwari Nagar Outreach', area: 'Rajarajeshwari Nagar', lat: 12.927, lng: 77.520 }
 ];
 
 function demoPlaceholderPdfBase64(organizationName, kind) {
@@ -68,120 +56,71 @@ function demoPlaceholderPdfBase64(organizationName, kind) {
   return Buffer.from(pdf, 'ascii').toString('base64');
 }
 
-router.post('/demo/seed-bengaluru', (req, res) => {
+router.post('/demo/seed-bengaluru-ngos', (req, res) => {
   try {
     const alreadySeeded = db.prepare('SELECT setting_value FROM platform_settings WHERE setting_key = ?')
-      .get(BENGALURU_DEMO_SEED_SETTING);
+      .get(BENGALURU_DEMO_NGO_SEED_SETTING);
     if (alreadySeeded?.setting_value === 'true') {
-      return res.status(409).json({ error: 'The Bengaluru demo partner accounts have already been created. Credentials were shown only once.' });
+      return res.status(409).json({ error: 'The six Bengaluru demo NGOs have already been created. Credentials were shown only once.' });
     }
 
-    const emailPrefix = 'foodbridge-demo-bengaluru-';
+    const emailPrefix = 'foodbridge-demo-bengaluru-ngo-';
     const existing = db.prepare('SELECT email FROM users WHERE email LIKE ?').all(`${emailPrefix}%@example.com`);
     if (existing.length) {
-      return res.status(409).json({ error: 'Some Bengaluru demo account emails already exist. No accounts were created; contact an administrator to avoid duplicates.' });
+      return res.status(409).json({ error: 'Some Bengaluru demo NGO emails already exist. No accounts were created; contact an administrator to avoid duplicates.' });
     }
-
-    const approvalSetting = db.prepare('SELECT setting_value FROM platform_settings WHERE setting_key = ?')
-      .get(AUTO_APPROVAL_SETTING);
-    const autoApproveDemoPartners = approvalSetting?.setting_value === 'true';
-    const partnerStatus = autoApproveDemoPartners ? 'active' : 'pending';
-    const partnerVerified = autoApproveDemoPartners ? 1 : 0;
-    const approvalNote = 'Automatically approved at registration by the administrator setting (Bengaluru demo seed). Attached document is a demo placeholder, not a valid FSSAI licence.';
 
     const credentials = db.transaction(() => {
       const created = [];
-      for (const partner of BENGALURU_DEMO_PARTNERS) {
-        const index = BENGALURU_DEMO_PARTNERS.filter(item => item.kind === partner.kind).indexOf(partner) + 1;
-        const roleSegment = partner.kind === 'biogas_operator' ? 'biogas' : partner.kind === 'food_bank' ? 'foodbank' : 'donor';
-        const email = `${emailPrefix}${roleSegment}-${String(index).padStart(2, '0')}@example.com`;
+      BENGALURU_DEMO_NGOS.forEach((ngo, index) => {
+        const number = String(index + 1).padStart(2, '0');
+        const email = `${emailPrefix}${number}@example.com`;
         const password = `FbDemo-${crypto.randomBytes(9).toString('base64url')}`;
         const userId = uuidv4();
-        const address = `${partner.area}, Bengaluru, Karnataka`;
-        let orgId = null;
-        let biogasFacilityId;
-        const documentName = partner.kind === 'donor'
-          ? `DEMO_ONLY_NOT_A_VALID_FSSAI_LICENCE_${roleSegment}_${String(index).padStart(2, '0')}.pdf`
-          : `DEMO_ONLY_PLACEHOLDER_DOCUMENT_${roleSegment}_${String(index).padStart(2, '0')}.pdf`;
+        const orgId = uuidv4();
+        const documentName = `DEMO_ONLY_NGO_PLACEHOLDER_${number}.pdf`;
         const document = storeDocument({
           fileName: documentName,
-          fileData: demoPlaceholderPdfBase64(partner.name, partner.kind)
+          fileData: demoPlaceholderPdfBase64(ngo.name, 'ngo')
         });
 
-        if (partner.kind === 'biogas_operator') {
-          biogasFacilityId = uuidv4();
-          db.prepare(`
-            INSERT INTO biogas_facilities
-              (id, name, location_address, location_lat, location_lng, contact_phone, contact_email,
-               status, verified, notes, document_url, document_name)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `).run(biogasFacilityId, partner.name, address, partner.lat, partner.lng, '', email,
-            partnerStatus, partnerVerified,
-            'Synthetic Bengaluru demo account. Not a real facility.', document.url, documentName);
-          db.prepare(`
-            INSERT INTO organization_documents (id, org_id, file_name, file_path, doc_type, file_size)
-            VALUES (?, ?, ?, ?, 'demo_placeholder', ?)
-          `).run(uuidv4(), biogasFacilityId, documentName, document.url, document.size);
-        } else {
-          orgId = uuidv4();
-          db.prepare(`
-            INSERT INTO organizations
-              (id, name, type, location_address, location_lat, location_lng, contact_email,
-               description, status, verified, document_url, document_name)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `).run(orgId, partner.name, partner.kind, address, partner.lat, partner.lng, email,
-            `Synthetic FoodBridge demo partner. ${autoApproveDemoPartners ? 'Automatically approved by the admin setting.' : 'Verification is pending.'} Attached PDF is a demo placeholder only.`,
-            partnerStatus, partnerVerified,
-            document.url, documentName);
-          db.prepare(`
-            INSERT INTO organization_documents (id, org_id, file_name, file_path, doc_type, file_size)
-            VALUES (?, ?, ?, ?, 'verification_certificate', ?)
-          `).run(uuidv4(), orgId, documentName, document.url, document.size);
-          if (partner.kind === 'donor') {
-            db.prepare('INSERT INTO donor_profiles (org_id) VALUES (?)').run(orgId);
-          } else {
-            db.prepare('INSERT INTO demand_org_profiles (org_id) VALUES (?)').run(orgId);
-          }
-        }
-
-        const passwordHash = bcrypt.hashSync(password, 10);
+        db.prepare(`
+          INSERT INTO organizations
+            (id, name, type, location_address, location_lat, location_lng, contact_email,
+             description, status, verified, document_url, document_name)
+          VALUES (?, ?, 'ngo', ?, ?, ?, ?, ?, 'active', 1, ?, ?)
+        `).run(orgId, ngo.name, `${ngo.area}, Bengaluru, Karnataka`, ngo.lat, ngo.lng, email,
+          'Synthetic FoodBridge test NGO. Automatically approved for the Bengaluru demo; attached PDF is a generic demo placeholder.',
+          document.url, documentName);
+        db.prepare(`
+          INSERT INTO organization_documents (id, org_id, file_name, file_path, doc_type, file_size)
+          VALUES (?, ?, ?, ?, 'demo_placeholder', ?)
+        `).run(uuidv4(), orgId, documentName, document.url, document.size);
+        db.prepare('INSERT INTO demand_org_profiles (org_id) VALUES (?)').run(orgId);
         db.prepare('INSERT INTO users (id, email, password_hash, role, org_id, name) VALUES (?, ?, ?, ?, ?, ?)')
-          .run(userId, email, passwordHash, partner.kind, orgId, `${partner.label} Demo Coordinator ${String(index).padStart(2, '0')}`);
-        if (partner.kind === 'biogas_operator') {
-          db.prepare('UPDATE biogas_facilities SET operator_user_id = ? WHERE id = ?').run(userId, biogasFacilityId);
-        }
-        if (autoApproveDemoPartners) {
-          const entityId = biogasFacilityId || orgId;
-          db.prepare(`
-            INSERT INTO verification_records (id, org_id, verified_by, action, notes)
-            VALUES (?, ?, NULL, 'approved', ?)
-          `).run(uuidv4(), entityId, approvalNote);
-        }
+          .run(userId, email, bcrypt.hashSync(password, 10), 'demand_org', orgId, `NGO Demo Coordinator ${number}`);
+        db.prepare(`
+          INSERT INTO verification_records (id, org_id, verified_by, action, notes)
+          VALUES (?, ?, NULL, 'approved', ?)
+        `).run(uuidv4(), orgId,
+          'Automatically approved at registration for the Bengaluru demo NGO seed. Attached PDF is a generic placeholder, not a valid compliance certificate.');
+
         created.push({
-          type: partner.label,
-          name: partner.name,
-          area: partner.area,
-          email,
-          password,
-          document: documentName,
-          status: autoApproveDemoPartners ? 'active — automatically approved' : 'pending verification'
+          type: 'NGO', name: ngo.name, area: ngo.area, email, password,
+          document: documentName, status: 'active — automatically approved'
         });
-      }
+      });
       db.prepare(`
         INSERT INTO platform_settings (setting_key, setting_value, updated_by, updated_at)
         VALUES (?, 'true', ?, CURRENT_TIMESTAMP)
-      `).run(BENGALURU_DEMO_SEED_SETTING, req.user.id);
+      `).run(BENGALURU_DEMO_NGO_SEED_SETTING, req.user.id);
       return created;
     })();
 
-    res.status(201).json({
-      created: credentials,
-      autoApproved: autoApproveDemoPartners,
-      message: 'Demo accounts created once. Save these credentials now; they are not stored in plain text.'
-    });
+    res.status(201).json({ created: credentials, autoApproved: true, message: 'Six demo NGOs created and approved. Save these credentials now; they are not stored in plain text.' });
   } catch (err) {
-    console.error('[Admin/DemoSeed/Bengaluru]', err);
-    res.status(500).json({ error: 'Could not create the Bengaluru demo accounts' });
+    console.error('[Admin/DemoSeed/BengaluruNGOs]', err);
+    res.status(500).json({ error: 'Could not create the six Bengaluru demo NGOs' });
   }
 });
 

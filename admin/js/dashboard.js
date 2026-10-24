@@ -628,30 +628,30 @@ async function saveAutomaticApprovalSetting(event) {
   }
 }
 
-async function createBengaluruDemoAccounts() {
-  const button = document.getElementById('demo-seed-button');
+async function createBengaluruDemoNgos() {
+  const button = document.getElementById('ngo-seed-button');
   if (!button) return;
   const confirmed = window.confirm(
-    'Create 18 synthetic Bengaluru accounts (10 donors, 5 food banks, 3 biogas operators)? The current automatic-approval setting will determine whether they are active or pending. They receive clearly marked demo documents and have no posts. Credentials will be shown once.'
+    'Create six synthetic NGO accounts across Bengaluru? These demo NGOs will be automatically approved, receive clearly marked generic demo PDFs, and have no posts. Credentials will be shown once.'
   );
   if (!confirmed) return;
 
   button.disabled = true;
   button.textContent = 'Creating accounts…';
   try {
-    const data = await apiFetch('/admin/demo/seed-bengaluru', 'POST', {});
+    const data = await apiFetch('/admin/demo/seed-bengaluru-ngos', 'POST', {});
     const credentials = (data.created || []).map(account =>
       `${account.type} | ${account.name} | ${account.area}\nEmail: ${account.email}\nPassword: ${account.password}\nStatus: ${account.status}`
     ).join('\n\n');
-    setText('demo-seed-credentials', credentials);
-    const result = document.getElementById('demo-seed-result');
+    setText('ngo-seed-credentials', credentials);
+    const result = document.getElementById('ngo-seed-result');
     if (result) result.hidden = false;
-    button.textContent = 'Demo accounts created';
-    toast('18 Bengaluru demo accounts created. Save the credentials now.', 'success');
+    button.textContent = 'NGO accounts created';
+    toast('Six Bengaluru NGO demo accounts created and automatically approved. Save the credentials now.', 'success');
     await Promise.all([loadVerification(), loadParticipants()]);
   } catch (error) {
     button.disabled = false;
-    button.textContent = 'Create 18 demo accounts';
+    button.textContent = 'Create 6 NGO accounts';
     toast(error.message || 'Could not create the demo accounts.', 'error');
   }
 }
@@ -1435,7 +1435,7 @@ function wireNavigation() {
 
 function wireDelegatedActions() {
   document.getElementById('auto-approval-toggle')?.addEventListener('change', saveAutomaticApprovalSetting);
-  document.getElementById('demo-seed-button')?.addEventListener('click', createBengaluruDemoAccounts);
+  document.getElementById('ngo-seed-button')?.addEventListener('click', createBengaluruDemoNgos);
 
   document.addEventListener('click', event => {
     const target = event.target.closest('[data-action]');
