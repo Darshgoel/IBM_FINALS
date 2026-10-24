@@ -146,6 +146,7 @@ button { cursor: pointer; }
 .location-row { display: flex; gap: 8px; }
 .location-input {
   flex: 1;
+  min-width: 0;
   background: #fff;
   border: 1px solid var(--border-strong);
   border-radius: 10px;
@@ -171,6 +172,22 @@ button { cursor: pointer; }
 }
 .locate-btn:hover { border-color: var(--green); background: var(--pale-green); }
 .locate-btn:disabled { opacity: .6; cursor: wait; }
+.choose-location-btn {
+  flex: 0 0 auto;
+  border: 1px solid var(--border-strong);
+  background: #fff;
+  border-radius: 10px;
+  padding: 0 12px;
+  color: var(--green-dark);
+  font-size: 13px;
+  font-weight: 700;
+}
+.choose-location-btn:hover { border-color: var(--green); background: var(--pale-green); }
+@media (max-width: 420px) {
+  .location-row { gap: 6px; }
+  .location-input { padding-inline: 10px; }
+  .choose-location-btn { padding-inline: 9px; }
+}
 
 .spinner {
   display: inline-block; width: 15px; height: 15px;
@@ -233,19 +250,6 @@ button { cursor: pointer; }
 }
 .search-btn:hover { background: var(--green-dark); }
 .search-btn:active { transform: translateY(1px); }
-
-/* ── Demo banner ── */
-.demo-banner {
-  background: var(--amber);
-  color: #3D2E05;
-  font-size: 13px;
-  border-bottom: 1px solid #E3A81F;
-}
-.demo-banner-inner {
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  padding: 9px 0;
-  text-align: center;
-}
 
 /* ── Results section ── */
 .results-section { padding: 30px 0 26px; opacity: 0; transition: opacity .25s; }
@@ -465,6 +469,30 @@ button { cursor: pointer; }
   border: 1px solid var(--border);
   z-index: 0;
 }
+.map-picker-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border: 1px solid #CDE6D2;
+  border-radius: 12px;
+  background: var(--pale-green);
+  color: var(--green-dark);
+  font-size: 13px;
+  font-weight: 650;
+}
+.map-picker-apply {
+  border: 0;
+  border-radius: 9px;
+  padding: 10px 14px;
+  background: var(--green);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 750;
+}
+.map-picker-apply:hover { background: var(--green-dark); }
 @media (max-width: 640px) { #recipient-map { height: 340px; } }
 
 .map-legend {

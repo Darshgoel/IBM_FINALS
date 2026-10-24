@@ -9,7 +9,7 @@
  * - Slide-up detail inspection panel with directions & contact info
  * - Multi-criteria sorting (distance, availability, capacity)
  * - Browser Notification opt-in with SSE integration & desktop alerts
- * - Seamless live API integration + resilient offline demo fallback
+ * - Live API integration without fabricated fallback locations
  */
 
 // ── State ──
@@ -17,6 +17,8 @@ const state = {
   userLat: null,
   userLng: null,
   locationName: '',
+  locationSource: 'text',
+  locationPickerActive: false,
   people: 3,
   dietary: 'any',
   urgency: 'today',
@@ -43,82 +45,6 @@ const LANDMARK_COORDS = {
   'delhi':          { lat: 28.6139, lng: 77.2090, name: 'New Delhi' },
   'mumbai':         { lat: 19.0760, lng: 72.8777, name: 'Mumbai' }
 };
-
-// Fallback seed data in case backend server is unreachable
-const DEMO_ACCESS_POINTS = [
-  {
-    id: 'ngo-helping-hands',
-    name: 'Helping Hands Food Mission',
-    type: 'ngo',
-    location_address: '14, 2nd Cross, Shanthi Nagar, Bengaluru',
-    location_lat: 12.9560,
-    location_lng: 77.5990,
-    operating_hours: 'Daily 11:00 AM – 8:00 PM',
-    contact_phone: '+91 80 2221 4455',
-    description: 'Community feeding program and hot meal distribution center serving families and migrant workers.',
-    serving_capacity: 350,
-    food_requirements: ['Cooked meals', 'Rice & Curry', 'Dal', 'Fresh Chapati'],
-    dietary_restrictions: ['vegetarian', 'halal'],
-    activeIncoming: 2,
-    status: 'open',
-    foodAvailableText: 'Fresh cooked lunch & dinner meals (Vegetarian, Halal-certified)',
-    accessInfo: 'Walk-ins welcome at community dining hall. Free hot meals distributed on a first-come basis. Carry a reusable container if taking food for family.'
-  },
-  {
-    id: 'shelter-city-hope',
-    name: 'City Hope Night Shelter & Community Kitchen',
-    type: 'shelter',
-    location_address: '88 Broadway Street, Shivajinagar, Bengaluru',
-    location_lat: 12.9850,
-    location_lng: 77.6050,
-    operating_hours: 'Daily 6:00 PM – 10:00 AM (Dinner 7:30 PM)',
-    contact_phone: '+91 80 2559 7800',
-    description: 'Overnight shelter and kitchen providing nutritious dinner, clean drinking water, and morning breakfast to unhoused citizens.',
-    serving_capacity: 180,
-    food_requirements: ['Hot meals', 'Bread', 'Milk', 'Nutritious snacks'],
-    dietary_restrictions: ['vegetarian'],
-    activeIncoming: 1,
-    status: 'open',
-    foodAvailableText: 'Nutritious hot khichdi, whole grain bread, and warm milk',
-    accessInfo: 'Evening meal token counter opens at 6:30 PM. Wheelchair accessible ground floor dining area.'
-  },
-  {
-    id: 'foodbank-central-reserve',
-    name: 'Central Food Bank & Community Pantry',
-    type: 'food_bank',
-    location_address: 'Plot 42, Yeshwanthpur Industrial Area, Bengaluru',
-    location_lat: 13.0230,
-    location_lng: 77.5510,
-    operating_hours: 'Daily 24/7 (Public Pantry: 8:00 AM – 9:00 PM)',
-    contact_phone: '+91 80 2337 9911',
-    description: 'Regional food distribution center and dry pantry buffering large surplus for high-volume emergency aid.',
-    serving_capacity: 1500,
-    food_requirements: ['Dry ration kits', 'Packaged dairy', 'Fresh produce', 'Baked goods'],
-    dietary_restrictions: ['vegetarian', 'vegan', 'halal'],
-    activeIncoming: 4,
-    status: 'open',
-    foodAvailableText: 'Prepared meal packs, dry ration emergency boxes, bakery assortments',
-    accessInfo: 'Family emergency pantry open at Gate 2. Family ration kits available upon direct request. No ID or documents needed.'
-  },
-  {
-    id: 'ngo-nourish-kids',
-    name: 'Nourish Kids Youth Nutrition Pantry',
-    type: 'ngo',
-    location_address: '77, 2nd Stage, BTM Layout, Bengaluru',
-    location_lat: 12.9166,
-    location_lng: 77.6101,
-    operating_hours: 'Mon–Sat 10:00 AM – 6:00 PM',
-    contact_phone: '+91 80 2668 5544',
-    description: 'After-school nutrition and evening snack center supporting underprivileged children and student families.',
-    serving_capacity: 120,
-    food_requirements: ['Fresh fruits', 'Milk', 'Cooked snacks', 'Biscuits', 'Nutritious meals'],
-    dietary_restrictions: ['vegetarian'],
-    activeIncoming: 1,
-    status: 'soon',
-    foodAvailableText: 'Fruit baskets, fortified milk packets, and healthy snacks',
-    accessInfo: 'Open to children and families with young dependents. Evening meal distribution starts at 4:30 PM.'
-  }
-];
 
 // ── DOM Helpers ──
 const $ = (id) => document.getElementById(id);
@@ -159,6 +85,7 @@ window.useMyLocation = function () {
       state.userLat = pos.coords.latitude;
       state.userLng = pos.coords.longitude;
       state.locationName = 'Current Location (GPS)';
+      state.locationSource = 'gps';
       locInput.value = state.locationName;
       locateBtn.innerHTML = '📍';
       locateBtn.disabled = false;
@@ -173,6 +100,7 @@ window.useMyLocation = function () {
       state.userLat = 12.9716;
       state.userLng = 77.5946;
       state.locationName = 'Bengaluru Central (Default)';
+      state.locationSource = 'default';
       locInput.value = state.locationName;
       showToast('Could not access GPS. Using default area center.', 'info');
       searchFood();
@@ -210,19 +138,19 @@ window.searchFood = async function () {
   const rawLocation = (locInput.value || '').trim();
 
   // Resolve typed location to coordinates if not using GPS
-  if (rawLocation && rawLocation !== 'Current Location (GPS)') {
+  let matchedLandmark = false;
+  if (state.locationSource !== 'pin' && rawLocation && rawLocation !== 'Current Location (GPS)') {
     const lower = rawLocation.toLowerCase();
-    let matched = false;
     for (const [key, coords] of Object.entries(LANDMARK_COORDS)) {
       if (lower.includes(key)) {
         state.userLat = coords.lat;
         state.userLng = coords.lng;
         state.locationName = coords.name;
-        matched = true;
+        matchedLandmark = true;
         break;
       }
     }
-    if (!matched && !state.userLat) {
+    if (!matchedLandmark && !state.userLat) {
       // Default fallback coordinates (Central Bangalore)
       state.userLat = 12.9716;
       state.userLng = 77.5946;
@@ -237,14 +165,14 @@ window.searchFood = async function () {
 
   // Build query URL
   const queryParams = new URLSearchParams();
-  if (state.userLat && state.userLng) {
+  if (state.userLat != null && state.userLng != null) {
     queryParams.append('lat', state.userLat);
     queryParams.append('lng', state.userLng);
   }
   queryParams.append('people', state.people);
   queryParams.append('dietary', state.dietary);
   queryParams.append('urgency', state.urgency);
-  if (rawLocation) queryParams.append('q', rawLocation);
+  if (rawLocation && state.locationSource === 'text' && !matchedLandmark) queryParams.append('q', rawLocation);
 
   let points = [];
 
@@ -253,16 +181,11 @@ window.searchFood = async function () {
     if (res.ok) {
       const data = await res.json();
       points = data.accessPoints || [];
-    } else {
-      throw new Error('API returned status ' + res.status);
-    }
+    } else throw new Error('API returned status ' + res.status);
   } catch (err) {
-    console.info('[Recipient Search] Backend API not responding, using demo dataset:', err.message);
-    // Use fallback demo points — clearly marked so the user knows these are not live results
-    points = DEMO_ACCESS_POINTS.map((item) => ({ ...item, _isDemo: true }));
-    // Show a persistent banner so the user understands the data is not live
-    const banner = document.getElementById('demo-mode-banner');
-    if (banner) banner.style.display = 'block';
+    console.error('[Recipient Search] Could not load live access points:', err);
+    errorDiv.textContent = 'Could not load access points. Please try again in a moment.';
+    errorDiv.style.display = 'block';
   }
 
   // Ensure all points have computed distances & dietary arrays
@@ -310,7 +233,7 @@ window.searchFood = async function () {
 
   // Re-render map if it was already open
   if (recipientMap) {
-    renderMap(state.accessPoints);
+    renderMap(state.networkMapPoints || state.accessPoints);
   }
 
   // Show alert opt-in banner if not yet enabled
@@ -436,10 +359,7 @@ function renderCards(points) {
   const container = $('access-list');
   const countLabel = $('results-count');
 
-  const isDemo = points.length > 0 && points[0]._isDemo;
-  countLabel.textContent = isDemo
-    ? `${points.length} demo location${points.length === 1 ? '' : 's'} (sample data)`
-    : `${points.length} verified access point${points.length === 1 ? '' : 's'} near you`;
+  countLabel.textContent = `${points.length} verified access point${points.length === 1 ? '' : 's'} near you`;
 
   container.innerHTML = points
     .map((ap) => {
@@ -497,7 +417,6 @@ function renderCards(points) {
               ${escapeHtml(ap.name)}
               <span class="access-type-tag ${tagClass}">${typeLabel}</span>
               ${isTopPick ? '<span class="access-type-tag" style="background:rgba(255,120,31,0.16);color:#C4510B;">★ Top Pick</span>' : ''}
-              ${ap._isDemo ? '<span class="access-type-tag" style="background:rgba(130,59,232,0.10);color:#823BE8;">DEMO</span>' : ''}
             </div>
             <div class="access-meta">
               <span>📍 ${escapeHtml(ap.location_address || 'Central Address')}</span>
@@ -718,6 +637,7 @@ function escapeHtml(str) {
 let recipientMap = null;
 let userMarker   = null;
 let apMarkers    = [];
+let networkPointsPromise = null;
 
 function escHtml(str) {
   if (!str) return '';
@@ -731,6 +651,7 @@ function initMap(lat, lng) {
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     maxZoom: 19
   }).addTo(recipientMap);
+  enableMapLocationClicks();
 }
 
 function renderMap(points) {
@@ -750,17 +671,18 @@ function renderMap(points) {
     html: `<div style="width:16px;height:16px;background:#246BEE;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 4px rgba(36,107,238,0.3);"></div>`,
     iconSize: [16, 16], iconAnchor: [8, 8]
   });
-  userMarker = L.marker([lat, lng], { icon: userIcon, zIndexOffset: 1000 })
+  userMarker = L.marker([lat, lng], { icon: userIcon, zIndexOffset: 1000, draggable: state.locationPickerActive })
     .addTo(recipientMap)
-    .bindPopup('<div class="rmap-popup-name">📍 Your Location</div>');
+    .bindPopup(`<div class="rmap-popup-name">📍 ${state.locationPickerActive ? 'Selected location' : 'Your Location'}</div>${state.locationPickerActive ? '<div class="rmap-popup-row">Drag this pin to adjust your search location.</div>' : ''}`);
+  userMarker.on('dragend', event => updateLocationFromMap(event.target.getLatLng()));
 
   const topPickId = state.recommendedPoint ? state.recommendedPoint.id : null;
 
   points.forEach(ap => {
     if (!ap.location_lat || !ap.location_lng) return;
     const isTop = ap.id === topPickId;
-    const color = isTop ? '#F5A623' : '#FF781F';
-    const ring  = isTop ? 'rgba(245,166,35,0.35)' : 'rgba(255,120,31,0.25)';
+    const color = isTop ? '#F5A623' : ap.type === 'food_bank' ? '#805AD5' : '#FF781F';
+    const ring  = isTop ? 'rgba(245,166,35,0.35)' : ap.type === 'food_bank' ? 'rgba(128,90,213,0.25)' : 'rgba(255,120,31,0.25)';
     const size  = isTop ? 18 : 14;
     const half  = size / 2;
 
@@ -793,42 +715,112 @@ function renderMap(points) {
     apMarkers.push(marker);
   });
 
-  // Fit map to show all markers + user location
-  const allLatLngs = [
-    [lat, lng],
-    ...points.filter(p => p.location_lat && p.location_lng).map(p => [p.location_lat, p.location_lng])
-  ];
-  if (allLatLngs.length > 1) {
+  // The picker stays focused around the selected location; normal map view fits the network.
+  const allLatLngs = points.filter(p => p.location_lat && p.location_lng).map(p => [p.location_lat, p.location_lng]);
+  allLatLngs.push([lat, lng]);
+  if (state.locationPickerActive) {
+    recipientMap.setView([lat, lng], Math.max(recipientMap.getZoom(), 13));
+  } else if (allLatLngs.length > 1) {
     recipientMap.fitBounds(L.latLngBounds(allLatLngs), { padding: [40, 40], maxZoom: 15 });
   } else {
     recipientMap.setView([lat, lng], 13);
   }
 }
 
-window.switchView = function(view) {
+function updateLocationFromMap(latlng) {
+  state.userLat = latlng.lat;
+  state.userLng = latlng.lng;
+  state.locationName = `Map pin (${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)})`;
+  state.locationSource = 'pin';
+  $('location-input').value = state.locationName;
+  if (userMarker && userMarker.getLatLng() !== latlng) userMarker.setLatLng(latlng);
+}
+
+function setLocationPickerMode(enabled) {
+  state.locationPickerActive = enabled;
+  const controls = $('map-picker-controls');
+  if (controls) controls.style.display = enabled ? 'flex' : 'none';
+  if (userMarker && userMarker.dragging) {
+    if (enabled) userMarker.dragging.enable();
+    else userMarker.dragging.disable();
+    userMarker.setPopupContent(`<div class="rmap-popup-name">📍 ${enabled ? 'Selected location' : 'Your Location'}</div>${enabled ? '<div class="rmap-popup-row">Drag this pin to adjust your search location.</div>' : ''}`);
+  }
+}
+
+window.chooseLocationOnMap = function() {
+  switchView('map', true);
+  if (userMarker) userMarker.openPopup();
+};
+
+window.useSelectedMapLocation = function() {
+  if (!userMarker) return;
+  updateLocationFromMap(userMarker.getLatLng());
+  setLocationPickerMode(false);
+  switchView('list');
+  searchFood();
+};
+
+window.switchView = function(view, pickLocation = false) {
   const listEl = $('access-list');
   const mapEl  = $('map-view');
   const btnList = $('btn-view-list');
   const btnMap  = $('btn-view-map');
 
   if (view === 'map') {
+    setLocationPickerMode(pickLocation);
     listEl.style.display = 'none';
     mapEl.style.display  = 'block';
     btnList.classList.remove('active');
     btnMap.classList.add('active');
     // Initialize or resize map — must happen after element is visible
-    if (!recipientMap) {
-      renderMap(state.accessPoints || []);
-    } else {
-      recipientMap.invalidateSize();
+    if (!recipientMap) renderMap(state.accessPoints || []);
+    else recipientMap.invalidateSize();
+    if (recipientMap && userMarker && pickLocation) {
+      userMarker.dragging.enable();
+      recipientMap.setView([state.userLat || 12.9716, state.userLng || 77.5946], Math.max(recipientMap.getZoom(), 13));
     }
+    loadNetworkMapPoints();
   } else {
+    setLocationPickerMode(false);
     mapEl.style.display  = 'none';
     listEl.style.display = '';
     btnMap.classList.remove('active');
     btnList.classList.add('active');
   }
 };
+
+// Map clicks set the search pin only while the explicit location picker is open.
+function enableMapLocationClicks() {
+  if (!recipientMap || recipientMap._foodBridgePickerClickBound) return;
+  recipientMap._foodBridgePickerClickBound = true;
+  recipientMap.on('click', event => {
+    if (!state.locationPickerActive) return;
+    updateLocationFromMap(event.latlng);
+  });
+}
+
+async function loadNetworkMapPoints() {
+  if (!networkPointsPromise) {
+    networkPointsPromise = fetch('/api/recipient/network-map', { headers: { Accept: 'application/json' } })
+      .then(res => {
+        if (!res.ok) throw new Error(`API returned status ${res.status}`);
+        return res.json();
+      })
+      .then(data => data.accessPoints || [])
+      .catch(err => {
+        networkPointsPromise = null;
+        console.error('[Recipient Map] Could not load network partners:', err);
+        showToast('Could not load network map. Please try again.', 'error');
+        return null;
+      });
+  }
+  const points = await networkPointsPromise;
+  if (points && recipientMap) {
+    state.networkMapPoints = points;
+    renderMap(points);
+    recipientMap.invalidateSize();
+  }
+}
 
 // ── Initialization ──
 document.addEventListener('DOMContentLoaded', () => {
@@ -843,6 +835,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // Handle enter key inside location input
   const locInput = $('location-input');
   if (locInput) {
+    locInput.addEventListener('input', () => {
+      state.locationSource = 'text';
+      state.userLat = null;
+      state.userLng = null;
+    });
     locInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         searchFood();

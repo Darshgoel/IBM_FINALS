@@ -57,6 +57,7 @@
               autocomplete="off"
             />
             <button class="locate-btn" id="locate-btn" onclick="useMyLocation()" title="Use my current location" aria-label="Use my current location">📡</button>
+            <button class="choose-location-btn" id="choose-location-btn" onclick="chooseLocationOnMap()" title="Choose a location on the map">🗺️ Map</button>
           </div>
         </div>
 
@@ -98,14 +99,6 @@
           🔍 Find Food Access Points
         </button>
       </div>
-    </div>
-  </div>
-
-  <!-- ── Demo mode banner (hidden until API is unreachable) ── -->
-  <div id="demo-mode-banner" class="demo-banner" style="display:none;">
-    <div class="shell demo-banner-inner">
-      <span aria-hidden="true">⚠️</span>
-      <span>Live data unavailable — showing <strong>sample demo locations</strong> only. Start the backend server to see real results.</span>
     </div>
   </div>
 
@@ -155,9 +148,14 @@
 
       <!-- Map view -->
       <div id="map-view" style="display:none;">
+        <div class="map-picker-controls" id="map-picker-controls" style="display:none;">
+          <span>Click the map or drag the blue pin to choose a location.</span>
+          <button class="map-picker-apply" onclick="useSelectedMapLocation()">Use this location &amp; find food</button>
+        </div>
         <div id="recipient-map"></div>
         <div class="map-legend">
-          <span><span class="map-leg-dot" style="background:#FF781F;"></span> Food access point</span>
+          <span><span class="map-leg-dot" style="background:#FF781F;"></span> NGO / community partner</span>
+          <span><span class="map-leg-dot" style="background:#805AD5;"></span> Food bank</span>
           <span><span class="map-leg-dot" style="background:#246BEE;"></span> Your location</span>
           <span><span class="map-leg-dot" style="background:#F5A623;"></span> Top pick</span>
         </div>

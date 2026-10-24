@@ -105,6 +105,30 @@ router.get(['/search', '/nearby'], (req, res) => {
   }
 });
 
+// GET /api/recipient/network-map
+// The recipient map shows every verified, active receiving partner with coordinates,
+// independent of the current search location and radius.
+router.get('/network-map', (req, res) => {
+  try {
+    const accessPoints = db.prepare(`
+      SELECT o.id, o.name, o.type, o.location_address, o.location_lat, o.location_lng,
+             o.operating_hours, o.description,
+             dp.serving_capacity, dp.food_requirements, dp.dietary_restrictions
+      FROM organizations o
+      JOIN demand_org_profiles dp ON o.id = dp.org_id
+      WHERE o.status = 'active' AND o.verified = 1
+        AND o.location_lat IS NOT NULL AND o.location_lng IS NOT NULL
+        AND o.location_lat <> 0 AND o.location_lng <> 0
+      ORDER BY o.name
+    `).all();
+
+    res.json({ accessPoints, count: accessPoints.length });
+  } catch (err) {
+    console.error('[Recipient/NetworkMap]', err);
+    res.status(500).json({ error: 'Could not load network map' });
+  }
+});
+
 // GET /api/recipient/access-point/:id
 router.get('/access-point/:id', (req, res) => {
   try {
