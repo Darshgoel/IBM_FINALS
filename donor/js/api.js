@@ -27,7 +27,6 @@ const api = {
     getSurplusDetail:(t, id)   => request('GET',    `/donor/surplus/${id}`, null, t),
     cancelSurplus:(t, id)      => request('DELETE', `/donor/surplus/${id}`, null, t),
     getImpact:    (t)          => request('GET',    '/donor/impact',       null, t),
-    getPredictions:(t)         => request('GET',    '/donor/predictions',  null, t),
     getAlerts:    (t)          => request('GET',    '/donor/alerts',       null, t),
     markAlertRead:(t, id)      => request('PUT',    `/donor/alerts/${id}/read`, null, t),
   }

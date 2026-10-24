@@ -1,6 +1,6 @@
 /**
  * FoodBridge — Donor Dashboard JS
- * Sections: Overview, Post Surplus, My Surplus, Impact, Predictions, Profile
+ * Sections: Overview, Post Surplus, My Surplus, Impact, Profile
  */
 
 import api from './api.js';
@@ -30,7 +30,6 @@ const sectionCopy = {
   post: ['Post Surplus', 'Share safe, usable food with the network'],
   'my-surplus': ['My Surplus', 'Track every listing from posting to handover'],
   impact: ['Impact', 'Meals recovered and waste prevented'],
-  predictions: ['Predictions', 'Forecasts built from your surplus history'],
   profile: ['Profile', 'Organization details and collection preferences']
 };
 
@@ -117,7 +116,6 @@ window.navigate = function (section, el) {
   if (section === 'overview') loadOverview();
   if (section === 'my-surplus') loadSurplus();
   if (section === 'impact') loadImpact();
-  if (section === 'predictions') loadPredictions();
   if (section === 'profile') loadProfile();
 
   window.closeSidebar?.();
@@ -817,82 +815,6 @@ async function loadImpact() {
     }
   } catch (err) {
     showToast(err.message || 'Impact data could not be loaded.', 'error');
-  }
-}
-
-// ── Predictions ───────────────────────────────────────────────────────────────
-async function loadPredictions() {
-  const el = document.getElementById('prediction-content');
-  try {
-    const { prediction, patterns, riskDays } = await api.donor.getPredictions(token);
-
-    if (!prediction || !Array.isArray(patterns) || !patterns.length) {
-      el.innerHTML = `
-        <div class="empty-state">
-          <span class="empty-icon">${fbIcon('sparkles')}</span>
-          <strong>Forecasts need more history</strong>
-          <p>Post at least two surplus records to generate a prediction. Accuracy is not claimed by the current API.</p>
-          <button class="cta" type="button" onclick="navigate('post', null)">Post surplus</button>
-        </div>`;
-      return;
-    }
-
-    const confidence = Math.round((prediction.confidence || 0) * 100);
-    el.innerHTML = `
-      <div class="prediction-grid">
-        <div class="prediction-card">
-          <div class="prediction-icon">${fbIcon('package', 'icon icon-lg')}</div>
-          <div class="prediction-title">Expected next surplus</div>
-          <div class="prediction-value">${prediction.expectedQty ?? '—'} <span class="unit">kg</span></div>
-          <div class="prediction-sub">${escapeHtml(String(prediction.foodType || 'Based on your history').replace(/_/g, ' '))}</div>
-          <div class="confidence-bar" aria-label="Prediction confidence ${confidence}%"><div class="confidence-fill" style="width:${confidence}%"></div></div>
-          <div class="prediction-sub" style="margin-top:5px">Statistical confidence: ${confidence}%</div>
-        </div>
-        <div class="prediction-card">
-          <div class="prediction-icon" style="background:var(--fb-warning-soft);color:var(--fb-warning)">${fbIcon('calendar', 'icon icon-lg')}</div>
-          <div class="prediction-title">High surplus days</div>
-          <div class="risk-list" style="margin-top:8px">
-            ${riskDays.length ? riskDays.slice(0, 5).map(day => `
-              <div class="history-row">
-                <span class="day">${escapeHtml(day.day)}</span>
-                <span class="count">${day.count} historical post${day.count === 1 ? '' : 's'}</span>
-              </div>`).join('') : '<div class="prediction-sub">No peak day detected yet.</div>'}
-          </div>
-        </div>
-        <div class="prediction-card">
-          <div class="prediction-icon" style="background:var(--fb-blue-soft);color:var(--fb-blue)">${fbIcon('chart', 'icon icon-lg')}</div>
-          <div class="prediction-title">Your top surplus types</div>
-          <div class="stack-sm" style="margin-top:9px">
-            ${patterns.slice(0, 3).map(pattern => `
-              <div class="history-row">
-                <span class="day">${foodIcon(pattern.food_type, true)} ${escapeHtml(String(pattern.food_type || 'other').replace(/_/g, ' '))}</span>
-                <span class="count">~${Math.round(pattern.avg_qty || 0)} kg avg · ${pattern.frequency}×</span>
-              </div>`).join('')}
-          </div>
-        </div>
-      </div>
-
-      <div class="card" style="margin-top:16px">
-        <div class="card-header">
-          <div class="card-heading">
-            <h2 class="card-title">Planning guidance</h2>
-            <p class="card-sub">Derived from your recorded food types and peak days — not an accuracy claim</p>
-          </div>
-        </div>
-        <div class="stack-sm">
-          ${patterns.slice(0, 3).map(pattern => `
-            <div class="prevention-tip">
-              <span class="tip-icon">${fbIcon('lightbulb')}</span>
-              <div>
-                <div class="tip-title">${escapeHtml(String(pattern.food_type || 'Food').replace(/_/g, ' '))}</div>
-                <div class="tip-detail">You average around ${Math.round(pattern.avg_qty || 0)} kg across ${pattern.frequency} recorded post${Number(pattern.frequency) === 1 ? '' : 's'}. Consider preparing closer to confirmed demand on ${escapeHtml(riskDays[0]?.day || 'your peak day')}.</div>
-              </div>
-            </div>`).join('')}
-        </div>
-      </div>
-    `;
-  } catch (err) {
-    el.innerHTML = `<div class="error-state">${fbIcon('alert-circle')}<strong>Predictions could not be loaded</strong><span>${escapeHtml(err.message || 'Please try again.')}</span><button class="btn btn-sm" type="button" onclick="navigate('predictions', null)">Retry</button></div>`;
   }
 }
 

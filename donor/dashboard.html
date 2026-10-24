@@ -74,10 +74,6 @@
         <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-leaf"></use></svg></span>
         <span class="nav-label">Impact</span>
       </button>
-      <button type="button" class="nav-item" data-section="predictions" onclick="navigate('predictions', this)">
-        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-sparkles"></use></svg></span>
-        <span class="nav-label">Predictions</span>
-      </button>
 
       <span class="nav-section-label">Account</span>
       <button type="button" class="nav-item" data-section="profile" onclick="navigate('profile', this)">
@@ -572,24 +568,6 @@
               <div class="mini-label">Waste avoided</div>
               <p class="card-sub" style="margin-top:4px">The displayed CO₂e estimate uses a documented planning factor applied to recovered kilograms. It is an estimate, not a measured emission reduction.</p>
             </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ── Predictions ───────────────────────────────────────────────── -->
-      <section class="section" id="section-predictions" aria-labelledby="predictions-title">
-        <div class="page-heading">
-          <div>
-            <h2 id="predictions-title">Surplus predictions</h2>
-            <p>Statistical forecasts built from your recorded surplus history. They are planning estimates, not guarantees.</p>
-          </div>
-        </div>
-        <div id="prediction-content" aria-live="polite">
-          <div class="empty-state">
-            <span class="empty-icon"><svg class="icon" aria-hidden="true"><use href="#i-sparkles"></use></svg></span>
-            <strong>Forecasts need history</strong>
-            <p>Post at least two surplus records to generate a prediction. Accuracy appears after your first full forecast day closes.</p>
-            <button class="cta" type="button" onclick="navigate('post', null)">Post surplus</button>
           </div>
         </div>
       </section>
