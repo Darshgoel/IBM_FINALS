@@ -18,6 +18,7 @@ router.get(['/search', '/nearby'], (req, res) => {
       FROM organizations o
       JOIN demand_org_profiles dp ON o.id = dp.org_id
       WHERE o.status = 'active' AND o.verified = 1
+        AND LOWER(o.type) NOT LIKE '%food_bank%'
     `;
     const params = [];
 
@@ -117,6 +118,7 @@ router.get('/network-map', (req, res) => {
       FROM organizations o
       JOIN demand_org_profiles dp ON o.id = dp.org_id
       WHERE o.status = 'active' AND o.verified = 1
+        AND LOWER(o.type) NOT LIKE '%food_bank%'
         AND o.location_lat IS NOT NULL AND o.location_lng IS NOT NULL
         AND o.location_lat <> 0 AND o.location_lng <> 0
       ORDER BY o.name
@@ -137,6 +139,7 @@ router.get('/access-point/:id', (req, res) => {
       FROM organizations o
       JOIN demand_org_profiles dp ON o.id = dp.org_id
       WHERE o.id = ? AND o.status = 'active' AND o.verified = 1
+        AND LOWER(o.type) NOT LIKE '%food_bank%'
     `).get(req.params.id);
 
     if (!org) return res.status(404).json({ error: 'Access point not found' });
