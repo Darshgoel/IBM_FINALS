@@ -105,6 +105,22 @@ body.nav-open .sidebar-backdrop { opacity: 1; visibility: visible; }
 .auto-approval-switch input:focus-visible + .auto-approval-track { outline: 3px solid rgba(139,92,246,0.6); outline-offset: 3px; }
 .auto-approval-switch input:disabled + .auto-approval-track { opacity: 0.55; cursor: wait; }
 
+.demo-seed-card {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px 24px;
+  margin: 0 0 18px; padding: 18px 20px; border: 1px solid rgba(6,182,212,0.25);
+  border-radius: 12px; background: linear-gradient(110deg, rgba(6,182,212,0.07), rgba(255,255,255,0.025));
+}
+.demo-seed-copy h3 { font-size: 0.92rem; font-weight: 700; margin-bottom: 6px; }
+.demo-seed-copy p { color: var(--muted); font-size: 0.77rem; line-height: 1.55; }
+.demo-seed-card > button { grid-column: 2; grid-row: 1; white-space: nowrap; }
+.demo-seed-result { grid-column: 1 / -1; min-width: 0; padding-top: 12px; border-top: 1px solid var(--border); }
+.demo-seed-result strong { color: var(--cyan); font-size: 0.8rem; }
+.demo-seed-result pre {
+  max-height: 320px; overflow: auto; margin-top: 8px; padding: 12px; border-radius: 8px;
+  background: rgba(0,0,0,0.25); color: var(--text); font: 0.72rem/1.55 ui-monospace, SFMono-Regular, Consolas, monospace;
+  white-space: pre-wrap; overflow-wrap: anywhere; user-select: text;
+}
+
 .sidebar-footer { padding: 14px 10px; border-top: 1px solid var(--border); }
 .user-card { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 8px; background: var(--card); }
 .user-avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--primary-g); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem; color: #fff; flex-shrink: 0; }
@@ -452,6 +468,9 @@ body.nav-open .sidebar-backdrop { opacity: 1; visibility: visible; }
   .topbar { padding: 0 16px; }
   .live-indicator { display: none; }
   .auto-approval-card { align-items: flex-start; gap: 16px; padding: 16px; }
+  .demo-seed-card { grid-template-columns: 1fr; align-items: start; gap: 14px; padding: 16px; }
+  .demo-seed-card > button { grid-column: 1; grid-row: auto; justify-self: start; white-space: normal; }
+  .demo-seed-result { grid-column: 1; }
 }
 
 @media (max-width: 640px) {

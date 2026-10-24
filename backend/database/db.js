@@ -315,11 +315,15 @@ try {
       verified INTEGER DEFAULT 0,
       verified_by TEXT,
       notes TEXT DEFAULT '',
+      document_url TEXT DEFAULT '',
+      document_name TEXT DEFAULT '',
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
     )
   `);
 } catch(e){}
+try { db.exec("ALTER TABLE biogas_facilities ADD COLUMN document_url TEXT DEFAULT ''"); } catch(e){}
+try { db.exec("ALTER TABLE biogas_facilities ADD COLUMN document_name TEXT DEFAULT ''"); } catch(e){}
 
 // food_bank_inventory table
 try {
