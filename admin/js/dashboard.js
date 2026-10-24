@@ -632,7 +632,7 @@ async function createBengaluruDemoAccounts() {
   const button = document.getElementById('demo-seed-button');
   if (!button) return;
   const confirmed = window.confirm(
-    'Create 18 synthetic Bengaluru accounts (10 donors, 5 food banks, 3 biogas operators)? They will remain pending verification, receive only clearly marked demo documents where supported, and have no posts. Credentials will be shown once.'
+    'Create 18 synthetic Bengaluru accounts (10 donors, 5 food banks, 3 biogas operators)? The current automatic-approval setting will determine whether they are active or pending. They receive clearly marked demo documents and have no posts. Credentials will be shown once.'
   );
   if (!confirmed) return;
 

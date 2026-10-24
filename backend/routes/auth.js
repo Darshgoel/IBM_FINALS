@@ -107,7 +107,16 @@ router.post('/register', (req, res) => {
           const facility = db.prepare('SELECT id, operator_user_id FROM biogas_facilities WHERE id = ?').get(biogasFacilityId);
           if (!facility) throw new Error('Biogas facility not found');
           if (facility.operator_user_id) throw new Error('That facility already has an operator account');
-          // ownership is set after user is inserted; store for later
+          // Ownership is linked after user insertion; automatic approval still
+          // applies to the claimed facility when the administrator enabled it.
+          if (autoApproveOrganization) {
+            db.prepare("UPDATE biogas_facilities SET status = 'active', verified = 1 WHERE id = ?").run(biogasFacilityId);
+            db.prepare(`
+              INSERT INTO verification_records (id, org_id, verified_by, action, notes)
+              VALUES (?, ?, NULL, 'approved', ?)
+            `).run(uuidv4(), biogasFacilityId, 'Automatically approved at registration by the administrator setting.');
+            autoApproved = true;
+          }
         } else if (orgName) {
           // Register a brand-new facility
           biogasFacilityId = uuidv4();

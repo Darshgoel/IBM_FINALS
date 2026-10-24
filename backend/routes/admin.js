@@ -82,6 +82,13 @@ router.post('/demo/seed-bengaluru', (req, res) => {
       return res.status(409).json({ error: 'Some Bengaluru demo account emails already exist. No accounts were created; contact an administrator to avoid duplicates.' });
     }
 
+    const approvalSetting = db.prepare('SELECT setting_value FROM platform_settings WHERE setting_key = ?')
+      .get(AUTO_APPROVAL_SETTING);
+    const autoApproveDemoPartners = approvalSetting?.setting_value === 'true';
+    const partnerStatus = autoApproveDemoPartners ? 'active' : 'pending';
+    const partnerVerified = autoApproveDemoPartners ? 1 : 0;
+    const approvalNote = 'Automatically approved at registration by the administrator setting (Bengaluru demo seed). Attached document is a demo placeholder, not a valid FSSAI licence.';
+
     const credentials = db.transaction(() => {
       const created = [];
       for (const partner of BENGALURU_DEMO_PARTNERS) {
@@ -107,8 +114,9 @@ router.post('/demo/seed-bengaluru', (req, res) => {
             INSERT INTO biogas_facilities
               (id, name, location_address, location_lat, location_lng, contact_phone, contact_email,
                status, verified, notes, document_url, document_name)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `).run(biogasFacilityId, partner.name, address, partner.lat, partner.lng, '', email,
+            partnerStatus, partnerVerified,
             'Synthetic Bengaluru demo account. Not a real facility.', document.url, documentName);
           db.prepare(`
             INSERT INTO organization_documents (id, org_id, file_name, file_path, doc_type, file_size)
@@ -120,9 +128,10 @@ router.post('/demo/seed-bengaluru', (req, res) => {
             INSERT INTO organizations
               (id, name, type, location_address, location_lat, location_lng, contact_email,
                description, status, verified, document_url, document_name)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `).run(orgId, partner.name, partner.kind, address, partner.lat, partner.lng, email,
-            'Synthetic FoodBridge demo partner. Verification is pending; attached PDF is a demo placeholder only.',
+            `Synthetic FoodBridge demo partner. ${autoApproveDemoPartners ? 'Automatically approved by the admin setting.' : 'Verification is pending.'} Attached PDF is a demo placeholder only.`,
+            partnerStatus, partnerVerified,
             document.url, documentName);
           db.prepare(`
             INSERT INTO organization_documents (id, org_id, file_name, file_path, doc_type, file_size)
@@ -141,7 +150,22 @@ router.post('/demo/seed-bengaluru', (req, res) => {
         if (partner.kind === 'biogas_operator') {
           db.prepare('UPDATE biogas_facilities SET operator_user_id = ? WHERE id = ?').run(userId, biogasFacilityId);
         }
-        created.push({ type: partner.label, name: partner.name, area: partner.area, email, password, document: documentName, status: 'pending verification' });
+        if (autoApproveDemoPartners) {
+          const entityId = biogasFacilityId || orgId;
+          db.prepare(`
+            INSERT INTO verification_records (id, org_id, verified_by, action, notes)
+            VALUES (?, ?, NULL, 'approved', ?)
+          `).run(uuidv4(), entityId, approvalNote);
+        }
+        created.push({
+          type: partner.label,
+          name: partner.name,
+          area: partner.area,
+          email,
+          password,
+          document: documentName,
+          status: autoApproveDemoPartners ? 'active — automatically approved' : 'pending verification'
+        });
       }
       db.prepare(`
         INSERT INTO platform_settings (setting_key, setting_value, updated_by, updated_at)
@@ -150,7 +174,11 @@ router.post('/demo/seed-bengaluru', (req, res) => {
       return created;
     })();
 
-    res.status(201).json({ created: credentials, message: 'Demo accounts created once. Save these credentials now; they are not stored in plain text.' });
+    res.status(201).json({
+      created: credentials,
+      autoApproved: autoApproveDemoPartners,
+      message: 'Demo accounts created once. Save these credentials now; they are not stored in plain text.'
+    });
   } catch (err) {
     console.error('[Admin/DemoSeed/Bengaluru]', err);
     res.status(500).json({ error: 'Could not create the Bengaluru demo accounts' });
