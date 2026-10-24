@@ -400,6 +400,17 @@ const inHours = hours => {
 document.getElementById('p-avail-time').value = nowLocal();
 document.getElementById('p-usable-time').value = inHours(4);
 
+// Availability is when the food became / becomes available to collect, so it
+// may be in the past or now, but must never be set in the future.
+const availabilityInput = document.getElementById('p-avail-time');
+const setAvailabilityMax = () => {
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  availabilityInput.max = now.toISOString().slice(0, 16);
+};
+setAvailabilityMax();
+setInterval(setAvailabilityMax, 30000);
+
 window.toggleTag = button => {
   button.classList.toggle('selected');
 };
@@ -431,6 +442,7 @@ window.postSurplus = async () => {
   if (!foodName) return fail('Food name is required.');
   if (!quantity || quantity <= 0) return fail('Please enter a valid quantity.');
   if (!availTime || !usableTime) return fail('Please set both availability and safe-until times.');
+  if (new Date(availTime) > new Date()) return fail('Available from time cannot be in the future.');
   if (new Date(usableTime) <= new Date()) return fail('Safe-until time must be in the future.');
   if (!hygiene) return fail('Please confirm the food safety confirmation before posting.');
 

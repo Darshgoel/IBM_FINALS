@@ -63,6 +63,20 @@ router.post('/surplus', async (req, res) => {
       return res.status(400).json({ error: 'foodName, foodType, and quantity are required' });
     }
 
+    const availabilityMs = availabilityTime ? Date.parse(availabilityTime) : Date.now();
+    if (!Number.isFinite(availabilityMs)) {
+      return res.status(400).json({ error: 'Available-from time is invalid' });
+    }
+    if (availabilityMs > Date.now()) {
+      return res.status(400).json({ error: 'Available-from time cannot be in the future' });
+    }
+    const usableUntilMs = remainingUsableTime
+      ? Date.parse(remainingUsableTime)
+      : Date.now() + 4 * 3600000;
+    if (!Number.isFinite(usableUntilMs) || usableUntilMs <= Date.now()) {
+      return res.status(400).json({ error: 'Safe-until time must be a valid future time' });
+    }
+
     const orgId = req.user.orgId;
     const org = db.prepare('SELECT status, verified FROM organizations WHERE id = ?').get(orgId);
     if (!org || org.status !== 'active' || !org.verified) {
