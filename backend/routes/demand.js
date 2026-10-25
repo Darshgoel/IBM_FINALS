@@ -528,8 +528,16 @@ router.put('/matches/:id/decline', async (req, res) => {
 
     if (result.status) return res.status(result.status).json({ error: result.error });
 
-    try { await matchOpenDemandsForInventory(); }
-    catch (matchErr) { console.error('[Demand/Decline rematching]', matchErr); }
+    try {
+      await matchOpenDemandsForInventory();
+      // Food-bank fallback offers have no demand_id. Re-run donor-side routing
+      // after a decline so remaining surplus can be offered to another bank
+      // with capacity (or to a newly eligible direct demand).
+      const declinedMatch = db.prepare('SELECT * FROM matches WHERE id = ?').get(req.params.id);
+      if (declinedMatch?.notes === 'fallback_food_bank' && declinedMatch.surplus_id) {
+        runUnifiedMatching({ surplusId: declinedMatch.surplus_id });
+      }
+    } catch (matchErr) { console.error('[Demand/Decline rematching]', matchErr); }
 
     res.json({ success: true, message: 'Match declined and reserved surplus restored to pool' });
   } catch (err) {

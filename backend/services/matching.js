@@ -713,6 +713,14 @@ function tryFoodBankFallback(surplus, donorOrg, precomputedRoutes) {
   const eligibleBanks = [];
 
   for (const fb of foodBankCandidates) {
+    // A declined fallback is a final no from this bank for this surplus.
+    const previouslyDeclined = db.prepare(`
+      SELECT 1 FROM matches
+      WHERE source_type = 'surplus' AND surplus_id = ? AND demand_org_id = ? AND status = 'declined'
+      LIMIT 1
+    `).get(surplus.id, fb.id);
+    if (previouslyDeclined) continue;
+
     let dist = null;
     let routeDuration = null;
     let routeProv = 'haversine';
@@ -754,25 +762,37 @@ function tryFoodBankFallback(surplus, donorOrg, precomputedRoutes) {
 
     // A bank may accept part of the remaining surplus; the rest can be offered
     // to another eligible bank instead of rejecting this bank outright.
-    let capacityInSurplusUnit = Infinity;
-    if (fb.receiving_capacity) {
-      const rcStr = String(fb.receiving_capacity).trim();
-      const rcMatch = rcStr.match(/^(\d+(?:\.\d+)?)\s*(\w+)?/);
-      if (rcMatch) {
-        const rcQty = parseFloat(rcMatch[1]);
-        const rcUnit = (rcMatch[2] || surplus.quantity_unit || '').toLowerCase();
-        const surplusUnit = (surplus.quantity_unit || '').toLowerCase();
-        const convertedCapacity = convertQuantity(rcQty, rcUnit, surplusUnit, surplus.food_type);
-        if (!isNaN(rcQty) && rcQty > 0 && convertedCapacity.success) {
-          capacityInSurplusUnit = convertedCapacity.convertedQty;
-        }
-      }
-    }
+    // Food banks must declare a daily receiving limit. Count pending offers as
+    // reserved capacity, along with today's accepted/completed allocations.
+    // Unknown capacity is not treated as unlimited capacity.
+    let capacityInSurplusUnit = 0;
     const capacityKg = Number(fb.receiving_capacity_kg);
     if (Number.isFinite(capacityKg) && capacityKg > 0) {
-      const convertedCapacity = convertQuantity(capacityKg, 'kg', surplus.quantity_unit, surplus.food_type);
-      if (convertedCapacity.success) capacityInSurplusUnit = Math.min(capacityInSurplusUnit, convertedCapacity.convertedQty);
+      // receiving_capacity_kg is a daily intake limit. Reserve capacity for
+      // today's pending, accepted, and completed offers so simultaneous
+      // surplus posts cannot overbook a food bank before it responds.
+      const todaysMatches = db.prepare(`
+        SELECT m.allocated_quantity, m.allocated_unit, s.food_type
+        FROM matches m
+        LEFT JOIN surplus_posts s ON s.id = m.surplus_id
+        WHERE m.demand_org_id = ?
+          AND m.status IN ('pending', 'confirmed', 'completed')
+          AND date(m.matched_at) = date('now')
+      `).all(fb.id);
+      const usedKg = todaysMatches.reduce((total, match) => {
+        const converted = convertQuantity(
+          Number(match.allocated_quantity) || 0,
+          match.allocated_unit || 'kg',
+          'kg',
+          match.food_type || surplus.food_type
+        );
+        return total + (converted.success ? converted.convertedQty : (Number(match.allocated_quantity) || 0));
+      }, 0);
+      const capacityLeftKg = Math.max(0, capacityKg - usedKg);
+      const convertedCapacity = convertQuantity(capacityLeftKg, 'kg', surplus.quantity_unit, surplus.food_type);
+      if (convertedCapacity.success) capacityInSurplusUnit = convertedCapacity.convertedQty;
     }
+    if (capacityInSurplusUnit <= 0.001) continue;
 
     if (dist == null || dist > MAX_MATCH_DISTANCE_KM) continue;
     const routeResult = precomputed?.distanceKm != null
