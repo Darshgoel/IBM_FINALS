@@ -5,9 +5,17 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { suggestLocations } = require('../services/geocoding');
-const { convertQuantity } = require('../services/matching');
+const {
+  convertQuantity,
+  isFoodAcceptedByProfile,
+  checkDietarySafety,
+  runUnifiedMatching,
+  precomputeRoutes,
+  precomputeRoutesToBiogas
+} = require('../services/matching');
 
 const router = express.Router();
+const routingSurplusIds = new Set();
 
 router.use(authenticate);
 router.use(requireRole('network_admin', 'network_intelligence', 'admin'));
@@ -21,36 +29,202 @@ function formatTimeRemaining(hours) {
   return `${h}h ${m}m`;
 }
 
+function canonicalUnit(raw) {
+  const value = String(raw || 'units').trim().toLowerCase();
+  const aliases = {
+    kilogram: 'kg', kilograms: 'kg', kgs: 'kg', gram: 'g', grams: 'g',
+    liter: 'liters', litre: 'liters', litres: 'liters', milliliter: 'ml', milliliters: 'ml',
+    serving: 'servings', portion: 'servings', portions: 'servings', meal: 'servings', meals: 'servings', plate: 'servings', plates: 'servings'
+  };
+  return aliases[value] || value;
+}
+
+function formatUnitTotals(rows, quantityKey, unitKey) {
+  const totals = new Map();
+  for (const row of rows || []) {
+    const quantity = Number(row[quantityKey]) || 0;
+    if (quantity <= 0.0001) continue;
+    const unit = canonicalUnit(row[unitKey]);
+    totals.set(unit, (totals.get(unit) || 0) + quantity);
+  }
+  if (!totals.size) return '0';
+  return [...totals.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([unit, quantity]) => `${Number(quantity.toFixed(1)).toLocaleString('en-IN')} ${unit}`)
+    .join(' · ');
+}
+
+function getDemandCompletionRows() {
+  return db.prepare(`
+    SELECT dr.id, dr.quantity_needed, dr.quantity_unit, dr.food_requirement, dr.urgency,
+           dr.remaining_quantity, dr.status, dr.demand_org_id,
+           COALESCE(SUM(CASE WHEN m.status = 'completed' THEN m.allocated_quantity ELSE 0 END), 0) AS completed_quantity
+    FROM demand_registrations dr
+    LEFT JOIN matches m ON m.demand_id = dr.id
+    JOIN organizations o ON o.id = dr.demand_org_id
+    WHERE dr.status != 'cancelled' AND o.status = 'active' AND o.verified = 1
+    GROUP BY dr.id
+  `).all();
+}
+
+function demandFulfillmentRate(rows) {
+  const applicable = rows.filter(row => Number(row.quantity_needed) > 0);
+  if (!applicable.length) return 0;
+  const total = applicable.reduce((sum, row) => {
+    const requested = Number(row.quantity_needed) || 0;
+    const delivered = Math.min(requested, Math.max(0, Number(row.completed_quantity) || 0));
+    return sum + delivered / requested;
+  }, 0);
+  return Math.round((total / applicable.length) * 100);
+}
+
+function completedMatchRows(extraWhere = '', params = []) {
+  return db.prepare(`
+    SELECT m.allocated_quantity AS quantity, m.allocated_unit AS unit,
+           COALESCE(sp.food_type, fi.food_type, '') AS food_type,
+           m.completed_at, m.matched_at
+    FROM matches m
+    LEFT JOIN surplus_posts sp ON m.source_type = 'surplus' AND sp.id = m.surplus_id
+    LEFT JOIN food_bank_inventory fi ON m.source_type = 'food_bank_inventory' AND fi.id = m.source_inventory_id
+    WHERE m.status = 'completed' ${extraWhere}
+  `).all(...params);
+}
+
+function massEquivalentKg(rows) {
+  let kg = 0;
+  let unconvertible = 0;
+  for (const row of rows) {
+    const converted = convertQuantity(Number(row.quantity) || 0, row.unit || 'kg', 'kg', row.food_type || '');
+    if (converted.success) kg += converted.convertedQty;
+    else if (Number(row.quantity) > 0) unconvertible += 1;
+  }
+  return { kg: Math.round(kg * 10) / 10, unconvertible };
+}
+
+function getWasteRiskRows(hours = 3.5) {
+  return db.prepare(`
+    SELECT sp.id, sp.food_name, sp.food_type, sp.donor_org_id, sp.quantity_unit,
+           COALESCE(sp.remaining_quantity, sp.quantity) AS remaining_quantity,
+           sp.remaining_usable_time, sp.special_instructions, sp.pickup_address,
+           sp.status, o.name AS donor_name, o.location_address,
+           ((julianday(sp.remaining_usable_time) - julianday('now')) * 24) AS hours_left
+    FROM surplus_posts sp
+    JOIN organizations o ON o.id = sp.donor_org_id
+    WHERE sp.status IN ('available', 'partially_matched')
+      AND o.status = 'active' AND o.verified = 1
+      AND COALESCE(sp.remaining_quantity, sp.quantity) > 0.001
+      AND COALESCE(sp.unsafe, 0) = 0
+      AND sp.remaining_usable_time IS NOT NULL
+      AND julianday(sp.remaining_usable_time) > julianday('now')
+      AND julianday(sp.remaining_usable_time) <= julianday('now', ?)
+    ORDER BY julianday(sp.remaining_usable_time) ASC
+  `).all(`+${hours} hours`);
+}
+
+function parseStorageCapacityKg(value) {
+  const text = String(value || '');
+  const amounts = [...text.matchAll(/(\d+(?:\.\d+)?)\s*(?:kg|kilograms?)\b/ig)];
+  if (!amounts.length) return null;
+  return amounts.reduce((sum, match) => sum + Number(match[1]), 0);
+}
+
+function parseProfileTags(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  try {
+    const value = JSON.parse(raw);
+    if (Array.isArray(value)) return value;
+  } catch (_) {}
+  return String(raw).split(',').map(value => value.trim()).filter(Boolean);
+}
+
+function hasEligibleReserveReceiver(surplus) {
+  const donors = db.prepare(`
+    SELECT location_lat, location_lng FROM organizations WHERE id = ? AND status = 'active' AND verified = 1
+  `).get(surplus.donor_org_id);
+  if (!donors || donors.location_lat == null || donors.location_lng == null) return false;
+  const banks = db.prepare(`
+    SELECT o.id, o.location_lat, o.location_lng, dp.food_requirements, dp.dietary_restrictions,
+           dp.storage_capacity, dp.receiving_capacity_kg
+    FROM organizations o JOIN demand_org_profiles dp ON dp.org_id = o.id
+    WHERE o.type LIKE '%food_bank%' AND o.status = 'active' AND o.verified = 1
+  `).all();
+  const rawExpiry = String(surplus.remaining_usable_time || '').trim();
+  const expiryText = rawExpiry.includes('T') ? rawExpiry : rawExpiry.replace(' ', 'T');
+  const expiry = Date.parse(/[zZ]|[+-]\d{2}:?\d{2}$/.test(expiryText) ? expiryText : `${expiryText}Z`);
+  const foodType = String(surplus.food_type || '').toLowerCase();
+  const perishable = /dairy|milk|yogurt|curd|cheese|paneer|butter|beverage|cooked|meal|curry|pulav|pulao|biryani/.test(foodType);
+
+  return banks.some(bank => {
+    if (bank.location_lat == null || bank.location_lng == null) return false;
+    const lat1 = Number(donors.location_lat) * Math.PI / 180;
+    const lat2 = Number(bank.location_lat) * Math.PI / 180;
+    const dLat = lat2 - lat1;
+    const dLng = (Number(bank.location_lng) - Number(donors.location_lng)) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+    const distanceKm = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const estimatedRoadDistanceKm = distanceKm * 1.4;
+    if (!Number.isFinite(distanceKm) || estimatedRoadDistanceKm > 50) return false;
+    const etaMinutes = Math.round(40 + (estimatedRoadDistanceKm / 25) * 60);
+    if (!Number.isFinite(expiry) || Date.now() + (etaMinutes + 15) * 60000 > expiry) return false;
+    if (!isFoodAcceptedByProfile(surplus.food_type, surplus.food_name, parseProfileTags(bank.food_requirements))) return false;
+    if (!checkDietarySafety(surplus.dietary_tags, [], bank.dietary_restrictions).pass) return false;
+    if (perishable && !/(refrigerat|cold storage|freezer|chilled|cold chain)/i.test(bank.storage_capacity || '')) return false;
+    if (db.prepare(`SELECT 1 FROM matches WHERE source_type = 'surplus' AND surplus_id = ? AND demand_org_id = ? AND status = 'declined' LIMIT 1`).get(surplus.id, bank.id)) return false;
+
+    const capacityKg = Number(bank.receiving_capacity_kg);
+    if (!Number.isFinite(capacityKg) || capacityKg <= 0) return false;
+    const todayMatches = db.prepare(`
+      SELECT m.allocated_quantity, m.allocated_unit, COALESCE(sp.food_type, '') AS food_type
+      FROM matches m LEFT JOIN surplus_posts sp ON sp.id = m.surplus_id
+      WHERE m.demand_org_id = ? AND m.status IN ('pending', 'confirmed', 'completed')
+        AND date(m.matched_at) = date('now')
+    `).all(bank.id);
+    const usedKg = todayMatches.reduce((sum, match) => {
+      const converted = convertQuantity(Number(match.allocated_quantity) || 0, match.allocated_unit || 'kg', 'kg', match.food_type || surplus.food_type);
+      return sum + (converted.success ? converted.convertedQty : Number(match.allocated_quantity) || 0);
+    }, 0);
+    const stock = convertQuantity(Number(surplus.remaining_quantity) || 0, surplus.quantity_unit || 'kg', 'kg', surplus.food_type);
+    return stock.success && Math.min(stock.convertedQty, capacityKg - usedKg) > 0.001;
+  });
+}
+
 // ── GET /api/network/overview ──────────────────────────────────────────────
 router.get('/overview', (req, res) => {
   try {
-    const totalSurplus = db.prepare("SELECT COUNT(*) as c, COALESCE(SUM(quantity), 0) as qty FROM surplus_posts WHERE status NOT IN ('cancelled')").get();
-    const activeSurplus = db.prepare("SELECT COUNT(*) as c FROM surplus_posts WHERE status = 'available'").get();
-    const activeDemands = db.prepare("SELECT COUNT(*) as c FROM demand_registrations WHERE status IN ('open','partially_fulfilled')").get();
+    const activeSurplus = db.prepare(`
+      SELECT COUNT(*) AS c FROM surplus_posts
+      WHERE status IN ('available', 'partially_matched')
+        AND COALESCE(remaining_quantity, quantity) > 0.001
+        AND COALESCE(unsafe, 0) = 0
+        AND remaining_usable_time IS NOT NULL
+        AND julianday(remaining_usable_time) > julianday('now')
+        AND EXISTS (SELECT 1 FROM organizations o WHERE o.id = surplus_posts.donor_org_id AND o.status = 'active' AND o.verified = 1)
+    `).get();
+    const activeDemands = db.prepare(`
+      SELECT COUNT(*) AS c FROM demand_registrations
+      WHERE status IN ('open', 'partially_fulfilled')
+        AND COALESCE(remaining_quantity, quantity_needed) > 0.001
+        AND EXISTS (SELECT 1 FROM organizations o WHERE o.id = demand_registrations.demand_org_id AND o.status = 'active' AND o.verified = 1)
+    `).get();
     const activeRedist = db.prepare("SELECT COUNT(*) as c FROM matches WHERE status IN ('pending','confirmed')").get();
-    const totalDemand = db.prepare("SELECT COUNT(*) as c FROM demand_registrations WHERE status NOT IN ('cancelled')").get();
-    const fulfilledDemand = db.prepare("SELECT COUNT(*) as c FROM demand_registrations WHERE status = 'fulfilled'").get();
-    const recoveredToday = db.prepare("SELECT COALESCE(SUM(quantity), 0) as qty FROM surplus_posts WHERE status = 'completed' AND date(updated_at) = date('now')").get();
-
-    // Waste risk count (available & expires within 3 hours)
-    const wasteRisksRaw = db.prepare(`
-      SELECT sp.*, o.name as donor_name,
-        ROUND(CAST((julianday(sp.remaining_usable_time) - julianday('now')) * 24 AS NUMERIC), 2) as hours_left
-      FROM surplus_posts sp
-      JOIN organizations o ON sp.donor_org_id = o.id
-      WHERE sp.status = 'available' AND sp.remaining_usable_time <= datetime('now', '+3.5 hours')
-      ORDER BY sp.remaining_usable_time ASC
-    `).all();
-
+    const recoveredTodayRows = completedMatchRows("AND date(m.completed_at) = date('now')");
+    const demandRows = getDemandCompletionRows();
+    const wasteRisksRaw = getWasteRiskRows(3.5);
     const wasteRiskCount = wasteRisksRaw.length;
-    const fulfillmentRate = totalDemand.c > 0 ? Math.round((fulfilledDemand.c / totalDemand.c) * 100) : (totalSurplus.c > 0 ? 100 : 0);
+    const fulfillmentRate = demandFulfillmentRate(demandRows);
 
     // Recent surplus for overview list
     const recentSurplusRaw = db.prepare(`
       SELECT sp.*, o.name as donor_name, o.location_address
       FROM surplus_posts sp
       JOIN organizations o ON sp.donor_org_id = o.id
-      WHERE sp.status != 'cancelled'
+      WHERE sp.status IN ('available', 'partially_matched')
+        AND o.status = 'active' AND o.verified = 1
+        AND COALESCE(sp.remaining_quantity, sp.quantity) > 0.001
+        AND COALESCE(sp.unsafe, 0) = 0
+        AND sp.remaining_usable_time IS NOT NULL
+        AND julianday(sp.remaining_usable_time) > julianday('now')
       ORDER BY sp.created_at DESC LIMIT 6
     `).all();
 
@@ -69,10 +243,15 @@ router.get('/overview', (req, res) => {
 
     // Urgent demands for overview list
     const urgentDemandsRaw = db.prepare(`
-      SELECT dr.*, o.name as org_name, o.location_address
+      SELECT dr.*, o.name as org_name, o.location_address,
+        COALESCE((SELECT SUM(m.allocated_quantity) FROM matches m
+          WHERE m.demand_id = dr.id AND m.status = 'completed'), 0) AS completed_quantity
       FROM demand_registrations dr
       JOIN organizations o ON dr.demand_org_id = o.id
       WHERE dr.status IN ('open','partially_fulfilled')
+        AND o.status = 'active' AND o.verified = 1
+        AND COALESCE(dr.quantity_needed, 0) > COALESCE((SELECT SUM(m.allocated_quantity) FROM matches m
+          WHERE m.demand_id = dr.id AND m.status = 'completed'), 0)
       ORDER BY CASE dr.urgency WHEN 'emergency' THEN 1 WHEN 'immediate' THEN 2 WHEN 'regular' THEN 3 ELSE 4 END, dr.created_at DESC
       LIMIT 6
     `).all();
@@ -82,7 +261,7 @@ router.get('/overview', (req, res) => {
       title: d.food_requirement,
       foodType: d.food_requirement,
       orgName: d.org_name,
-      quantity: d.quantity_needed,
+      quantity: Math.max(0, Number(d.quantity_needed) - (Number(d.completed_quantity) || 0)),
       unit: d.quantity_unit,
       urgency: d.urgency,
       address: d.location_address,
@@ -96,11 +275,11 @@ router.get('/overview', (req, res) => {
       id: r.id,
       foodType: r.food_name || r.food_type,
       donorName: r.donor_name,
-      quantity: r.quantity,
+      quantity: r.remaining_quantity,
       unit: r.quantity_unit,
-      detail: `Surplus at risk — expires in ${formatTimeRemaining(r.hours_left)}. No match confirmed yet.`,
+      detail: `Unallocated safe surplus at risk — expires in ${formatTimeRemaining(r.hours_left)}.`,
       expiresIn: formatTimeRemaining(r.hours_left),
-      severity: r.hours_left <= 1.5 ? 'high' : 'medium'
+      severity: r.hours_left <= 2.0 ? 'high' : 'medium'
     }));
 
     res.json({
@@ -109,7 +288,7 @@ router.get('/overview', (req, res) => {
       activeRedistributions: activeRedist.c,
       fulfillmentRate,
       wasteRiskCount,
-      foodRecoveredToday: `${Math.round(recoveredToday.qty)} kg`,
+      foodRecoveredToday: formatUnitTotals(recoveredTodayRows, 'quantity', 'unit'),
       recentSurplus,
       urgentDemands,
       wasteRisks
@@ -337,15 +516,13 @@ router.get('/rebalancing', (req, res) => {
 router.get('/reserve', (req, res) => {
   try {
     const foodBanksRaw = db.prepare(`
-      SELECT o.*, dp.serving_capacity, dp.storage_capacity
+      SELECT o.id, o.name, o.location_address, dp.storage_capacity
       FROM organizations o
       LEFT JOIN demand_org_profiles dp ON o.id = dp.org_id
       WHERE o.type = 'food_bank' AND o.status = 'active' AND o.verified = 1
     `).all();
 
     const reservePoints = foodBanksRaw.map(fb => {
-      // Inventory already received takes up reserve capacity. Add pending/accepted
-      // allocations separately so promised deliveries reserve room before arrival.
       const inventoryRows = db.prepare(`
         SELECT food_type, quantity_remaining, quantity_unit
         FROM food_bank_inventory WHERE org_id = ? AND quantity_remaining > 0
@@ -357,41 +534,67 @@ router.get('/reserve', (req, res) => {
         LEFT JOIN food_bank_inventory i ON m.source_type = 'food_bank_inventory' AND i.id = m.source_inventory_id
         WHERE m.demand_org_id = ? AND m.status IN ('pending', 'confirmed')
       `).all(fb.id);
-      const toServings = (quantity, unit, foodType) => {
-        const converted = convertQuantity(Number(quantity) || 0, unit || 'servings', 'servings', foodType || '');
-        return converted.success ? converted.convertedQty : 0;
+      const toKg = (quantity, unit, foodType) => {
+        const converted = convertQuantity(Number(quantity) || 0, unit || 'kg', 'kg', foodType || '');
+        return converted.success ? converted.convertedQty : null;
       };
-      const stockServings = inventoryRows.reduce((sum, row) => sum + toServings(row.quantity_remaining, row.quantity_unit, row.food_type), 0);
-      const incomingServings = incomingRows.reduce((sum, row) => sum + toServings(row.allocated_quantity, row.allocated_unit, row.food_type), 0);
-      const currentLoad = Math.round((stockServings + incomingServings) * 10) / 10;
+      const stockKgValues = inventoryRows.map(row => toKg(row.quantity_remaining, row.quantity_unit, row.food_type));
+      const incomingKgValues = incomingRows.map(row => toKg(row.allocated_quantity, row.allocated_unit, row.food_type));
+      const unknownInventoryItems = stockKgValues.filter(value => value == null).length;
+      const unknownIncomingItems = incomingKgValues.filter(value => value == null).length;
+      const inventoryLoadKg = stockKgValues.reduce((sum, value) => sum + (value || 0), 0);
+      const incomingLoadKg = incomingKgValues.reduce((sum, value) => sum + (value || 0), 0);
+      const hasUnknownLoad = unknownInventoryItems + unknownIncomingItems > 0;
+      const capacityKg = parseStorageCapacityKg(fb.storage_capacity);
+      const currentLoadKg = hasUnknownLoad ? null : Math.round((inventoryLoadKg + incomingLoadKg) * 10) / 10;
+      const availableKg = capacityKg != null && currentLoadKg != null
+        ? Math.max(0, Math.round((capacityKg - currentLoadKg) * 10) / 10)
+        : null;
 
       return {
         id: fb.id,
         name: fb.name,
         locationAddress: fb.location_address,
-        capacity: Number(fb.serving_capacity) > 0 ? Number(fb.serving_capacity) : null,
-        currentLoad,
-        inventoryLoad: Math.round(stockServings * 10) / 10,
-        incomingLoad: Math.round(incomingServings * 10) / 10,
+        capacityKg,
+        currentLoadKg,
+        inventoryLoadKg: Math.round(inventoryLoadKg * 10) / 10,
+        incomingLoadKg: Math.round(incomingLoadKg * 10) / 10,
+        availableKg,
+        hasUnknownLoad,
+        unknownInventoryItems,
+        unknownIncomingItems,
         storageInfo: fb.storage_capacity || 'Storage details not declared',
         status: 'operational'
       };
     });
 
     const pendingReserve = db.prepare(`
-      SELECT sp.*, o.name as donor_name
+      SELECT sp.*, o.name as donor_name,
+             COALESCE(sp.remaining_quantity, sp.quantity) AS remaining_to_route
       FROM surplus_posts sp
       JOIN organizations o ON sp.donor_org_id = o.id
-      WHERE sp.status = 'available' AND sp.remaining_usable_time <= datetime('now', '+3 hours')
-    `).all().map(p => ({
+      WHERE o.status = 'active' AND o.verified = 1
+        AND sp.status IN ('available', 'partially_matched')
+        AND COALESCE(sp.unsafe, 0) = 0
+        AND COALESCE(sp.remaining_quantity, sp.quantity) > 0.001
+        AND NOT EXISTS (
+          SELECT 1 FROM matches m WHERE m.source_type = 'surplus' AND m.surplus_id = sp.id
+            AND m.status IN ('pending', 'confirmed')
+        )
+        AND sp.remaining_usable_time IS NOT NULL
+        AND julianday(sp.remaining_usable_time) > julianday('now')
+        AND julianday(sp.remaining_usable_time) <= julianday('now', '+3 hours')
+      ORDER BY julianday(sp.remaining_usable_time) ASC
+    `).all().filter(hasEligibleReserveReceiver).map(p => ({
       id: p.id,
       title: p.food_name,
       foodType: p.food_type,
       donorName: p.donor_name,
-      quantity: p.quantity,
+      quantity: p.remaining_to_route,
       unit: p.quantity_unit,
-      address: p.pickup_address || p.location_address,
-      status: 'pending_buffer'
+      address: p.pickup_address || '',
+      availableUntil: p.remaining_usable_time,
+      status: 'reserve_review'
     }));
 
     res.json({ reservePoints, pendingReserve });
@@ -403,75 +606,112 @@ router.get('/reserve', (req, res) => {
 // ── GET /api/network/community ─────────────────────────────────────────────
 router.get('/community', (req, res) => {
   try {
-    const topSurplus = db.prepare(`
-      SELECT o.name, o.location_address as area, COUNT(*) as post_count, COALESCE(SUM(sp.quantity), 0) as total_qty
-      FROM organizations o
-      JOIN surplus_posts sp ON o.id = sp.donor_org_id
-      WHERE sp.status != 'cancelled'
-      GROUP BY o.id
-      ORDER BY total_qty DESC LIMIT 4
+    const supplyRows = db.prepare(`
+      SELECT o.id AS org_id, o.name, o.location_address AS area,
+             sp.id AS surplus_id, sp.food_name, sp.food_type,
+             COALESCE(sp.remaining_quantity, sp.quantity) AS quantity,
+             sp.quantity_unit AS unit
+      FROM surplus_posts sp
+      JOIN organizations o ON o.id = sp.donor_org_id
+      WHERE o.status = 'active' AND o.verified = 1
+        AND sp.status IN ('available', 'partially_matched')
+        AND COALESCE(sp.remaining_quantity, sp.quantity) > 0.001
+        AND COALESCE(sp.unsafe, 0) = 0
+        AND sp.remaining_usable_time IS NOT NULL
+        AND julianday(sp.remaining_usable_time) > julianday('now')
     `).all();
-
-    const surplusHotspots = topSurplus.map(s => ({
-      area: s.area || s.name,
-      detail: `${s.name} — ${s.post_count} surplus donations (${Math.round(s.total_qty * 10) / 10} kg registered)`,
-      severity: s.total_qty > 50 ? 'high' : 'medium'
-    }));
-
-    const topDemand = db.prepare(`
-      SELECT o.name, o.location_address as area, COUNT(*) as demand_count, COALESCE(SUM(dr.quantity_needed), 0) as total_qty
-      FROM organizations o
-      JOIN demand_registrations dr ON o.id = dr.demand_org_id
-      WHERE dr.status != 'cancelled'
-      GROUP BY o.id
-      ORDER BY total_qty DESC LIMIT 4
+    const demandRows = getDemandCompletionRows().filter(row =>
+      ['open', 'partially_fulfilled'].includes(row.status) &&
+      Number(row.quantity_needed) > (Number(row.completed_quantity) || 0)
+    );
+    const demandOrgRows = new Map();
+    const demandOrganizations = db.prepare(`
+      SELECT id, name, location_address FROM organizations WHERE status = 'active' AND verified = 1
     `).all();
+    const orgById = new Map(demandOrganizations.map(org => [org.id, org]));
 
-    const demandHotspots = topDemand.map(d => ({
-      area: d.area || d.name,
-      detail: `${d.name} — ${d.demand_count} community requests (${Math.round(d.total_qty)} servings needed)`,
-      severity: d.total_qty > 50 ? 'high' : 'medium'
-    }));
+    const supplyByOrg = new Map();
+    for (const row of supplyRows) {
+      if (!supplyByOrg.has(row.org_id)) supplyByOrg.set(row.org_id, { ...row, post_count: 0, quantities: [] });
+      const group = supplyByOrg.get(row.org_id);
+      group.post_count += 1;
+      group.quantities.push({ quantity: row.quantity, unit: row.unit });
+    }
 
-    const unservedDemands = db.prepare(`
-      SELECT dr.*, o.name as org_name, o.location_address as area
-      FROM demand_registrations dr
-      JOIN organizations o ON dr.demand_org_id = o.id
-      WHERE dr.status = 'open'
-      ORDER BY dr.created_at ASC LIMIT 3
-    `).all();
+    for (const row of demandRows) {
+      if (!orgById.has(row.demand_org_id)) continue;
+      if (!demandOrgRows.has(row.demand_org_id)) demandOrgRows.set(row.demand_org_id, { org: orgById.get(row.demand_org_id), requests: [] });
+      demandOrgRows.get(row.demand_org_id).requests.push({
+        ...row,
+        remaining: Math.max(0, Number(row.quantity_needed) - (Number(row.completed_quantity) || 0))
+      });
+    }
 
-    const accessGaps = unservedDemands.map(u => ({
-      area: u.area || u.org_name,
-      detail: `${u.org_name} has an unfulfilled request for ${u.quantity_needed} ${u.quantity_unit} of ${u.food_requirement.replace(/_/g, ' ')}. Requires donor connection.`,
-      severity: u.urgency === 'emergency' || u.urgency === 'immediate' ? 'high' : 'medium'
-    }));
+    const formatArea = address => String(address || '').split(',')[0].trim();
+    const surplusHotspots = [...supplyByOrg.values()]
+      .sort((a, b) => b.post_count - a.post_count)
+      .slice(0, 4)
+      .map(org => ({
+        area: formatArea(org.area) || org.name,
+        orgName: org.name,
+        orgId: org.org_id,
+        post_count: org.post_count,
+        detail: `${org.name} — ${org.post_count} active post${org.post_count === 1 ? '' : 's'} with ${formatUnitTotals(org.quantities, 'quantity', 'unit')} remaining.`,
+        severity: org.post_count >= 3 ? 'high' : 'medium'
+      }));
 
-    const mismatches = [];
-    const openRequirements = db.prepare(`
-      SELECT DISTINCT food_requirement, quantity_unit, SUM(quantity_needed) as needed
-      FROM demand_registrations
-      WHERE status IN ('open', 'partially_fulfilled')
-      GROUP BY food_requirement, quantity_unit
-    `).all();
+    const demandHotspots = [...demandOrgRows.entries()]
+      .map(([orgId, entry]) => ({
+        orgId,
+        orgName: entry.org.name,
+        area: formatArea(entry.org.location_address) || entry.org.name,
+        requests: entry.requests,
+        request_count: entry.requests.length,
+        quantities: entry.requests.map(request => ({ quantity: request.remaining, unit: request.quantity_unit }))
+      }))
+      .sort((a, b) => b.request_count - a.request_count)
+      .slice(0, 4)
+      .map(org => ({
+        ...org,
+        detail: `${org.orgName} — ${org.request_count} open request${org.request_count === 1 ? '' : 's'} with ${formatUnitTotals(org.quantities, 'quantity', 'unit')} still unmet.`,
+        severity: org.request_count >= 3 ? 'high' : 'medium'
+      }));
 
-    const availableTypes = db.prepare(`
-      SELECT DISTINCT food_type
-      FROM surplus_posts
-      WHERE status = 'available'
-    `).all().map(r => r.food_type);
+    const accessGaps = demandRows
+      .sort((a, b) => {
+        const urgency = { emergency: 0, immediate: 1, regular: 2, planned: 3 };
+        return (urgency[a.urgency] ?? 4) - (urgency[b.urgency] ?? 4) || String(a.id).localeCompare(String(b.id));
+      })
+      .slice(0, 5)
+      .map(row => {
+        const org = orgById.get(row.demand_org_id);
+        const outstanding = Math.max(0, Number(row.quantity_needed) - (Number(row.completed_quantity) || 0));
+        return {
+          orgName: org?.name || 'Demand organisation',
+          area: formatArea(org?.location_address) || org?.name || 'Area not recorded',
+          detail: `${org?.name || 'A demand organisation'} still needs ${outstanding} ${row.quantity_unit || 'units'} of ${String(row.food_requirement || 'food').replace(/_/g, ' ')}; completed deliveries are deducted.`,
+          severity: ['emergency', 'immediate'].includes(row.urgency) ? 'high' : 'medium'
+        };
+      });
 
-    openRequirements.forEach(reqItem => {
-      const isAvailable = availableTypes.some(t => t.toLowerCase() === reqItem.food_requirement.toLowerCase());
-      if (!isAvailable) {
-        mismatches.push({
-          id: `mis-${mismatches.length + 1}`,
-          title: `Unmet Need: ${reqItem.food_requirement.replace(/_/g, ' ')}`,
-          detail: `Community demands ${Math.round(reqItem.needed)} ${reqItem.quantity_unit || 'servings'} of ${reqItem.food_requirement.replace(/_/g, ' ')}, but 0 matching available surplus exists in the donor network.`,
-          frequency: 'Active deficit'
-        });
-      }
+    const availableTypes = supplyRows.map(row => ({ foodType: row.food_type, foodName: row.food_name }));
+    const requirementGroups = new Map();
+    demandRows.forEach(row => {
+      const key = `${String(row.food_requirement || '').toLowerCase()}|${canonicalUnit(row.quantity_unit)}`;
+      const outstanding = Math.max(0, Number(row.quantity_needed) - (Number(row.completed_quantity) || 0));
+      const group = requirementGroups.get(key) || { food_requirement: row.food_requirement, quantity_unit: row.quantity_unit, needed: 0 };
+      group.needed += outstanding;
+      requirementGroups.set(key, group);
     });
+    const mismatches = [...requirementGroups.values()]
+      .filter(reqItem => !availableTypes.some(supply => isFoodAcceptedByProfile(supply.foodType, supply.foodName, [reqItem.food_requirement])))
+      .map((reqItem, index) => ({
+        id: `mis-${index + 1}`,
+        foodRequirement: reqItem.food_requirement,
+        title: `Unmet Need: ${String(reqItem.food_requirement || 'food').replace(/_/g, ' ')}`,
+        detail: `${formatUnitTotals([{ quantity: reqItem.needed, unit: reqItem.quantity_unit }], 'quantity', 'unit')} remains unmet and no active in-date surplus with a compatible food type is listed.`,
+        frequency: 'Current supply gap'
+      }));
 
     res.json({ surplusHotspots, demandHotspots, accessGaps, mismatches });
   } catch (err) {
@@ -483,20 +723,13 @@ router.get('/community', (req, res) => {
 // ── GET /api/network/waste-risk ────────────────────────────────────────────
 router.get('/waste-risk', (req, res) => {
   try {
-    const atRisk = db.prepare(`
-      SELECT sp.*, o.name as donor_name, o.location_address,
-        ROUND(CAST((julianday(sp.remaining_usable_time) - julianday('now')) * 24 AS NUMERIC), 2) as hours_left
-      FROM surplus_posts sp
-      JOIN organizations o ON sp.donor_org_id = o.id
-      WHERE sp.status = 'available'
-      ORDER BY sp.remaining_usable_time ASC
-    `).all();
+    const atRisk = getWasteRiskRows(3.5);
 
     const risks = atRisk.map(r => ({
       id: r.id,
       foodType: r.food_name || r.food_type,
       donorName: r.donor_name,
-      quantity: r.quantity,
+      quantity: r.remaining_quantity,
       unit: r.quantity_unit,
       detail: `Pickup at ${r.location_address || 'donor site'}. ${r.special_instructions || 'Needs match.'}`,
       expiresIn: formatTimeRemaining(r.hours_left),
@@ -507,6 +740,74 @@ router.get('/waste-risk', (req, res) => {
     res.json({ risks });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch waste risk' });
+  }
+});
+
+// ── POST /api/network/surplus/:id/route ────────────────────────────────────
+// Coordinator-triggered priority matching: eligible direct demands are tried
+// first, followed by the existing food-bank fallback and safety review flow.
+router.post('/surplus/:id/route', async (req, res) => {
+  const surplusId = req.params.id;
+  if (routingSurplusIds.has(surplusId)) {
+    return res.status(409).json({ error: 'Routing is already running for this surplus. Refresh the queue shortly.' });
+  }
+  routingSurplusIds.add(surplusId);
+  try {
+    const surplus = db.prepare(`
+      SELECT sp.*, o.status AS donor_status, o.verified AS donor_verified
+      FROM surplus_posts sp JOIN organizations o ON o.id = sp.donor_org_id
+      WHERE sp.id = ?
+    `).get(surplusId);
+    if (!surplus) return res.status(404).json({ error: 'Surplus post not found' });
+    if (surplus.donor_status !== 'active' || !surplus.donor_verified) {
+      return res.status(409).json({ error: 'Only active, verified donors can be routed' });
+    }
+    if (!['available', 'partially_matched'].includes(surplus.status) || Number(surplus.unsafe) === 1) {
+      return res.status(409).json({ error: 'This surplus is no longer eligible for safe-food matching' });
+    }
+    const remaining = surplus.remaining_quantity == null ? Number(surplus.quantity) : Number(surplus.remaining_quantity);
+    if (!(remaining > 0.001) || !surplus.remaining_usable_time ||
+        Number(db.prepare("SELECT julianday(?) > julianday('now') AS valid").get(surplus.remaining_usable_time)?.valid) !== 1) {
+      return res.status(409).json({ error: 'This surplus has no remaining safe quantity or is past its safe-until time' });
+    }
+
+    const donorOrg = db.prepare('SELECT * FROM organizations WHERE id = ?').get(surplus.donor_org_id);
+    const candidates = db.prepare(`
+      SELECT DISTINCT o.id, o.location_lat, o.location_lng
+      FROM organizations o
+      WHERE o.status = 'active' AND o.verified = 1 AND (
+        EXISTS (
+          SELECT 1 FROM demand_registrations d
+          WHERE d.demand_org_id = o.id AND d.status IN ('open', 'partially_fulfilled')
+            AND COALESCE(d.remaining_quantity, d.quantity_needed) > 0
+        ) OR (o.type LIKE '%food_bank%' AND EXISTS (
+          SELECT 1 FROM demand_org_profiles dp WHERE dp.org_id = o.id
+        ))
+      )
+    `).all();
+    const [routeResults, biogasRouteResults] = await Promise.all([
+      precomputeRoutes(donorOrg, candidates),
+      precomputeRoutesToBiogas(donorOrg)
+    ]);
+
+    // The matching service handles demand priority, food-bank capacity,
+    // partner notifications, and fallback to biogas or coordinator review.
+    const priorMatchIds = new Set(db.prepare('SELECT id FROM matches WHERE surplus_id = ?').all(surplusId).map(match => match.id));
+    runUnifiedMatching({ surplusId, routeResults, biogasRouteResults });
+
+    const offers = db.prepare(`
+      SELECT m.id, m.allocated_quantity AS quantity, m.allocated_unit AS unit,
+             m.status, o.name AS recipient_name
+      FROM matches m JOIN organizations o ON o.id = m.demand_org_id
+      WHERE m.surplus_id = ? ORDER BY m.matched_at DESC
+    `).all(surplusId).filter(match => !priorMatchIds.has(match.id));
+    const updated = db.prepare('SELECT status, remaining_quantity FROM surplus_posts WHERE id = ?').get(surplusId);
+    res.json({ success: true, offers, status: updated?.status, remainingQuantity: updated?.remaining_quantity });
+  } catch (err) {
+    console.error('[Network/SurplusRoute]', err);
+    res.status(500).json({ error: 'Could not route this surplus' });
+  } finally {
+    routingSurplusIds.delete(surplusId);
   }
 });
 
@@ -600,17 +901,29 @@ router.get('/interventions', (req, res) => {
 // ── GET /api/network/metrics ───────────────────────────────────────────────
 router.get('/metrics', (req, res) => {
   try {
-    const totalSurplus = db.prepare("SELECT COALESCE(SUM(quantity), 0) as q FROM surplus_posts WHERE status != 'cancelled'").get();
-    const totalDemand = db.prepare("SELECT COALESCE(SUM(quantity_needed), 0) as q FROM demand_registrations WHERE status != 'cancelled'").get();
-    const recovered = db.prepare("SELECT COALESCE(SUM(quantity), 0) as q FROM surplus_posts WHERE status IN ('completed', 'confirmed', 'matched')").get();
-    const openDemand = db.prepare("SELECT COALESCE(SUM(quantity_needed), 0) as q FROM demand_registrations WHERE status IN ('open','partially_fulfilled')").get();
-
-    const totalSurplusQty = Math.round(totalSurplus.q * 10) / 10;
-    const totalDemandQty = Math.round(totalDemand.q);
-    const recoveredQty = Math.round(recovered.q * 10) / 10;
-    const openDemandQty = Math.round(openDemand.q);
-
-    const fulfillmentRate = totalDemandQty > 0 ? Math.round(((totalDemandQty - openDemandQty) / totalDemandQty) * 100) : (totalSurplusQty > 0 ? 100 : 0);
+    const totalSurplusRows = db.prepare(`
+      SELECT quantity, quantity_unit AS unit FROM surplus_posts WHERE status != 'cancelled'
+    `).all();
+    const demandRows = getDemandCompletionRows();
+    const unmetRows = demandRows.filter(row => ['open', 'partially_fulfilled'].includes(row.status)).map(row => ({
+      quantity: Math.max(0, (Number(row.quantity_needed) || 0) - (Number(row.completed_quantity) || 0)),
+      unit: row.quantity_unit
+    }));
+    const completedRows = completedMatchRows();
+    const recoveredMass = massEquivalentKg(completedRows);
+    const sevenDayCompleted = completedMatchRows("AND date(m.completed_at) >= date('now', '-6 days')");
+    const sevenDayExpiredRows = db.prepare(`
+      SELECT COALESCE(remaining_quantity, quantity) AS quantity, quantity_unit AS unit
+      FROM surplus_posts WHERE status = 'expired' AND date(updated_at) >= date('now', '-6 days')
+    `).all();
+    const matchCounts = db.prepare(`
+      SELECT COUNT(*) AS total,
+             SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed
+      FROM matches WHERE date(matched_at) >= date('now', '-6 days')
+    `).get();
+    const matchCompletionRate = Number(matchCounts.total) > 0
+      ? Math.round((Number(matchCounts.completed || 0) / Number(matchCounts.total)) * 100)
+      : 0;
 
     const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const weeklyData = [];
@@ -623,48 +936,48 @@ router.get('/metrics', (req, res) => {
       const dayName = daysOfWeek[d.getDay()];
 
       const daySurplus = db.prepare(`
-        SELECT COALESCE(SUM(quantity), 0) as qty FROM surplus_posts WHERE created_at LIKE ? AND status != 'cancelled'
-      `).get(`${dateStr}%`);
-
+        SELECT COUNT(*) AS count FROM surplus_posts WHERE date(created_at) = ? AND status != 'cancelled'
+      `).get(dateStr);
       const dayDemand = db.prepare(`
-        SELECT COALESCE(SUM(quantity_needed), 0) as qty FROM demand_registrations WHERE created_at LIKE ? AND status != 'cancelled'
-      `).get(`${dateStr}%`);
-
+        SELECT COUNT(*) AS count FROM demand_registrations WHERE date(created_at) = ? AND status != 'cancelled'
+      `).get(dateStr);
       const dayFulfilled = db.prepare(`
-        SELECT COALESCE(SUM(sp.quantity), 0) as qty
-        FROM matches m
-        JOIN surplus_posts sp ON m.surplus_id = sp.id
-        WHERE m.status IN ('completed', 'confirmed', 'matched')
-          AND (m.matched_at LIKE ? OR m.completed_at LIKE ?)
-      `).get(`${dateStr}%`, `${dateStr}%`);
-
+        SELECT COUNT(*) AS count FROM matches WHERE status = 'completed' AND date(completed_at) = ?
+      `).get(dateStr);
       const dayExpired = db.prepare(`
-        SELECT COALESCE(SUM(quantity), 0) as qty FROM surplus_posts WHERE status = 'expired' AND updated_at LIKE ?
-      `).get(`${dateStr}%`);
+        SELECT COUNT(*) AS count FROM surplus_posts WHERE status = 'expired' AND date(updated_at) = ?
+      `).get(dateStr);
 
       weeklyData.push({
         day: dayName,
         date: dateStr,
-        surplus: Math.round(daySurplus.qty || 0),
-        demand: Math.round(dayDemand.qty || 0),
-        fulfilled: Math.round(dayFulfilled.qty || 0)
+        surplus: Number(daySurplus.count) || 0,
+        demand: Number(dayDemand.count) || 0,
+        fulfilled: Number(dayFulfilled.count) || 0
       });
 
       wasteData.push({
         day: dayName,
         date: dateStr,
-        intercepted: Math.round(dayFulfilled.qty || 0),
-        unintercepted: Math.round(dayExpired.qty || 0)
+        intercepted: Number(dayFulfilled.count) || 0,
+        unintercepted: Number(dayExpired.count) || 0
       });
     }
 
+    const co2Estimate = recoveredMass.kg > 0
+      ? `~${Math.round(recoveredMass.kg * 2.5 * 10) / 10} kg CO₂e`
+      : '0 kg CO₂e';
+
     res.json({
-      totalSurplus: `${totalSurplusQty} kg`,
-      totalDemand: `${totalDemandQty} servings`,
-      foodRecovered: `${recoveredQty} kg`,
-      wastePrevented: `${Math.round(recoveredQty * 2.5 * 10) / 10} kg CO₂e`,
-      fulfillmentRate,
-      unmetDemand: `${openDemandQty} servings`,
+      totalSurplus: formatUnitTotals(totalSurplusRows, 'quantity', 'unit'),
+      totalDemand: formatUnitTotals(demandRows.map(row => ({ quantity: row.quantity_needed, unit: row.quantity_unit })), 'quantity', 'unit'),
+      foodRecovered: formatUnitTotals(completedRows, 'quantity', 'unit'),
+      wastePrevented: recoveredMass.unconvertible > 0 ? `${co2Estimate} (mass-convertible only)` : co2Estimate,
+      fulfillmentRate: demandFulfillmentRate(demandRows),
+      unmetDemand: formatUnitTotals(unmetRows, 'quantity', 'unit'),
+      matchCompletionRate,
+      sevenDayRecovered: formatUnitTotals(sevenDayCompleted, 'quantity', 'unit'),
+      sevenDayExpired: formatUnitTotals(sevenDayExpiredRows, 'quantity', 'unit'),
       weeklyData,
       wasteData
     });

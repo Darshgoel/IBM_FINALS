@@ -282,7 +282,7 @@
             <div class="stat-body">
               <div class="stat-label">Fulfillment rate</div>
               <div class="stat-value" id="ov-rate">--</div>
-              <div class="stat-change">Registered demand met to date</div>
+              <div class="stat-change">Average share delivered; completed collections only</div>
             </div>
           </div>
           <div class="stat-card red">
@@ -310,7 +310,7 @@
                 <h2 class="card-title">Latest surplus</h2>
                 <p class="card-sub">Most recent donor listings across the network</p>
               </div>
-              <button class="card-link" type="button" onclick="navigate('supply-demand', null)">
+              <button class="card-link" type="button" onclick="openOverviewDrilldown('surplus')">
                 View all
                 <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg>
               </button>
@@ -324,7 +324,7 @@
                 <h2 class="card-title">Urgent demands</h2>
                 <p class="card-sub">Highest-priority unmet needs</p>
               </div>
-              <button class="card-link" type="button" onclick="navigate('supply-demand', null)">
+              <button class="card-link" type="button" onclick="openOverviewDrilldown('demand')">
                 View all
                 <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg>
               </button>
@@ -520,13 +520,13 @@
       <section class="section" id="page-fallback" aria-labelledby="reserve-title">
         <div class="page-heading">
           <div>
-            <h1 id="reserve-title">Reserve allocation</h1>
-            <p>Surplus with no immediate demand can be routed to a storage-capable reserve point.</p>
+            <h1 id="reserve-title">Reserve capacity and candidates</h1>
+            <p>Review remaining safe surplus with no active offer and a verified food bank that passes food, safety, capacity and conservative route estimates.</p>
           </div>
           <div class="heading-actions">
             <button class="btn btn-secondary" type="button" onclick="refreshCurrentPage()">
               <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg>
-              Refresh capacity
+              Refresh reserve data
             </button>
           </div>
         </div>
@@ -535,9 +535,9 @@
           <div class="stat-card green">
             <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-inbox"></use></svg></div>
             <div class="stat-body">
-              <div class="stat-label">Reserve points</div>
+              <div class="stat-label">Verified food banks</div>
               <div class="stat-value" id="rs-points">--</div>
-              <div class="stat-change">Storage-capable organisations</div>
+              <div class="stat-change">Active partners with reserve profiles</div>
             </div>
           </div>
           <div class="stat-card blue">
@@ -545,15 +545,15 @@
             <div class="stat-body">
               <div class="stat-label">Available capacity</div>
               <div class="stat-value" id="rs-available">--</div>
-              <div class="stat-change">Servings not committed</div>
+              <div class="stat-change" id="rs-available-note">Known free storage in kg</div>
             </div>
           </div>
           <div class="stat-card amber">
             <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-clock-fast"></use></svg></div>
             <div class="stat-body">
-              <div class="stat-label">Pending reserve routing</div>
+              <div class="stat-label">Eligible reserve candidates</div>
               <div class="stat-value" id="rs-pending">--</div>
-              <div class="stat-change">Surplus closing within three hours</div>
+              <div class="stat-change">No active offer; eligible receiving partner exists</div>
             </div>
           </div>
         </div>
@@ -563,7 +563,7 @@
             <div class="card-header">
               <div class="card-heading">
                 <h2 class="card-title">Reserve capacity</h2>
-                <p class="card-sub">Capacity is based on committed and in-progress matches</p>
+                <p class="card-sub">Declared storage compared with stock and pending deliveries, where units can be converted safely</p>
               </div>
             </div>
             <div class="reserve-list" id="reserve-points" aria-live="polite"></div>
@@ -572,8 +572,8 @@
           <div class="card">
             <div class="card-header">
               <div class="card-heading">
-                <h2 class="card-title">Pending reserve routing</h2>
-                <p class="card-sub">Available surplus approaching its safe-until window</p>
+                <h2 class="card-title">Surplus eligible for reserve review</h2>
+                <p class="card-sub">Safe surplus with remaining quantity, no pending or confirmed match, and a compatible receiver</p>
               </div>
             </div>
             <div class="net-list" id="pending-reserve" aria-live="polite"></div>
@@ -601,7 +601,7 @@
         <div class="page-heading">
           <div>
             <h1 id="community-title">Community food intelligence</h1>
-            <p>Hotspots, access gaps and recurring supply-demand mismatches across active zones.</p>
+            <p>Current partner supply, unmet demand and food type gaps, with links to the records behind each summary.</p>
           </div>
           <div class="heading-actions">
             <button class="btn btn-secondary" type="button" onclick="refreshCurrentPage()">
@@ -615,25 +615,25 @@
           <div class="stat-card green">
             <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-package"></use></svg></div>
             <div class="stat-body">
-              <div class="stat-label">Surplus hotspots</div>
+              <div class="stat-label">Supply concentrations</div>
               <div class="stat-value" id="ci-surplus">--</div>
-              <div class="stat-change">Areas with concentrated supply</div>
+              <div class="stat-change">Partners with the most active remaining surplus</div>
             </div>
           </div>
           <div class="stat-card orange">
             <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-users"></use></svg></div>
             <div class="stat-body">
-              <div class="stat-label">Demand hotspots</div>
+              <div class="stat-label">Unmet demand concentrations</div>
               <div class="stat-value" id="ci-demand">--</div>
-              <div class="stat-change">Areas with persistent unmet need</div>
+              <div class="stat-change">Partners with the most open unmet requests</div>
             </div>
           </div>
           <div class="stat-card red">
             <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-alert"></use></svg></div>
             <div class="stat-body">
-              <div class="stat-label">Access gaps</div>
+              <div class="stat-label">Open unmet needs</div>
               <div class="stat-value" id="ci-gaps">--</div>
-              <div class="stat-change">Demand zones without recent delivery</div>
+              <div class="stat-change">Open needs ranked by urgency</div>
             </div>
           </div>
         </div>
@@ -642,8 +642,8 @@
           <div class="card">
             <div class="card-header">
               <div class="card-heading">
-                <h2 class="card-title">Surplus hotspots</h2>
-                <p class="card-sub">Areas with consistently high food availability</p>
+                <h2 class="card-title">Supply concentrations</h2>
+                <p class="card-sub">Active partners ranked by the count of in-date surplus posts</p>
               </div>
             </div>
             <div class="hotspot-grid" id="surplus-hotspots" aria-live="polite"></div>
@@ -651,8 +651,8 @@
           <div class="card">
             <div class="card-header">
               <div class="card-heading">
-                <h2 class="card-title">Demand hotspots</h2>
-                <p class="card-sub">Areas with persistently high unmet need</p>
+                <h2 class="card-title">Unmet demand concentrations</h2>
+                <p class="card-sub">Active partners ranked by their open request count</p>
               </div>
             </div>
             <div class="hotspot-grid" id="demand-hotspots" aria-live="polite"></div>
@@ -662,8 +662,8 @@
         <div class="card">
           <div class="card-header">
             <div class="card-heading">
-              <h2 class="card-title">Food access gaps</h2>
-              <p class="card-sub">Underserved areas with no confirmed delivery in the last 30 days</p>
+                <h2 class="card-title">Open unmet needs</h2>
+                <p class="card-sub">Requests ranked by urgency with completed deliveries deducted</p>
             </div>
           </div>
           <div class="hotspot-grid" id="access-gaps" aria-live="polite"></div>
@@ -672,8 +672,8 @@
         <div class="card">
           <div class="card-header">
             <div class="card-heading">
-              <h2 class="card-title">Recurring supply-demand mismatches</h2>
-              <p class="card-sub">Structural patterns derived from post attributes and active demand</p>
+                <h2 class="card-title">Current food type gaps</h2>
+                <p class="card-sub">Active demand food types with no compatible in-date surplus currently listed</p>
             </div>
           </div>
           <div class="net-list" id="recurring-mismatches" aria-live="polite"></div>
@@ -725,8 +725,8 @@
         <div class="net-callout">
           <svg class="icon" aria-hidden="true"><use href="#i-shield"></use></svg>
           <div>
-            <strong>Advisory queue.</strong>
-            <p>This build has no re-match or force-reserve endpoint. Coordinate a donor, recipient or reserve placement through the existing match and operations workflows; the queue updates from stored surplus status.</p>
+            <strong>Coordinator action.</strong>
+            <p>Use “Find destination” to run the matching rules for this remaining surplus. Eligible open demands are prioritized before food-bank reserve offers. Any offer stays pending until the receiving partner accepts or declines it.</p>
           </div>
         </div>
 
@@ -820,7 +820,7 @@
             <div class="stat-body">
               <div class="stat-label">Total surplus</div>
               <div class="stat-value" id="m-total-surplus">--</div>
-              <div class="stat-change">All recorded posts</div>
+              <div class="stat-change">Non-cancelled posts, grouped by unit</div>
             </div>
           </div>
           <div class="stat-card blue">
@@ -828,7 +828,7 @@
             <div class="stat-body">
               <div class="stat-label">Total demand</div>
               <div class="stat-value" id="m-total-demand">--</div>
-              <div class="stat-change">All recorded requests</div>
+              <div class="stat-change">Non-cancelled requests, grouped by unit</div>
             </div>
           </div>
           <div class="stat-card green">
@@ -836,7 +836,7 @@
             <div class="stat-body">
               <div class="stat-label">Food recovered</div>
               <div class="stat-value" id="m-recovered">--</div>
-              <div class="stat-change">Completed collections</div>
+              <div class="stat-change">Completed allocations, grouped by unit</div>
             </div>
           </div>
           <div class="stat-card purple">
@@ -844,7 +844,7 @@
             <div class="stat-body">
               <div class="stat-label">Waste prevented</div>
               <div class="stat-value" id="m-waste-prevented">--</div>
-              <div class="stat-change">CO2e estimate from recovered food</div>
+              <div class="stat-change">Estimate from recovered food safely convertible to kg</div>
             </div>
           </div>
           <div class="stat-card blue">
@@ -852,7 +852,7 @@
             <div class="stat-body">
               <div class="stat-label">Fulfillment rate</div>
               <div class="stat-value" id="m-fulfillment">--</div>
-              <div class="stat-change">Demand met to date</div>
+              <div class="stat-change">Average share delivered; completed collections only</div>
             </div>
           </div>
           <div class="stat-card red">
@@ -860,7 +860,7 @@
             <div class="stat-body">
               <div class="stat-label">Unmet demand</div>
               <div class="stat-value" id="m-unmet">--</div>
-              <div class="stat-change">Open demand quantity</div>
+              <div class="stat-change">Original demand less completed deliveries, by unit</div>
             </div>
           </div>
         </div>
@@ -873,10 +873,10 @@
             </div>
           </div>
           <div class="metric-mini-grid">
-            <div class="metric-mini"><span>Seven-day network utilization</span><strong id="m-utilization">--</strong></div>
-            <div class="metric-mini"><span>Seven-day fulfilled</span><strong id="m-success">--</strong></div>
-            <div class="metric-mini"><span>Seven-day expired</span><strong id="m-expired">--</strong></div>
-            <div class="metric-mini"><span>Surplus trend</span><strong id="m-trend">--</strong></div>
+            <div class="metric-mini"><span>Seven-day match completion rate</span><strong id="m-utilization">--</strong></div>
+            <div class="metric-mini"><span>Seven-day recovered quantity</span><strong id="m-success">--</strong></div>
+            <div class="metric-mini"><span>Seven-day expired quantity</span><strong id="m-expired">--</strong></div>
+            <div class="metric-mini"><span>Surplus-post trend</span><strong id="m-trend">--</strong></div>
           </div>
         </div>
 
@@ -884,32 +884,32 @@
           <div class="card chart-card">
             <div class="card-header">
               <div class="card-heading">
-                <h2 class="card-title">Supply vs demand</h2>
-                <p class="card-sub">Daily recorded quantities for the last seven days</p>
+                <h2 class="card-title">Supply and demand activity</h2>
+                <p class="card-sub">Daily record counts for the last seven days</p>
               </div>
             </div>
-            <div class="net-chart" id="weekly-chart" role="group" aria-label="Supply, demand and fulfilled quantities for the last seven days"></div>
+            <div class="net-chart" id="weekly-chart" role="group" aria-label="Supply, demand and completed collection counts for the last seven days"></div>
             <div class="chart-legend">
-              <span class="legend-item"><i style="background:var(--fb-primary)"></i> Surplus</span>
-              <span class="legend-item"><i style="background:var(--fb-blue)"></i> Demand</span>
-              <span class="legend-item"><i style="background:var(--fb-orange)"></i> Fulfilled</span>
+              <span class="legend-item"><i style="background:var(--fb-primary)"></i> Surplus posts</span>
+              <span class="legend-item"><i style="background:var(--fb-blue)"></i> Demand requests</span>
+              <span class="legend-item"><i style="background:var(--fb-orange)"></i> Completed collections</span>
             </div>
-            <p class="chart-note">Hover or focus a bar to read its value. Surplus and recovered quantities are recorded in kilograms; demand follows the unit registered by each organization.</p>
+            <p class="chart-note">Each bar counts records, so different food quantity units are not added together.</p>
           </div>
 
           <div class="card chart-card">
             <div class="card-header">
               <div class="card-heading">
-                <h2 class="card-title">Waste intercepted</h2>
-                <p class="card-sub">Recovered and expired quantities for the last seven days</p>
+                <h2 class="card-title">Collections and expired posts</h2>
+                <p class="card-sub">Completed collection and expired-post counts for the last seven days</p>
               </div>
             </div>
-            <div class="net-chart" id="waste-chart" role="group" aria-label="Intercepted and wasted quantities for the last seven days"></div>
+            <div class="net-chart" id="waste-chart" role="group" aria-label="Completed collection and expired post counts for the last seven days"></div>
             <div class="chart-legend">
-              <span class="legend-item"><i style="background:var(--fb-success)"></i> Intercepted</span>
-              <span class="legend-item"><i style="background:var(--fb-error)"></i> Expired</span>
+              <span class="legend-item"><i style="background:var(--fb-success)"></i> Completed collections</span>
+              <span class="legend-item"><i style="background:var(--fb-error)"></i> Expired surplus posts</span>
             </div>
-            <p class="chart-note">Only completed matches count as intercepted food. Expired posts count as wasted.</p>
+            <p class="chart-note">Counts only: completed matches are collections; only posts explicitly marked expired are counted as expired.</p>
           </div>
         </div>
 

@@ -1,9 +1,8 @@
 /**
  * FoodBridge — Network Intelligence dashboard
  *
- * Visual shell and layout are adapted from the reference portal. All data
- * comes from the IBM_FINALS /api/network endpoints; this build exposes no
- * re-match, force-reserve, allocation-run or forecast-accuracy mutations.
+ * Visual shell and layout are adapted from the reference portal. Network data
+ * and coordinator-triggered priority routing use the /api/network endpoints.
  */
 
 const API_BASE = '/api';
@@ -335,6 +334,7 @@ const STATUS_LABELS = {
   pending: 'Pending',
   confirmed: 'Confirmed',
   pending_buffer: 'Pending reserve',
+  reserve_review: 'Review candidate',
   operational: 'Operational',
   active: 'Active'
 };
@@ -348,7 +348,7 @@ function statusBadgeClass(status) {
   if (['available', 'completed', 'fulfilled', 'confirmed', 'operational', 'active', 'accepted'].includes(value)) {
     return 'badge-success';
   }
-  if (['pending', 'partially_fulfilled', 'matched', 'near capacity', 'at-risk', 'pending_buffer'].includes(value)) {
+  if (['pending', 'partially_fulfilled', 'matched', 'near capacity', 'at-risk', 'pending_buffer', 'reserve_review'].includes(value)) {
     return 'badge-warning';
   }
   if (['open', 'reserve'].includes(value)) {
@@ -976,14 +976,14 @@ async function loadReserve() {
     state.reserve = data;
     const points = data.reservePoints || [];
     const pending = data.pendingReserve || [];
-    const available = points.reduce((total, point) => {
-      const capacity = Number(point.capacity) || 0;
-      const load = Number(point.currentLoad) || 0;
-      return total + (capacity > 0 ? Math.max(0, capacity - load) : 0);
-    }, 0);
+    const available = points.reduce((total, point) => total + (Number(point.availableKg) || 0), 0);
+    const unknownStorageCount = points.filter(point => point.availableKg == null).length;
 
     setText('rs-points', formatNumber(points.length));
-    setText('rs-available', formatNumber(available));
+    setText('rs-available', `${formatNumber(available)} kg`);
+    setText('rs-available-note', unknownStorageCount
+      ? `${unknownStorageCount} point${unknownStorageCount === 1 ? '' : 's'} excluded: numeric storage or convertible load unavailable`
+      : 'Total declared free storage');
     setText('rs-pending', formatNumber(pending.length));
     renderReservePoints(points);
     renderPendingReserve(pending);
@@ -1003,12 +1003,13 @@ function renderReservePoints(points) {
   }
 
   host.innerHTML = points.map(point => {
-    const capacity = Number(point.capacity) || 0;
-    const load = Number(point.currentLoad) || 0;
-    const hasCapacity = capacity > 0;
-    const available = hasCapacity ? Math.max(0, capacity - load) : null;
-    const percent = capacity > 0 ? Math.min(100, Math.round((load / capacity) * 100)) : 0;
+    const capacity = Number(point.capacityKg);
+    const load = point.currentLoadKg == null ? null : Number(point.currentLoadKg);
+    const hasCapacity = Number.isFinite(capacity) && capacity > 0 && Number.isFinite(load);
+    const available = point.availableKg == null ? null : Number(point.availableKg);
+    const percent = hasCapacity ? Math.min(100, Math.round((load / capacity) * 100)) : 0;
     const tone = percent >= 90 ? 'danger' : percent >= 75 ? 'warn' : '';
+    const unconverted = (Number(point.unknownInventoryItems) || 0) + (Number(point.unknownIncomingItems) || 0);
     return `
       <article class="reserve-card">
         <div class="reserve-head">
@@ -1024,12 +1025,12 @@ function renderReservePoints(points) {
         </div>
         <div class="reserve-capacity-head">
           <span>Stored + incoming</span>
-          <strong>${formatNumber(load)}${hasCapacity ? ` / ${formatNumber(capacity)} servings` : ' servings · capacity not declared'}</strong>
+          <strong>${load == null ? 'Load unknown' : `${formatNumber(load)}${hasCapacity ? ` / ${formatNumber(capacity)} kg` : ' kg'}`}</strong>
         </div>
         ${hasCapacity ? `<div class="reserve-capacity-track"><i class="${tone}" style="width:${percent}%"></i></div>` : ''}
         <div class="reserve-foot">
-          <span>${hasCapacity ? `${percent}% used · ${formatNumber(point.inventoryLoad || 0)} stored + ${formatNumber(point.incomingLoad || 0)} incoming` : `${formatNumber(point.inventoryLoad || 0)} stored + ${formatNumber(point.incomingLoad || 0)} incoming`}</span>
-          <strong>${hasCapacity ? `${formatNumber(available)} servings available` : 'Capacity unavailable'}</strong>
+          <span>${formatNumber(point.inventoryLoadKg || 0)} kg stored + ${formatNumber(point.incomingLoadKg || 0)} kg incoming${unconverted ? ` · ${unconverted} item${unconverted === 1 ? '' : 's'} could not be converted` : ''}</span>
+          <strong>${hasCapacity && available != null ? `${formatNumber(available)} kg free` : 'Free storage unknown'}</strong>
         </div>
       </article>
     `;
@@ -1040,7 +1041,7 @@ function renderPendingReserve(items) {
   const host = document.getElementById('pending-reserve');
   if (!host) return;
   if (!items.length) {
-    host.innerHTML = emptyState('No pending reserve routing', 'Available surplus closing within three hours without a match will appear here.', 'check-circle');
+    host.innerHTML = emptyState('No eligible reserve candidates', 'No safe, unoffered surplus currently meets a verified food bank’s food, safety, location, timing and capacity requirements.', 'check-circle');
     return;
   }
 
@@ -1052,9 +1053,12 @@ function renderPendingReserve(items) {
         <div class="net-item-meta">
           <span>${icon('building', 'icon icon-sm')} ${escapeHtml(cleanText(item.donorName) || 'Donor')}</span>
           <span>${icon('pin', 'icon icon-sm')} ${escapeHtml(cleanText(item.address) || 'Pickup address not shared')}</span>
-          <span>${icon('info', 'icon icon-sm')} Coordinator routing required</span>
+          <span>${icon('info', 'icon icon-sm')} Direct demand first, reserve fallback second</span>
         </div>
         <div class="redist-badges">${statusBadge(item.status)}</div>
+        <button class="btn btn-primary btn-sm" type="button" data-route-id="${escapeAttr(item.id)}" onclick="routeSurplusNow('${escapeAttr(item.id)}', 'fallback')">
+          ${icon('route', 'icon icon-sm')} Find destination
+        </button>
       </div>
       <div class="net-item-right">
         <div class="net-qty amber">${formatNumber(item.quantity)}</div>
@@ -1115,10 +1119,34 @@ function renderHotspots(id, spots, type) {
         <div class="hotspot-area">${escapeHtml(cleanText(spot.area) || 'Unnamed area')}</div>
         <div class="hotspot-detail">${escapeHtml(cleanText(spot.detail) || '')}</div>
         <span class="hotspot-severity sev-${severity}">${escapeHtml(severity)}</span>
+        ${spot.orgName ? `<button class="btn btn-secondary btn-sm" type="button" data-community-type="${type === 'surplus' ? 'surplus' : 'demand'}" data-community-term="${escapeAttr(spot.orgName)}">View related ${type === 'surplus' ? 'posts' : 'requests'}</button>` : ''}
       </article>
     `;
   }).join('');
+  host.querySelectorAll('[data-community-type]').forEach(button => {
+    button.addEventListener('click', () => openCommunityDrilldown(button.dataset.communityType, button.dataset.communityTerm));
+  });
 }
+
+window.openCommunityDrilldown = async function openCommunityDrilldown(type, term) {
+  await navigate('supply-demand', null);
+  state.supplyDemand.type = type === 'surplus' ? 'surplus' : 'demand';
+  document.querySelectorAll('[id^="sd-type-"]').forEach(item => item.classList.remove('active'));
+  document.getElementById(`sd-type-${state.supplyDemand.type}`)?.classList.add('active');
+  const search = document.getElementById('sd-search');
+  if (search) search.value = term || '';
+  applySdFilters(true);
+};
+
+window.openOverviewDrilldown = async function openOverviewDrilldown(type) {
+  await navigate('supply-demand', null);
+  state.supplyDemand.type = type === 'surplus' ? 'surplus' : 'demand';
+  document.querySelectorAll('[id^="sd-type-"]').forEach(item => item.classList.remove('active'));
+  document.getElementById(`sd-type-${state.supplyDemand.type}`)?.classList.add('active');
+  const search = document.getElementById('sd-search');
+  if (search) search.value = '';
+  applySdFilters(true);
+};
 
 function renderMismatches(items) {
   const host = document.getElementById('recurring-mismatches');
@@ -1135,9 +1163,13 @@ function renderMismatches(items) {
         <div class="net-item-title">${escapeHtml(cleanText(item.title) || 'Structural mismatch')}</div>
         <div class="net-item-meta"><span>${escapeHtml(cleanText(item.detail) || '')}</span></div>
         ${item.frequency ? `<div class="mismatch-frequency">${icon('recycle')} ${escapeHtml(cleanText(item.frequency))}</div>` : ''}
+        ${item.foodRequirement ? `<button class="btn btn-secondary btn-sm" type="button" data-community-type="demand" data-community-term="${escapeAttr(item.foodRequirement)}">View related demands</button>` : ''}
       </div>
     </div>
   `).join('');
+  host.querySelectorAll('[data-community-type]').forEach(button => {
+    button.addEventListener('click', () => openCommunityDrilldown(button.dataset.communityType, button.dataset.communityTerm));
+  });
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1178,6 +1210,40 @@ window.setRiskFilter = function setRiskFilter(filter, button) {
   applyRiskFilter();
 };
 
+window.routeSurplusNow = async function routeSurplusNow(surplusId, sourcePage) {
+  const button = document.querySelector(`[data-route-id="${CSS.escape(String(surplusId))}"]`);
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Finding destination…';
+  }
+  try {
+    const result = await apiFetch(`/network/surplus/${encodeURIComponent(surplusId)}/route`, {
+      method: 'POST',
+      body: {}
+    });
+    const offers = result.offers || [];
+    if (offers.length) {
+      const recipients = [...new Set(offers.map(offer => offer.recipient_name).filter(Boolean))].join(', ');
+      await navigate('redistributions', null);
+      setRdStatus('pending', document.getElementById('rd-filter-pending'));
+      toast(`${offers.length} pending offer${offers.length === 1 ? '' : 's'} created${recipients ? ` for ${recipients}` : ''}. Recipients must accept or decline.`, 'success');
+      return;
+    }
+
+    if (sourcePage === 'fallback' && state.page === 'fallback') await loadReserve();
+    else if (state.page === 'waste-risk') await loadWasteRisk();
+    const statusMessage = result.status === 'biogas_pending'
+      ? 'No eligible human-food destination remained; the item was sent to a biogas facility for acceptance.'
+      : result.status === 'review_required'
+        ? 'No eligible destination passed the checks; the item was moved to coordinator review.'
+        : 'No new offer was created. The item may already be allocated or no eligible recipient has capacity.';
+    toast(statusMessage, result.status === 'review_required' ? 'warning' : 'info');
+  } catch (error) {
+    toast(error.message || 'Could not find a destination for this surplus.', 'error');
+    if (button) button.disabled = false;
+  }
+};
+
 function applyRiskFilter() {
   let items = state.risks;
   if (state.riskFilter === 'high') items = items.filter(risk => risk.severity === 'high');
@@ -1210,11 +1276,11 @@ function renderRiskList(items) {
           <div class="risk-timer">Expires in ${escapeHtml(cleanText(risk.expiresIn) || 'unknown')}</div>
           <div class="risk-status-line">
             <span class="badge ${high ? 'badge-danger' : 'badge-warning'}">${high ? 'High risk' : 'Medium risk'}</span>
-            <span class="badge badge-neutral">No automated re-route</span>
+            <span class="badge badge-neutral">Priority matching available</span>
           </div>
           <div class="risk-actions">
-            <button class="risk-btn reserve" type="button" onclick="navigate('network-map', null)">
-              ${icon('map', 'icon icon-sm')} View on network map
+            <button class="btn btn-primary btn-sm" type="button" data-route-id="${escapeAttr(risk.id)}" onclick="routeSurplusNow('${escapeAttr(risk.id)}', 'waste-risk')">
+              ${icon('route', 'icon icon-sm')} Find destination
             </button>
           </div>
         </div>
@@ -1341,15 +1407,9 @@ async function loadMetrics() {
 
     const weekly = metrics.weeklyData || [];
     const waste = metrics.wasteData || [];
-    const sumKey = (rows, key) => rows.reduce((total, row) => total + (Number(row[key]) || 0), 0);
-    const weeklySupply = sumKey(weekly, 'surplus');
-    const weeklyFulfilled = sumKey(weekly, 'fulfilled');
-    const weeklyExpired = sumKey(waste, 'unintercepted');
-    const utilization = weeklySupply > 0 ? Math.round((weeklyFulfilled / weeklySupply) * 100) : null;
-
-    setText('m-utilization', utilization == null ? 'No supply' : `${utilization}%`);
-    setText('m-success', `${formatNumber(weeklyFulfilled)} kg`);
-    setText('m-expired', `${formatNumber(weeklyExpired)} kg`);
+    setText('m-utilization', `${formatNumber(metrics.matchCompletionRate)}%`);
+    setText('m-success', metrics.sevenDayRecovered || '0');
+    setText('m-expired', metrics.sevenDayExpired || '0');
 
     const firstDaySupply = Number(weekly[0]?.surplus) || 0;
     const lastDaySupply = Number(weekly[weekly.length - 1]?.surplus) || 0;
@@ -1363,15 +1423,15 @@ async function loadMetrics() {
     }
 
     renderGroupedChart('weekly-chart', metrics.weeklyData || [], [
-      { key: 'surplus', label: 'surplus', className: '' },
-      { key: 'demand', label: 'demand', className: 'demand' },
-      { key: 'fulfilled', label: 'fulfilled', className: 'fulfilled' }
-    ], 'No supply, demand or completed collections in the last seven days.');
+      { key: 'surplus', label: 'surplus posts', className: '' },
+      { key: 'demand', label: 'demand requests', className: 'demand' },
+      { key: 'fulfilled', label: 'completed collections', className: 'fulfilled' }
+    ], 'No surplus posts, demand requests or completed collections in the last seven days.');
 
     renderGroupedChart('waste-chart', metrics.wasteData || [], [
-      { key: 'intercepted', label: 'intercepted', className: 'intercepted' },
-      { key: 'unintercepted', label: 'expired', className: 'wasted' }
-    ], 'No recovered or expired quantities in the last seven days.');
+      { key: 'intercepted', label: 'completed collections', className: 'intercepted' },
+      { key: 'unintercepted', label: 'expired posts', className: 'wasted' }
+    ], 'No completed collections or surplus posts marked expired in the last seven days.');
     markUpdated();
   } catch (error) {
     renderError('weekly-chart', error.message);

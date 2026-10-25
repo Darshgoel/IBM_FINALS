@@ -1630,6 +1630,7 @@ module.exports = {
   processExpiredSurplus,
   expireOverdueDemands,
   checkCompatibility,
+  checkDietarySafety,
   rankCandidate,
   convertQuantity,
   generateSurplusPredictions,
