@@ -30,6 +30,27 @@ router.post('/register', (req, res) => {
       return res.status(400).json({ error: 'A valid FSSAI licence document is required to register as a food donor' });
     }
 
+    if (['donor', 'demand_org', 'food_bank'].includes(role) && !String(operatingHours || '').trim()) {
+      return res.status(400).json({ error: 'Select operating days, opening time, and closing time' });
+    }
+    if (role === 'demand_org' && (!Number.isFinite(Number(req.body.servingCapacity)) || Number(req.body.servingCapacity) <= 0)) {
+      return res.status(400).json({ error: 'A positive daily meal serving capacity is required' });
+    }
+    if (role === 'food_bank' && (!Number.isFinite(Number(req.body.receivingCapacityKg)) || Number(req.body.receivingCapacityKg) <= 0)) {
+      return res.status(400).json({ error: 'A positive daily receiving capacity in kg is required' });
+    }
+    if (role === 'biogas_operator' && !req.body.biogasFacilityId) {
+      if (!String(operatingHours || '').trim()) {
+        return res.status(400).json({ error: 'Select operating days, opening time, and closing time' });
+      }
+      if (!Number.isFinite(Number(req.body.maxDailyIntakeKg)) || Number(req.body.maxDailyIntakeKg) <= 0) {
+        return res.status(400).json({ error: 'A positive maximum daily intake in kg is required' });
+      }
+      if (!Array.isArray(req.body.acceptedWasteTypes) || req.body.acceptedWasteTypes.length === 0) {
+        return res.status(400).json({ error: 'Select at least one accepted food-waste type' });
+      }
+    }
+
     const autoApprovalSetting = db.prepare(
       'SELECT setting_value FROM platform_settings WHERE setting_key = ?'
     ).get('automatic_organization_approval');
@@ -95,7 +116,14 @@ router.post('/register', (req, res) => {
         if (role === 'donor') {
           db.prepare('INSERT INTO donor_profiles (org_id) VALUES (?)').run(orgId);
         } else if (role === 'demand_org' || role === 'food_bank') {
-          db.prepare('INSERT INTO demand_org_profiles (org_id) VALUES (?)').run(orgId);
+          const servingCapacity = role === 'demand_org' ? Number(req.body.servingCapacity) : 0;
+          const storageCapacity = role === 'food_bank' ? String(req.body.storageCapacity || '') : '';
+          const receivingCapacityKg = role === 'food_bank' ? Number(req.body.receivingCapacityKg) : 0;
+          db.prepare(`
+            INSERT INTO demand_org_profiles
+              (org_id, serving_capacity, storage_capacity, receiving_capacity_kg)
+            VALUES (?, ?, ?, ?)
+          `).run(orgId, servingCapacity, storageCapacity, receivingCapacityKg);
         }
       }
 

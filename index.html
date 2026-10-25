@@ -712,8 +712,17 @@
             <input type="hidden" id="d-lat" /><input type="hidden" id="d-lng" />
             <label class="field-label" for="d-phone">Contact phone</label>
             <input class="field-input" type="tel" id="d-phone" placeholder="+91 98XXX XXXXX" />
-            <label class="field-label" for="d-hours">Operating hours</label>
-            <input class="field-input" type="text" id="d-hours" placeholder="e.g. Mon–Sun 10:00–23:00" />
+            <fieldset class="hours-picker" data-hours-prefix="d">
+              <legend>Operating schedule <span class="req">*</span></legend>
+              <div class="hours-days" aria-label="Days open">
+                <label><input type="checkbox" data-day="Mon" /> Mon</label><label><input type="checkbox" data-day="Tue" /> Tue</label>
+                <label><input type="checkbox" data-day="Wed" /> Wed</label><label><input type="checkbox" data-day="Thu" /> Thu</label>
+                <label><input type="checkbox" data-day="Fri" /> Fri</label><label><input type="checkbox" data-day="Sat" /> Sat</label>
+                <label><input type="checkbox" data-day="Sun" /> Sun</label>
+              </div>
+              <div class="hours-times"><label for="d-open">Opens<input class="field-input" type="time" id="d-open" /></label><label for="d-close">Closes<input class="field-input" type="time" id="d-close" /></label></div>
+              <p class="field-note">Same hours apply on selected days. A closing time earlier than opening means the next day.</p>
+            </fieldset>
             <label class="field-label" for="d-doc">FSSAI licence <span class="req">*</span></label>
             <input class="file-input" type="file" id="d-doc" accept=".pdf,.jpg,.jpeg,.png" required aria-required="true" onchange="previewDocName(this, 'd-doc-label')" />
             <span class="file-name" id="d-doc-label">No file chosen</span>
@@ -725,7 +734,6 @@
             <label class="field-label" for="n-org-type">Organisation type</label>
             <select class="field-input" id="n-org-type">
               <option value="ngo">NGO</option>
-              <option value="food_bank">Food bank</option>
               <option value="shelter">Shelter</option>
               <option value="community_kitchen">Community kitchen</option>
               <option value="other">Other</option>
@@ -748,8 +756,17 @@
             <input class="field-input" type="tel" id="n-phone" placeholder="+91 98XXX XXXXX" />
             <label class="field-label" for="n-capacity">Meals you can handle per day</label>
             <input class="field-input" type="number" id="n-capacity" min="1" placeholder="e.g. 150" />
-            <label class="field-label" for="n-hours">Operating hours</label>
-            <input class="field-input" type="text" id="n-hours" placeholder="e.g. Mon–Sat 09:00–18:00" />
+            <fieldset class="hours-picker" data-hours-prefix="n">
+              <legend>Operating schedule <span class="req">*</span></legend>
+              <div class="hours-days" aria-label="Days open">
+                <label><input type="checkbox" data-day="Mon" /> Mon</label><label><input type="checkbox" data-day="Tue" /> Tue</label>
+                <label><input type="checkbox" data-day="Wed" /> Wed</label><label><input type="checkbox" data-day="Thu" /> Thu</label>
+                <label><input type="checkbox" data-day="Fri" /> Fri</label><label><input type="checkbox" data-day="Sat" /> Sat</label>
+                <label><input type="checkbox" data-day="Sun" /> Sun</label>
+              </div>
+              <div class="hours-times"><label for="n-open">Opens<input class="field-input" type="time" id="n-open" /></label><label for="n-close">Closes<input class="field-input" type="time" id="n-close" /></label></div>
+              <p class="field-note">Same hours apply on selected days. A closing time earlier than opening means the next day.</p>
+            </fieldset>
             <label class="field-label" for="n-doc">Registration certificate (optional)</label>
             <input class="file-input" type="file" id="n-doc" accept=".pdf,.jpg,.jpeg,.png" onchange="previewDocName(this, 'n-doc-label')" />
             <span class="file-name" id="n-doc-label">No file chosen</span>
@@ -775,9 +792,21 @@
             <label class="field-label" for="fb-phone">Contact phone</label>
             <input class="field-input" type="tel" id="fb-phone" placeholder="+91 98XXX XXXXX" />
             <label class="field-label" for="fb-capacity">Storage capacity (kg, approx.)</label>
-            <input class="field-input" type="number" id="fb-capacity" min="0" placeholder="e.g. 2000" />
-            <label class="field-label" for="fb-hours">Operating hours</label>
-            <input class="field-input" type="text" id="fb-hours" placeholder="e.g. Mon–Sat 08:00–20:00" />
+            <input class="field-input" type="number" id="fb-capacity" min="1" placeholder="e.g. 2000" />
+            <label class="foodbank-cold-option"><input type="checkbox" id="fb-cold-storage" /> We have cold storage for perishable food (refrigeration / cold chain)</label>
+            <label class="field-label" for="fb-receive-capacity">Daily receiving capacity (kg/day) <span class="req">*</span></label>
+            <input class="field-input" type="number" id="fb-receive-capacity" min="1" placeholder="e.g. 500" />
+            <fieldset class="hours-picker" data-hours-prefix="fb">
+              <legend>Operating schedule <span class="req">*</span></legend>
+              <div class="hours-days" aria-label="Days open">
+                <label><input type="checkbox" data-day="Mon" /> Mon</label><label><input type="checkbox" data-day="Tue" /> Tue</label>
+                <label><input type="checkbox" data-day="Wed" /> Wed</label><label><input type="checkbox" data-day="Thu" /> Thu</label>
+                <label><input type="checkbox" data-day="Fri" /> Fri</label><label><input type="checkbox" data-day="Sat" /> Sat</label>
+                <label><input type="checkbox" data-day="Sun" /> Sun</label>
+              </div>
+              <div class="hours-times"><label for="fb-open">Opens<input class="field-input" type="time" id="fb-open" /></label><label for="fb-close">Closes<input class="field-input" type="time" id="fb-close" /></label></div>
+              <p class="field-note">Same hours apply on selected days. A closing time earlier than opening means the next day.</p>
+            </fieldset>
             <label class="field-label" for="fb-doc">Registration certificate (optional)</label>
             <input class="file-input" type="file" id="fb-doc" accept=".pdf,.jpg,.jpeg,.png" onchange="previewDocName(this, 'fb-doc-label')" />
             <span class="file-name" id="fb-doc-label">No file chosen</span>
@@ -804,8 +833,17 @@
             <input class="field-input" type="tel" id="bg-phone" placeholder="+91 98XXX XXXXX" />
             <label class="field-label" for="bg-capacity">Max daily intake (kg)</label>
             <input class="field-input" type="number" id="bg-capacity" min="0" placeholder="e.g. 300" />
-            <label class="field-label" for="bg-hours">Operating hours</label>
-            <input class="field-input" type="text" id="bg-hours" placeholder="e.g. Mon–Sat 06:00–20:00" />
+            <fieldset class="hours-picker" data-hours-prefix="bg">
+              <legend>Operating schedule <span class="req">*</span></legend>
+              <div class="hours-days" aria-label="Days open">
+                <label><input type="checkbox" data-day="Mon" /> Mon</label><label><input type="checkbox" data-day="Tue" /> Tue</label>
+                <label><input type="checkbox" data-day="Wed" /> Wed</label><label><input type="checkbox" data-day="Thu" /> Thu</label>
+                <label><input type="checkbox" data-day="Fri" /> Fri</label><label><input type="checkbox" data-day="Sat" /> Sat</label>
+                <label><input type="checkbox" data-day="Sun" /> Sun</label>
+              </div>
+              <div class="hours-times"><label for="bg-open">Opens<input class="field-input" type="time" id="bg-open" /></label><label for="bg-close">Closes<input class="field-input" type="time" id="bg-close" /></label></div>
+              <p class="field-note">Same hours apply on selected days. A closing time earlier than opening means the next day.</p>
+            </fieldset>
             <label class="field-label" for="bg-waste-types">Accepted waste types</label>
             <div class="checkbox-group" id="bg-waste-types">
               <label><input type="checkbox" value="cooked_meals" /> Cooked meals</label>

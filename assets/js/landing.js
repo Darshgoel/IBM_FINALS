@@ -484,6 +484,25 @@ async function handleRegister() {
 
   const payload = { name, email, password, role };
 
+  function readOperatingHours(prefix) {
+    const picker = document.querySelector(`[data-hours-prefix="${prefix}"]`);
+    const days = Array.from(picker?.querySelectorAll('[data-day]:checked') || []).map(input => input.dataset.day);
+    const opens = $(`${prefix}-open`)?.value || '';
+    const closes = $(`${prefix}-close`)?.value || '';
+    if (!days.length) {
+      showMsg('signup-error', 'Choose at least one day the organisation is open.');
+      picker?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return null;
+    }
+    if (!opens || !closes) {
+      showMsg('signup-error', 'Choose both an opening time and a closing time.');
+      (opens ? $(`${prefix}-close`) : $(`${prefix}-open`))?.focus();
+      return null;
+    }
+    const overnight = closes <= opens ? ' (closes next day)' : '';
+    return `${days.join(', ')} ${opens}–${closes}${overnight}`;
+  }
+
   // Helper: read pinned coordinates for a signup role prefix
   function _pinCoords(prefix) {
     const lat = parseFloat($(prefix + '-lat')?.value);
@@ -497,13 +516,14 @@ async function handleRegister() {
     const orgType = $(`${prefix}-org-type`).value;
     const address = ($(`${prefix}-address`).value || '').trim();
     const phone = ($(`${prefix}-phone`).value || '').trim();
-    const hours = ($(`${prefix}-hours`).value || '').trim();
+    const hours = readOperatingHours(prefix);
 
     if (!orgName || !address) {
       showMsg('signup-error', 'Please add your organisation name and address.');
       $(`${prefix}-org-name`).focus();
       return;
     }
+    if (!hours) return;
 
     payload.orgName = orgName;
     payload.orgType = orgType;
@@ -519,7 +539,12 @@ async function handleRegister() {
 
     if (role === 'demand_org') {
       const capacity = ($('n-capacity').value || '').trim();
-      if (capacity) payload.description += ` Daily meal capacity: ${capacity}.`;
+      if (!capacity || Number(capacity) <= 0) {
+        showMsg('signup-error', 'Enter a valid number of meals your organisation can serve per day.');
+        $('n-capacity').focus();
+        return;
+      }
+      payload.servingCapacity = Number(capacity);
     }
 
     const docInput = $(`${prefix}-doc`);
@@ -545,18 +570,28 @@ async function handleRegister() {
   } else if (role === 'food_bank') {
     const orgName = ($('fb-org-name').value || '').trim();
     const address = ($('fb-address').value || '').trim();
+    const hours = readOperatingHours('fb');
     if (!orgName || !address) {
       showMsg('signup-error', 'Please add your food bank name and address.');
       $('fb-org-name').focus();
       return;
     }
+    if (!hours) return;
     const capacity = ($('fb-capacity').value || '').trim();
+    const receivingCapacity = Number($('fb-receive-capacity').value || 0);
+    if (!Number.isFinite(receivingCapacity) || receivingCapacity <= 0) {
+      showMsg('signup-error', 'Enter your daily receiving capacity in kg so the network can offer food only within your limit.');
+      $('fb-receive-capacity').focus();
+      return;
+    }
     payload.orgName = orgName;
     payload.orgType = 'food_bank';
     payload.locationAddress = address;
     payload.contactPhone = ($('fb-phone').value || '').trim();
-    payload.operatingHours = ($('fb-hours').value || '').trim();
-    payload.description = 'Food bank registered through the FoodBridge public site.' + (capacity ? ` Storage capacity: ${capacity} kg.` : '');
+    payload.operatingHours = hours;
+    payload.storageCapacity = `${capacity ? `${capacity} kg` : 'Capacity not specified'}; ${$('fb-cold-storage').checked ? 'cold storage available' : 'dry storage only'}`;
+    payload.receivingCapacityKg = receivingCapacity;
+    payload.description = 'Food bank registered through the FoodBridge public site.';
     const fbCoords = _pinCoords('fb');
     if (fbCoords) { payload.locationLat = fbCoords.lat; payload.locationLng = fbCoords.lng; }
     const docInput = $('fb-doc');
@@ -577,20 +612,33 @@ async function handleRegister() {
   } else if (role === 'biogas_operator') {
     const orgName = ($('bg-org-name').value || '').trim();
     const address = ($('bg-address').value || '').trim();
+    const hours = readOperatingHours('bg');
     if (!orgName || !address) {
       showMsg('signup-error', 'Please add your facility name and address.');
       $('bg-org-name').focus();
       return;
     }
+    if (!hours) return;
+    const dailyIntake = Number($('bg-capacity').value || 0);
+    if (!Number.isFinite(dailyIntake) || dailyIntake <= 0) {
+      showMsg('signup-error', 'Enter a positive maximum daily intake in kg.');
+      $('bg-capacity').focus();
+      return;
+    }
     const checkedTypes = Array.from(
       document.querySelectorAll('#bg-waste-types input[type="checkbox"]:checked')
     ).map(cb => cb.value);
+    if (!checkedTypes.length) {
+      showMsg('signup-error', 'Select at least one food waste type your facility accepts.');
+      $('bg-waste-types').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
     payload.orgName = orgName;
     payload.locationAddress = address;
     payload.contactPhone = ($('bg-phone').value || '').trim();
-    payload.operatingHours = ($('bg-hours').value || '').trim();
-    payload.maxDailyIntakeKg = Number($('bg-capacity').value || 0);
-    payload.acceptedWasteTypes = checkedTypes.length ? checkedTypes : ['all_food_waste'];
+    payload.operatingHours = hours;
+    payload.maxDailyIntakeKg = dailyIntake;
+    payload.acceptedWasteTypes = checkedTypes;
     payload.description = 'Biogas facility registered through the FoodBridge public site.';
     const bgCoords = _pinCoords('bg');
     if (bgCoords) { payload.locationLat = bgCoords.lat; payload.locationLng = bgCoords.lng; }
