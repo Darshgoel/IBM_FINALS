@@ -116,9 +116,9 @@ function getWasteRiskRows(hours = 3.5) {
       AND COALESCE(sp.unsafe, 0) = 0
       AND sp.remaining_usable_time IS NOT NULL
       AND julianday(sp.remaining_usable_time) > julianday('now')
-      AND julianday(sp.remaining_usable_time) <= julianday('now', ?)
+      AND julianday(sp.remaining_usable_time) <= julianday('now') + (? / 24.0)
     ORDER BY julianday(sp.remaining_usable_time) ASC
-  `).all(`+${hours} hours`);
+    `).all(hours);
 }
 
 function parseStorageCapacityKg(value) {
@@ -583,7 +583,7 @@ router.get('/reserve', (req, res) => {
         )
         AND sp.remaining_usable_time IS NOT NULL
         AND julianday(sp.remaining_usable_time) > julianday('now')
-        AND julianday(sp.remaining_usable_time) <= julianday('now', '+3 hours')
+        AND julianday(sp.remaining_usable_time) <= julianday('now') + (3.0 / 24.0)
       ORDER BY julianday(sp.remaining_usable_time) ASC
     `).all().filter(hasEligibleReserveReceiver).map(p => ({
       id: p.id,
