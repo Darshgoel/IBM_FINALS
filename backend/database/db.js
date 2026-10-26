@@ -283,6 +283,8 @@ try { db.exec("ALTER TABLE biogas_facilities ADD COLUMN osm_place_id TEXT DEFAUL
 try { db.exec("ALTER TABLE biogas_facilities ADD COLUMN osm_id TEXT DEFAULT NULL"); } catch(e){}
 try { db.exec("ALTER TABLE biogas_facilities ADD COLUMN osm_type TEXT DEFAULT NULL"); } catch(e){}
 try { db.exec("ALTER TABLE demand_org_profiles ADD COLUMN receiving_capacity_kg REAL DEFAULT 0"); } catch(e){}
+try { db.exec("ALTER TABLE demand_org_profiles ADD COLUMN dry_storage_capacity_kg REAL DEFAULT 0"); } catch(e){}
+try { db.exec("ALTER TABLE demand_org_profiles ADD COLUMN cold_storage_capacity_kg REAL DEFAULT 0"); } catch(e){}
 // Biogas operator account linkage
 try { db.exec("ALTER TABLE biogas_facilities ADD COLUMN operator_user_id TEXT DEFAULT NULL"); } catch(e){}
 try { db.exec("ALTER TABLE biogas_facilities ADD COLUMN is_available INTEGER DEFAULT 1"); } catch(e){}

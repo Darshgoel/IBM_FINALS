@@ -577,7 +577,8 @@ async function handleRegister() {
       return;
     }
     if (!hours) return;
-    const capacity = ($('fb-capacity').value || '').trim();
+    const dryStorageCapacity = Number($('fb-dry-capacity').value || 0);
+    const coldStorageCapacity = Number($('fb-cold-capacity').value || 0);
     const receivingCapacity = Number($('fb-receive-capacity').value || 0);
     if (!Number.isFinite(receivingCapacity) || receivingCapacity <= 0) {
       showMsg('signup-error', 'Enter your daily receiving capacity in kg so the network can offer food only within your limit.');
@@ -589,7 +590,9 @@ async function handleRegister() {
     payload.locationAddress = address;
     payload.contactPhone = ($('fb-phone').value || '').trim();
     payload.operatingHours = hours;
-    payload.storageCapacity = `${capacity ? `${capacity} kg` : 'Capacity not specified'}; ${$('fb-cold-storage').checked ? 'cold storage available' : 'dry storage only'}`;
+    payload.dryStorageCapacityKg = dryStorageCapacity;
+    payload.coldStorageCapacityKg = coldStorageCapacity;
+    payload.storageCapacity = `${dryStorageCapacity} kg dry storage; ${coldStorageCapacity} kg cold storage`;
     payload.receivingCapacityKg = receivingCapacity;
     payload.description = 'Food bank registered through the FoodBridge public site.';
     const fbCoords = _pinCoords('fb');

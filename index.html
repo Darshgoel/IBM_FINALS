@@ -791,9 +791,10 @@
             <input type="hidden" id="fb-lat" /><input type="hidden" id="fb-lng" />
             <label class="field-label" for="fb-phone">Contact phone</label>
             <input class="field-input" type="tel" id="fb-phone" placeholder="+91 98XXX XXXXX" />
-            <label class="field-label" for="fb-capacity">Storage capacity (kg, approx.)</label>
-            <input class="field-input" type="number" id="fb-capacity" min="1" placeholder="e.g. 2000" />
-            <label class="foodbank-cold-option"><input type="checkbox" id="fb-cold-storage" /> We have cold storage for perishable food (refrigeration / cold chain)</label>
+            <label class="field-label" for="fb-dry-capacity">Dry storage capacity (kg)</label>
+            <input class="field-input" type="number" id="fb-dry-capacity" min="0" step="0.1" placeholder="e.g. 2000" />
+            <label class="field-label" for="fb-cold-capacity">Cold storage capacity (kg)</label>
+            <input class="field-input" type="number" id="fb-cold-capacity" min="0" step="0.1" placeholder="e.g. 500" />
             <label class="field-label" for="fb-receive-capacity">Daily receiving capacity (kg/day) <span class="req">*</span></label>
             <input class="field-input" type="number" id="fb-receive-capacity" min="1" placeholder="e.g. 500" />
             <fieldset class="hours-picker" data-hours-prefix="fb">

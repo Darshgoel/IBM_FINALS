@@ -244,69 +244,57 @@ window.searchFood = async function () {
 
 /**
  * Recommendation scoring (Interface 3.D)
- * Considers: Distance + Current Availability + Dietary Suitability + Serving Capacity + Urgency
+ * Distance is the primary factor; current on-hand stock and user fit break ties.
  */
 function computeRecommendation() {
   const points = state.accessPoints;
   if (!points || points.length === 0) return;
 
   let bestPoint = null;
-  let bestScore = -999;
+  let bestScore = -Infinity;
   let recommendationReason = '';
 
   points.forEach((ap) => {
-    let score = 50;
+    const dist = ap.distance != null && Number.isFinite(Number(ap.distance)) ? Number(ap.distance) : null;
+    const activeIncoming = Number(ap.activeIncoming) || 0;
+    // Continuous proximity scoring avoids the old flat bands where a distant
+    // point could catch up through availability and capacity bonuses.
+    let score = dist == null ? -100 : 80 - (dist * 4);
 
-    // 1. Distance scoring (closer = higher score)
-    const dist = ap.distance != null ? ap.distance : 5.0;
-    if (dist <= 2.0) score += 35;
-    else if (dist <= 5.0) score += 20;
-    else if (dist <= 10.0) score += 5;
-    else score -= 15;
+    // Current, unexpired stock is useful, but must not outweigh a much shorter trip.
+    if (activeIncoming > 0) score += 10;
 
-    // 2. Availability scoring
-    const activeIncoming = ap.activeIncoming || 0;
-    if (activeIncoming > 0) score += 25;
-    if (ap.status === 'open' || (ap.operating_hours && !ap.operating_hours.toLowerCase().includes('closed'))) {
-      score += 20;
-    }
-
-    // 3. Dietary suitability
+    // 2. Dietary suitability
+    let dietaryMatch = true;
     if (state.dietary !== 'any') {
-      const match = ap.dietary_restrictions.some(
-        (d) => d.toLowerCase() === state.dietary.toLowerCase()
+      dietaryMatch = ap.dietary_restrictions.some(
+        (d) => String(d).toLowerCase() === state.dietary.toLowerCase()
       );
-      if (match) {
-        score += 25;
-      } else {
-        score -= 20;
-      }
+      score += dietaryMatch ? 8 : -80;
     }
 
-    // 4. Capacity vs people requested
-    const cap = ap.serving_capacity || 100;
-    if (cap >= state.people * 10) score += 15;
-    else if (cap >= state.people) score += 5;
+    // 3. Capacity is a small tie-breaker; unknown capacity earns no bonus.
+    const cap = Number(ap.serving_capacity) || 0;
+    if (cap >= state.people * 10) score += 3;
+    else if (cap >= state.people) score += 1;
 
-    // 5. Urgency weighting
-    if (state.urgency === 'now') {
-      if (ap.type === 'ngo' || ap.type === 'shelter') score += 15;
-    }
+    // 4. Urgency can slightly favour staffed meal points without overriding proximity.
+    if (state.urgency === 'now' && (ap.type === 'ngo' || ap.type === 'shelter')) score += 2;
 
-    if (score > bestScore) {
+    if (score > bestScore || (score === bestScore && dist != null && (bestPoint?.distance == null || dist < Number(bestPoint.distance)))) {
       bestScore = score;
       bestPoint = ap;
 
       // Construct a human-readable explanation
       const parts = [];
-      if (dist != null) parts.push(`Only ${dist} km from you`);
-      if (activeIncoming > 0) parts.push('has active fresh surplus meals on hand');
-      else parts.push('open and currently serving');
+      if (dist != null) parts.push(`about ${dist} km from your selected location`);
+      if (activeIncoming > 0) parts.push('has in-date food currently in stock');
+      else parts.push('nearby verified access point');
 
-      if (state.dietary !== 'any') {
+      if (state.dietary !== 'any' && dietaryMatch) {
         parts.push(`meets your ${state.dietary} preference`);
       }
-      parts.push(`ample capacity (${cap}+ meals)`);
+      if (cap > 0) parts.push(`serving capacity ${cap} meals/day`);
 
       recommendationReason = parts.join(' • ');
     }
@@ -394,7 +382,7 @@ function renderCards(points) {
       let statusText = 'Open • Ready to Serve';
 
       if (hasFood) {
-        statusText = 'Fresh Surplus Meals Available Right Now';
+        statusText = 'In-date food available right now';
         dotClass = 'open';
       } else if (ap.operating_hours && ap.operating_hours.toLowerCase().includes('daily')) {
         statusText = 'Serving Regular Hours';
@@ -514,8 +502,7 @@ window.openDetail = async function (id) {
   // Directions button opens Google Maps navigation
   const dirBtn = $('d-directions-btn');
   dirBtn.onclick = () => {
-    const destination = encodeURIComponent(ap.location_address || ap.name);
-    window.open(`https://www.google.com/maps/dir/?api=1&destination=${destination}`, '_blank');
+    window.open(buildDirectionsUrl(ap), '_blank', 'noopener,noreferrer');
   };
 
   // Open overlay
@@ -598,6 +585,18 @@ function connectLiveAlerts() {
       };
     } catch (e) {}
   }
+}
+
+function buildDirectionsUrl(ap) {
+  const params = new URLSearchParams({ api: '1' });
+  const hasDestinationCoords = Number.isFinite(Number(ap.location_lat)) && Number.isFinite(Number(ap.location_lng)) && Number(ap.location_lat) !== 0 && Number(ap.location_lng) !== 0;
+  params.set('destination', hasDestinationCoords
+    ? `${ap.location_lat},${ap.location_lng}`
+    : (ap.location_address || ap.name));
+  if (state.userLat != null && state.userLng != null && Number.isFinite(Number(state.userLat)) && Number.isFinite(Number(state.userLng))) {
+    params.set('origin', `${state.userLat},${state.userLng}`);
+  }
+  return `https://www.google.com/maps/dir/?${params.toString()}`;
 }
 
 /**
@@ -695,8 +694,7 @@ function renderMap(points) {
     const typeLabels = { food_bank:'Food Bank', ngo:'NGO / Community Kitchen', shelter:'Shelter & Meals', community_kitchen:'Community Kitchen' };
     const typeLabel = typeLabels[ap.type] || 'Food Access Point';
     const dist = ap.distance != null ? `${ap.distance} km away` : '';
-    const dest = encodeURIComponent(ap.location_address || ap.name);
-    const destCoords = `${ap.location_lat},${ap.location_lng}`;
+    const directionsUrl = buildDirectionsUrl(ap);
 
     const popup = L.popup({ maxWidth: 240, minWidth: 200 }).setContent(`
       <div class="rmap-popup-name">${escHtml(ap.name)}${isTop ? ' ⭐' : ''}</div>
@@ -704,7 +702,7 @@ function renderMap(points) {
       <div class="rmap-popup-row">📍 ${escHtml(ap.location_address || 'Address on arrival')}</div>
       <div class="rmap-popup-row">⏰ ${escHtml(ap.operating_hours || 'Daily hours')}</div>
       ${dist ? `<div class="rmap-popup-row">📏 ${escHtml(dist)}</div>` : ''}
-      <button class="rmap-popup-dir" onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=${destCoords}','_blank')">🗺️ Get Directions</button>
+      <a class="rmap-popup-dir" href="${escHtml(directionsUrl)}" target="_blank" rel="noopener noreferrer">🗺️ Get Directions</a>
       <button class="rmap-popup-detail" onclick="openDetail('${ap.id}')">View Details →</button>
     `);
 

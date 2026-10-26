@@ -25,6 +25,8 @@ let routeSearch   = '';
 let isAvailable   = true;
 let locationMap   = null;
 let locationMarker = null;
+let profileMiniMap = null;
+let profileMiniMarker = null;
 
 // ── Page router ────────────────────────────────────────────────────────────
 const PAGE_MAP = {
@@ -519,8 +521,25 @@ async function loadProfile() {
 
   const lat = parseFloat(facility.location_lat) || 0;
   const lng = parseFloat(facility.location_lng) || 0;
+  renderFacilitySummary();
   // Defer map init until Leaflet has loaded
-  setTimeout(() => initLocationMap(lat || 12.9716, lng || 77.5946), 50);
+  setTimeout(() => {
+    initLocationMap(lat || 12.9716, lng || 77.5946);
+    initProfileMiniMap(lat || 12.9716, lng || 77.5946);
+  }, 50);
+}
+
+function renderFacilitySummary() {
+  if (!facility) return;
+  setText('profile-summary-name', facility.name || '—');
+  setText('profile-summary-address', facility.location_address || '—');
+  setText('profile-summary-phone', facility.contact_phone || facility.contact_email || '—');
+  setText('profile-summary-capacity', facility.max_daily_intake_kg != null ? `${facility.max_daily_intake_kg} kg/day` : '—');
+  const wasteTypes = Array.isArray(facility.accepted_waste_types) ? facility.accepted_waste_types : [];
+  setText('profile-summary-waste', wasteTypes.length ? wasteTypes.join(', ') : '—');
+  const status = facility.status || 'pending';
+  const row = $('profile-status-summary');
+  if (row) row.innerHTML = `<span class="badge ${status === 'active' ? 'badge-matched' : 'badge-pending'}">${esc(status)}</span>${facility.verified ? '<span class="badge badge-matched">Verified</span>' : '<span class="badge badge-pending">Pending verification</span>'}`;
 }
 
 function initLocationMap(lat, lng) {
@@ -547,6 +566,18 @@ function initLocationMap(lat, lng) {
   });
 }
 
+function initProfileMiniMap(lat, lng) {
+  if (typeof L === 'undefined' || !$('profile-mini-map')) return;
+  if (profileMiniMap) {
+    profileMiniMap.setView([lat, lng], 14);
+    profileMiniMarker?.setLatLng([lat, lng]);
+    return;
+  }
+  profileMiniMap = L.map('profile-mini-map', { zoomControl: false, interactive: false }).setView([lat, lng], 14);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors' }).addTo(profileMiniMap);
+  profileMiniMarker = L.marker([lat, lng]).addTo(profileMiniMap);
+}
+
 window.saveProfile = async function () {
   showMsg('profile-msg','');
   if (!facility) { showMsg('profile-msg','No facility linked.','error'); return; }
@@ -566,9 +597,11 @@ window.saveProfile = async function () {
     });
     facility = await api.biogas.getFacility(token);
     setText('sidebar-org-name', facility.name || 'My Facility');
+    renderFacilitySummary();
     if (!isNaN(lat) && !isNaN(lng) && locationMarker) {
       locationMarker.setLatLng([lat, lng]);
       locationMap?.setView([lat, lng]);
+      initProfileMiniMap(lat, lng);
     }
     showMsg('profile-msg','Profile saved.','success');
   } catch (e) {

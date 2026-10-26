@@ -519,7 +519,7 @@ button { cursor: pointer; }
   font-size: 11.5px; font-weight: 750;
   text-align: center;
 }
-.rmap-popup-dir { background: var(--green); border: none; color: #fff; }
+.rmap-popup-dir { background: var(--green); border: none; color: #fff; text-decoration: none; cursor: pointer; }
 .rmap-popup-dir:hover { background: var(--green-dark); }
 .rmap-popup-detail { background: #fff; border: 1px solid var(--border-strong); color: var(--green-dark); }
 .rmap-popup-detail:hover { border-color: var(--green); }

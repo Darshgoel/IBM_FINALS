@@ -288,6 +288,7 @@
 
       <!-- ── Profile & Location ─────────────────────────────────────────────── -->
       <section class="page-content" id="page-profile">
+        <div class="grid-main-aside">
         <div class="card form-card">
           <div class="card-header">
             <div class="card-heading">
@@ -345,6 +346,20 @@
           <div class="form-actions">
             <button class="btn btn-primary" type="button" id="save-profile-btn" onclick="saveProfile()">Save profile</button>
           </div>
+        </div>
+        <div class="card tinted">
+          <div class="card-header"><div class="card-heading"><h2 class="card-title">Current facility details</h2><p class="card-sub">Saved information used by the network</p></div></div>
+          <div id="profile-status-summary" class="profile-status-row"></div>
+          <div class="fb-detail-grid">
+            <span class="fb-detail-label">Facility</span><span class="fb-detail-value" id="profile-summary-name">—</span>
+            <span class="fb-detail-label">Address</span><span class="fb-detail-value" id="profile-summary-address">—</span>
+            <span class="fb-detail-label">Contact</span><span class="fb-detail-value" id="profile-summary-phone">—</span>
+            <span class="fb-detail-label">Daily intake limit</span><span class="fb-detail-value" id="profile-summary-capacity">—</span>
+            <span class="fb-detail-label">Accepted waste</span><span class="fb-detail-value" id="profile-summary-waste">—</span>
+          </div>
+          <div class="card-header" style="margin-top:1.25rem"><div class="card-heading"><h3 class="card-title">Map preview</h3><p class="card-sub">Current facility pin</p></div></div>
+          <div id="profile-mini-map"></div>
+        </div>
         </div>
       </section>
 

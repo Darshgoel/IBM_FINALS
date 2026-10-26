@@ -305,20 +305,20 @@
         <div class="grid-main-aside">
           <div class="card form-card">
             <div id="cap-msg" class="msg" style="display:none" role="alert"></div>
-            <div class="form-group-title"><svg class="icon" aria-hidden="true"><use href="#i-wallet"></use></svg> Receiving limits</div>
+            <div class="form-group-title"><svg class="icon" aria-hidden="true"><use href="#i-wallet"></use></svg> Intake &amp; storage limits</div>
             <div class="form-grid">
               <div class="form-group">
-                <label for="cap-serving">Serving capacity (meals/day)</label>
-                <input type="number" id="cap-serving" min="0" placeholder="e.g. 600" />
+                <label for="cap-recv-kg">Receiving capacity (kg/day)</label>
+                <input type="number" id="cap-recv-kg" min="0" step="0.1" placeholder="e.g. 500" />
               </div>
               <div class="form-group">
-                <label for="cap-recv-kg">Receiving capacity (kg/day)</label>
-                <input type="number" id="cap-recv-kg" min="0" placeholder="e.g. 500" />
+                <label for="cap-dry-kg">Dry storage (kg)</label>
+                <input type="number" id="cap-dry-kg" min="0" step="0.1" placeholder="e.g. 3000" />
               </div>
-              <div class="form-group full">
-                <label for="cap-storage">Storage description</label>
-                <input type="text" id="cap-storage" placeholder="e.g. 3000 kg dry + 800 kg cold chain" />
-                <div class="form-help">Describe your storage, not a calculated number. Inventory shows actual stock.</div>
+              <div class="form-group">
+                <label for="cap-cold-kg">Cold storage (kg)</label>
+                <input type="number" id="cap-cold-kg" min="0" step="0.1" placeholder="e.g. 800" />
+                <div class="form-help">Enter 0 if you do not have this storage type. Inventory shows actual stock.</div>
               </div>
             </div>
             <div class="form-actions">
@@ -328,12 +328,13 @@
           <div class="card tinted">
             <div class="card-header"><div class="card-heading"><h2 class="card-title">Current settings</h2></div></div>
             <div class="fb-detail-grid" id="cap-display">
-              <span class="fb-detail-label">Serving capacity</span><span class="fb-detail-value" id="cap-display-serving">—</span>
               <span class="fb-detail-label">Receiving (kg/day)</span><span class="fb-detail-value" id="cap-display-recv">—</span>
-              <span class="fb-detail-label">Storage</span><span class="fb-detail-value" id="cap-display-storage">—</span>
+              <span class="fb-detail-label">Dry storage</span><span class="fb-detail-value" id="cap-display-dry">—</span>
+              <span class="fb-detail-label">Cold storage</span><span class="fb-detail-value" id="cap-display-cold">—</span>
               <span class="fb-detail-label">Stock lots available</span><span class="fb-detail-value" id="cap-display-stock">—</span>
               <span class="fb-detail-label">Total kg stored</span><span class="fb-detail-value" id="cap-display-kg">—</span>
             </div>
+            <p class="form-help" id="cap-legacy-wrap" hidden>Previous storage note: <span id="cap-display-legacy"></span>. Enter the dry and cold amounts above and save to replace this note with numeric capacities.</p>
           </div>
         </div>
       </section>

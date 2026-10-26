@@ -47,19 +47,20 @@ router.get(['/search', '/nearby'], (req, res) => {
 
     // Enrich each access point with active matches, available food, and distance
     const enriched = accessPoints.map(ap => {
-      const activeMatches = db.prepare(`
-        SELECT COUNT(*) as count FROM matches m
-        WHERE m.demand_org_id = ? AND m.status IN ('pending','confirmed','completed')
+      // Count only usable food physically received and still in stock. Historical
+      // completed matches must not make a location look like it has food today.
+      const availableStock = db.prepare(`
+        SELECT COUNT(*) AS count
+        FROM food_bank_inventory i
+        WHERE i.org_id = ?
+          AND COALESCE(i.quantity_remaining, 0) > 0
+          AND COALESCE(i.biogas_status, 'available') = 'available'
+          AND i.expiry_date IS NOT NULL
+          AND CASE
+            WHEN length(trim(i.expiry_date)) = 10 THEN julianday(trim(i.expiry_date) || 'T23:59:59.999+05:30')
+            ELSE julianday(i.expiry_date)
+          END > julianday('now')
       `).get(ap.id);
-
-      // Check current surplus or recent food allocations
-      const surplusItems = db.prepare(`
-        SELECT s.food_name, s.food_type, s.quantity, s.quantity_unit, s.dietary_tags
-        FROM matches m
-        JOIN surplus_posts s ON m.surplus_id = s.id
-        WHERE m.demand_org_id = ? AND m.status IN ('confirmed', 'completed')
-        ORDER BY m.matched_at DESC LIMIT 3
-      `).all(ap.id);
 
       let distance = null;
       if (lat && lng && ap.location_lat && ap.location_lng) {
@@ -81,8 +82,7 @@ router.get(['/search', '/nearby'], (req, res) => {
         ...ap,
         food_requirements: foodReqs,
         dietary_restrictions: dietaryReqs,
-        activeIncoming: activeMatches ? activeMatches.count : 0,
-        recentSurplus: surplusItems,
+        activeIncoming: availableStock ? availableStock.count : 0,
         distance
       };
     });

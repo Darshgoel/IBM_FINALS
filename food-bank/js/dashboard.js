@@ -25,6 +25,7 @@ let org          = null;
 let locationMap  = null;
 let locationMarker = null;
 let miniMap      = null;
+let miniMarker   = null;
 
 // ── Page map ─────────────────────────────────────────────────────────────────
 const PAGE_MAP = {
@@ -499,15 +500,25 @@ async function loadCapacity() {
       api.foodBank.getProfile(token),
       api.foodBank.getInventoryStats(token)
     ]);
-    const p = profData.org || profData;
-    setVal('cap-serving',  p.serving_capacity||'');
-    setVal('cap-recv-kg',  p.receiving_capacity_kg||'');
-    setVal('cap-storage',  p.storage_capacity||'');
-    setText('cap-display-serving', p.serving_capacity ? `${p.serving_capacity} meals/day` : '—');
-    setText('cap-display-recv',    p.receiving_capacity_kg ? `${p.receiving_capacity_kg} kg/day` : '—');
-    setText('cap-display-storage', p.storage_capacity || '—');
+    const p = profData.profile || profData.org || profData;
+    const legacyStorage = String(p.storage_capacity || '');
+    const dryLegacy = legacyStorage.match(/(\d+(?:\.\d+)?)\s*kg[^;,+]*(?:dry)/i);
+    const coldLegacy = legacyStorage.match(/(\d+(?:\.\d+)?)\s*kg[^;,+]*(?:cold|refrigerat|freezer)/i);
+    const dryKg = Number(p.dry_storage_capacity_kg || (dryLegacy ? dryLegacy[1] : 0));
+    const coldKg = Number(p.cold_storage_capacity_kg || (coldLegacy ? coldLegacy[1] : 0));
+    setVal('cap-recv-kg', p.receiving_capacity_kg ?? '');
+    setVal('cap-dry-kg', dryKg);
+    setVal('cap-cold-kg', coldKg);
+    setText('cap-display-recv', p.receiving_capacity_kg ? `${p.receiving_capacity_kg} kg/day` : '—');
+    setText('cap-display-dry', `${dryKg} kg`);
+    setText('cap-display-cold', `${coldKg} kg`);
     setText('cap-display-stock',   statsData.totalItems ?? '—');
     setText('cap-display-kg',      `${Number(statsData.totalKgStored||0).toFixed(1)} kg`);
+    const hasStructuredStorage = /\d+(?:\.\d+)?\s*kg\s*dry storage/i.test(legacyStorage) && /\d+(?:\.\d+)?\s*kg\s*cold storage/i.test(legacyStorage);
+    const legacyNote = p.storage_capacity && dryKg === 0 && coldKg === 0 && !hasStructuredStorage ? p.storage_capacity : '';
+    setText('cap-display-legacy', legacyNote);
+    const legacyWrap = $('cap-legacy-wrap');
+    if (legacyWrap) legacyWrap.hidden = !legacyNote;
   } catch(e) { console.warn('[FoodBank] Capacity load failed', e); }
 }
 
@@ -515,10 +526,17 @@ window.saveCapacity = async function() {
   showMsg('cap-msg','');
   const btn = $('save-cap-btn'); btn.disabled=true; btn.textContent='Saving…';
   try {
+    const receivingCapacityKg = Number($('cap-recv-kg')?.value);
+    const dryStorageCapacityKg = Number($('cap-dry-kg')?.value || 0);
+    const coldStorageCapacityKg = Number($('cap-cold-kg')?.value || 0);
+    if (!Number.isFinite(receivingCapacityKg) || receivingCapacityKg <= 0 || !Number.isFinite(dryStorageCapacityKg) || dryStorageCapacityKg < 0 || !Number.isFinite(coldStorageCapacityKg) || coldStorageCapacityKg < 0) {
+      showMsg('cap-msg','Enter a positive receiving limit and non-negative dry/cold storage amounts.','error');
+      return;
+    }
     await api.foodBank.updateCapacity(token, {
-      servingCapacity:     parseInt($('cap-serving')?.value||0) || undefined,
-      storageCapacity:     $('cap-storage')?.value || undefined,
-      receivingCapacityKg: parseFloat($('cap-recv-kg')?.value||0) || undefined
+      receivingCapacityKg,
+      dryStorageCapacityKg,
+      coldStorageCapacityKg
     });
     showMsg('cap-msg','Settings saved.','success');
     await loadCapacity();
@@ -616,10 +634,10 @@ function initLocationMap(lat, lng) {
 function initMiniMap(lat, lng) {
   if (!lat || !lng) return;
   const el = $('profile-mini-map'); if (!el) return;
-  if (miniMap) { miniMap.setView([lat, lng], 14); return; }
+  if (miniMap) { miniMap.setView([lat, lng], 14); if (miniMarker) miniMarker.setLatLng([lat, lng]); return; }
   miniMap = L.map('profile-mini-map', {zoomControl:false, interactive:false}).setView([lat, lng], 14);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(miniMap);
-  L.marker([lat, lng]).addTo(miniMap);
+  miniMarker = L.marker([lat, lng]).addTo(miniMap);
 }
 
 window.saveProfile = async function() {
@@ -643,6 +661,7 @@ window.saveProfile = async function() {
       if (locationMap) locationMap.setView([lat, lng]);
       initMiniMap(lat, lng);
     }
+    await loadProfile();
   } catch(e) { showMsg('profile-msg', e.message||'Save failed.','error'); }
   finally { btn.disabled=false; btn.textContent='Save profile'; }
 };

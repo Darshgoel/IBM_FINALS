@@ -39,6 +39,11 @@ router.post('/register', (req, res) => {
     if (role === 'food_bank' && (!Number.isFinite(Number(req.body.receivingCapacityKg)) || Number(req.body.receivingCapacityKg) <= 0)) {
       return res.status(400).json({ error: 'A positive daily receiving capacity in kg is required' });
     }
+    if (role === 'food_bank' && ['dryStorageCapacityKg', 'coldStorageCapacityKg'].some(key =>
+      req.body[key] != null && (!Number.isFinite(Number(req.body[key])) || Number(req.body[key]) < 0)
+    )) {
+      return res.status(400).json({ error: 'Dry and cold storage capacities must be non-negative numbers in kg' });
+    }
     if (role === 'biogas_operator' && !req.body.biogasFacilityId) {
       if (!String(operatingHours || '').trim()) {
         return res.status(400).json({ error: 'Select operating days, opening time, and closing time' });
@@ -119,11 +124,13 @@ router.post('/register', (req, res) => {
           const servingCapacity = role === 'demand_org' ? Number(req.body.servingCapacity) : 0;
           const storageCapacity = role === 'food_bank' ? String(req.body.storageCapacity || '') : '';
           const receivingCapacityKg = role === 'food_bank' ? Number(req.body.receivingCapacityKg) : 0;
+          const dryStorageCapacityKg = role === 'food_bank' ? Number(req.body.dryStorageCapacityKg) || 0 : 0;
+          const coldStorageCapacityKg = role === 'food_bank' ? Number(req.body.coldStorageCapacityKg) || 0 : 0;
           db.prepare(`
             INSERT INTO demand_org_profiles
-              (org_id, serving_capacity, storage_capacity, receiving_capacity_kg)
-            VALUES (?, ?, ?, ?)
-          `).run(orgId, servingCapacity, storageCapacity, receivingCapacityKg);
+              (org_id, serving_capacity, storage_capacity, receiving_capacity_kg, dry_storage_capacity_kg, cold_storage_capacity_kg)
+            VALUES (?, ?, ?, ?, ?, ?)
+          `).run(orgId, servingCapacity, storageCapacity, receivingCapacityKg, dryStorageCapacityKg, coldStorageCapacityKg);
         }
       }
 

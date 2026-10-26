@@ -122,6 +122,16 @@ router.put('/profile', (req, res) => {
 router.put('/capacity', (req, res) => {
   try {
     const { servingCapacity, storageCapacity, receivingCapacity, receivingCapacityKg } = req.body;
+    const isFoodBank = req.user.role === 'food_bank';
+    const { dryStorageCapacityKg, coldStorageCapacityKg } = req.body;
+    const finiteNonNegative = value => value == null || (Number.isFinite(Number(value)) && Number(value) >= 0);
+    if (isFoodBank && (!finiteNonNegative(receivingCapacityKg) || !finiteNonNegative(dryStorageCapacityKg) || !finiteNonNegative(coldStorageCapacityKg))) {
+      return res.status(400).json({ error: 'Receiving and storage capacities must be non-negative numbers in kg.' });
+    }
+    const storageParts = [];
+    if (dryStorageCapacityKg != null) storageParts.push(`${Number(dryStorageCapacityKg)} kg dry storage`);
+    if (coldStorageCapacityKg != null) storageParts.push(`${Number(coldStorageCapacityKg)} kg cold storage`);
+    const structuredStorage = storageParts.length ? storageParts.join('; ') : null;
     // receivingCapacityKg (numeric kg) is stored in receiving_capacity_kg; the
     // legacy receivingCapacity (string label) maps to receiving_capacity.
     db.prepare(`
@@ -130,13 +140,17 @@ router.put('/capacity', (req, res) => {
         storage_capacity = COALESCE(?, storage_capacity),
         receiving_capacity = COALESCE(?, receiving_capacity),
         receiving_capacity_kg = COALESCE(?, receiving_capacity_kg),
+        dry_storage_capacity_kg = COALESCE(?, dry_storage_capacity_kg),
+        cold_storage_capacity_kg = COALESCE(?, cold_storage_capacity_kg),
         updated_at = CURRENT_TIMESTAMP
       WHERE org_id = ?
     `).run(
       servingCapacity ?? null,
-      storageCapacity ?? null,
+      structuredStorage ?? storageCapacity ?? null,
       receivingCapacity ?? null,
       receivingCapacityKg ?? null,
+      dryStorageCapacityKg ?? null,
+      coldStorageCapacityKg ?? null,
       req.user.orgId
     );
 

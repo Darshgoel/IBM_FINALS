@@ -145,7 +145,7 @@ function hasEligibleReserveReceiver(surplus) {
   if (!donors || donors.location_lat == null || donors.location_lng == null) return false;
   const banks = db.prepare(`
     SELECT o.id, o.location_lat, o.location_lng, dp.food_requirements, dp.dietary_restrictions,
-           dp.storage_capacity, dp.receiving_capacity_kg
+           dp.storage_capacity, dp.receiving_capacity_kg, dp.cold_storage_capacity_kg
     FROM organizations o JOIN demand_org_profiles dp ON dp.org_id = o.id
     WHERE o.type LIKE '%food_bank%' AND o.status = 'active' AND o.verified = 1
   `).all();
@@ -169,7 +169,10 @@ function hasEligibleReserveReceiver(surplus) {
     if (!Number.isFinite(expiry) || Date.now() + (etaMinutes + 15) * 60000 > expiry) return false;
     if (!isFoodAcceptedByProfile(surplus.food_type, surplus.food_name, parseProfileTags(bank.food_requirements))) return false;
     if (!checkDietarySafety(surplus.dietary_tags, [], bank.dietary_restrictions).pass) return false;
-    if (perishable && !/(refrigerat|cold storage|freezer|chilled|cold chain)/i.test(bank.storage_capacity || '')) return false;
+    const storageText = String(bank.storage_capacity || '');
+    const structuredColdDeclared = /\d+(?:\.\d+)?\s*kg\s*cold storage/i.test(storageText);
+    const legacyColdEvidence = /(refrigerat|cold storage|freezer|chilled|cold chain)/i.test(storageText);
+    if (perishable && !(Number(bank.cold_storage_capacity_kg) > 0) && (structuredColdDeclared || !legacyColdEvidence)) return false;
     if (db.prepare(`SELECT 1 FROM matches WHERE source_type = 'surplus' AND surplus_id = ? AND demand_org_id = ? AND status = 'declined' LIMIT 1`).get(surplus.id, bank.id)) return false;
 
     const capacityKg = Number(bank.receiving_capacity_kg);
@@ -516,7 +519,8 @@ router.get('/rebalancing', (req, res) => {
 router.get('/reserve', (req, res) => {
   try {
     const foodBanksRaw = db.prepare(`
-      SELECT o.id, o.name, o.location_address, dp.storage_capacity
+      SELECT o.id, o.name, o.location_address, dp.storage_capacity,
+             dp.dry_storage_capacity_kg, dp.cold_storage_capacity_kg
       FROM organizations o
       LEFT JOIN demand_org_profiles dp ON o.id = dp.org_id
       WHERE o.type = 'food_bank' AND o.status = 'active' AND o.verified = 1
@@ -545,7 +549,8 @@ router.get('/reserve', (req, res) => {
       const inventoryLoadKg = stockKgValues.reduce((sum, value) => sum + (value || 0), 0);
       const incomingLoadKg = incomingKgValues.reduce((sum, value) => sum + (value || 0), 0);
       const hasUnknownLoad = unknownInventoryItems + unknownIncomingItems > 0;
-      const capacityKg = parseStorageCapacityKg(fb.storage_capacity);
+      const structuredCapacityKg = Number(fb.dry_storage_capacity_kg || 0) + Number(fb.cold_storage_capacity_kg || 0);
+      const capacityKg = structuredCapacityKg > 0 ? structuredCapacityKg : parseStorageCapacityKg(fb.storage_capacity);
       const currentLoadKg = hasUnknownLoad ? null : Math.round((inventoryLoadKg + incomingLoadKg) * 10) / 10;
       const availableKg = capacityKg != null && currentLoadKg != null
         ? Math.max(0, Math.round((capacityKg - currentLoadKg) * 10) / 10)
@@ -563,7 +568,9 @@ router.get('/reserve', (req, res) => {
         hasUnknownLoad,
         unknownInventoryItems,
         unknownIncomingItems,
-        storageInfo: fb.storage_capacity || 'Storage details not declared',
+        storageInfo: Number(fb.dry_storage_capacity_kg) + Number(fb.cold_storage_capacity_kg) > 0
+          ? `${Number(fb.dry_storage_capacity_kg || 0)} kg dry; ${Number(fb.cold_storage_capacity_kg || 0)} kg cold`
+          : (fb.storage_capacity || 'Storage details not declared'),
         status: 'operational'
       };
     });

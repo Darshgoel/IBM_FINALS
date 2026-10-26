@@ -702,7 +702,7 @@ function tryFoodBankFallback(surplus, donorOrg, precomputedRoutes) {
 
   const foodBankCandidates = db.prepare(`
     SELECT o.*, dp.food_requirements, dp.dietary_restrictions, dp.receiving_capacity, dp.receiving_capacity_kg,
-           dp.storage_capacity, dp.serving_capacity
+           dp.storage_capacity, dp.serving_capacity, dp.cold_storage_capacity_kg
     FROM organizations o
     JOIN demand_org_profiles dp ON o.id = dp.org_id
     WHERE o.status = 'active' AND o.verified = 1 AND o.type LIKE '%food_bank%'
@@ -757,7 +757,8 @@ function tryFoodBankFallback(surplus, donorOrg, precomputedRoutes) {
     const storageStr = normalizeString(fb.storage_capacity || '');
     if (isPerishable) {
       const hasCold = /(refrigerat|cold storage|freezer|chilled|cold chain)/i.test(storageStr);
-      if (!hasCold) continue;
+      const structuredColdDeclared = /\d+(?:\.\d+)?\s*kg\s*cold storage/i.test(storageStr);
+      if (!(Number(fb.cold_storage_capacity_kg) > 0) && (structuredColdDeclared || !hasCold)) continue;
     }
 
     // A bank may accept part of the remaining surplus; the rest can be offered
